@@ -13,11 +13,11 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\Threads.Application\Threads.Application.csproj" />
+      <Folder Include="Middleware\" />
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="Middleware\" />
+      <ProjectReference Include="..\Threads.Application\Threads.Application.csproj" />
     </ItemGroup>
 
 </Project>

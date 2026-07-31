@@ -13,8 +13,4 @@
       </PackageReference>
     </ItemGroup>
 
-    <ItemGroup>
-      <ProjectReference Include="..\Threads.Infrastracture\Threads.Infrastracture.csproj" />
-    </ItemGroup>
-
 </Project>
