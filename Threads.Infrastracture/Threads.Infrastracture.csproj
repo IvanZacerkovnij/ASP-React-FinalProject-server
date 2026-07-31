@@ -1,0 +1,26 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <Folder Include="Data\Configurations\TableConfigurations\" />
+      <Folder Include="Data\Repostories\Comments\" />
+      <Folder Include="Data\Repostories\Posts\" />
+      <Folder Include="Data\Repostories\Users\" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.10" />
+      <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.10">
+        <PrivateAssets>all</PrivateAssets>
+        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      </PackageReference>
+      <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.10" />
+      <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.10" />
+    </ItemGroup>
+
+</Project>
