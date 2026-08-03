@@ -1,6 +1,43 @@
+using Threads.Domain.Common;
+
 namespace Threads.Domain.Entities;
 
-public class User
+public class User : BaseEntity
 {
-    
+    public string Username { get; set; } = null!;
+
+    public string Email { get; set; } = null!;
+
+    public string PasswordHash { get; set; } = null!;
+
+    public string? DisplayName { get; set; }
+
+    public string? Bio { get; set; }
+
+    public string? AvatarObjectKey { get; set; }
+
+    public bool IsVerified { get; set; }
+
+    public bool IsActive { get; set; } = true;
+
+    public ICollection<Post> Posts { get; set; } =
+        new List<Post>();
+
+    public ICollection<Comment> Comments { get; set; } =
+        new List<Comment>();
+
+    public ICollection<Like> Likes { get; set; } =
+        new List<Like>();
+
+    public ICollection<Follow> FollowingRelations { get; set; } =
+        new List<Follow>();
+
+    public ICollection<Follow> FollowerRelations { get; set; } =
+        new List<Follow>();
+
+    public ICollection<RefreshToken> RefreshTokens { get; set; } =
+        new List<RefreshToken>();
+
+    public ICollection<Media> UploadedMedia { get; set; } =
+        new List<Media>();
 }
