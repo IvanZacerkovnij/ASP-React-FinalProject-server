@@ -7,7 +7,6 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <Folder Include="Data\Configurations\TableConfigurations\" />
       <Folder Include="Data\Repostories\Comments\" />
       <Folder Include="Data\Repostories\Posts\" />
       <Folder Include="Data\Repostories\Users\" />
@@ -21,6 +20,7 @@
       </PackageReference>
       <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.10" />
       <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.10" />
+      <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
     </ItemGroup>
 
     <ItemGroup>
