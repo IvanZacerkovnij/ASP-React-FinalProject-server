@@ -15,4 +15,8 @@
       <ProjectReference Include="..\Threads.Domain\Threads.Domain.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <PackageReference Include="AutoMapper" Version="16.2.0" />
+    </ItemGroup>
+
 </Project>

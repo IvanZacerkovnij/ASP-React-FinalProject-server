@@ -1,0 +1,37 @@
+using AutoMapper;
+using Threads.Application.DTOs.Users;
+using Threads.Domain.Entities;
+
+namespace Threads.Application.Mapping;
+
+public class UserProfile : Profile
+{
+    public UserProfile()
+    {
+        CreateMap<User, UserShortResponse>()
+            .ForMember(destination => destination.AvatarUrl, options => options.MapFrom(source => source.AvatarObjectKey));
+
+        CreateMap<User, UserResponse>()
+            .ForMember(destination => destination.AvatarUrl, options => options.MapFrom(source => source.AvatarObjectKey))
+            .ForMember(destination => destination.FollowersCount, options => options.MapFrom(source => source.FollowerRelations.Count))
+            .ForMember(destination => destination.FollowingCount, options => options.MapFrom(source => source.FollowingRelations.Count))
+            .ForMember(destination => destination.PostsCount, options => options.MapFrom(source => source.Posts.Count))
+            .ForMember(destination => destination.IsFollowedByCurrentUser, options => options.Ignore())
+            .ForMember(destination => destination.CreatedAt, options => options.MapFrom(source => source.CreatedAt.UtcDateTime));
+
+        CreateMap<UpdateUserRequest, User>()
+            .ForMember(destination => destination.Username, options => options.Ignore())
+            .ForMember(destination => destination.Email, options => options.Ignore())
+            .ForMember(destination => destination.PasswordHash, options => options.Ignore())
+            .ForMember(destination => destination.AvatarObjectKey, options => options.Ignore())
+            .ForMember(destination => destination.IsVerified, options => options.Ignore())
+            .ForMember(destination => destination.IsActive, options => options.Ignore())
+            .ForMember(destination => destination.Posts, options => options.Ignore())
+            .ForMember(destination => destination.Comments, options => options.Ignore())
+            .ForMember(destination => destination.Likes, options => options.Ignore())
+            .ForMember(destination => destination.FollowingRelations, options => options.Ignore())
+            .ForMember(destination => destination.FollowerRelations, options => options.Ignore())
+            .ForMember(destination => destination.RefreshTokens, options => options.Ignore())
+            .ForMember(destination => destination.UploadedMedia, options => options.Ignore());
+    }
+}
