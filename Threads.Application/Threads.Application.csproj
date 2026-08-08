@@ -7,6 +7,16 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <Folder Include="DTOs\Auth\" />
+      <Folder Include="DTOs\Comments\" />
+      <Folder Include="DTOs\Posts\" />
+      <Folder Include="DTOs\Users\" />
+      <Folder Include="Interfaces\Auth\" />
+      <Folder Include="Interfaces\Comments\" />
+      <Folder Include="Interfaces\Media\" />
+      <Folder Include="Interfaces\Posts\" />
+      <Folder Include="Interfaces\Security\" />
+      <Folder Include="Interfaces\Users\" />
       <Folder Include="Mapping\" />
       <Folder Include="Services\" />
     </ItemGroup>

@@ -8,7 +8,7 @@ public static class DbConfigurator
 {
     private const string ConnectionStringName = "DefaultConnection";
 
-    public static void Configure(DbContextOptionsBuilder<ThreadsDbContext> optionsBuilder)
+    public static void Configure(DbContextOptionsBuilder optionsBuilder)
     {
         ArgumentNullException.ThrowIfNull(optionsBuilder);
 
