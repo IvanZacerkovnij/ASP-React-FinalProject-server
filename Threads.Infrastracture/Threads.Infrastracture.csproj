@@ -26,9 +26,11 @@
       <Compile Update="Data\Configurations\TableConfigurations\PollVoteConfigurator.cs" />
       <Compile Update="Data\Repositories\Follows\FollowRepository.cs" />
       <Compile Update="Data\Repositories\Polls\PollRepository.cs" />
+      <Compile Update="Services\S3ObjectStorageService.cs" />
     </ItemGroup>
 
     <ItemGroup>
+      <PackageReference Include="AWSSDK.S3" Version="4.0.13.1" />
       <PackageReference Include="BCrypt.Net-Next" Version="4.2.0" />
       <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.10" />
       <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.10" />

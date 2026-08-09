@@ -40,6 +40,7 @@ public class Program
         builder.Services.AddScoped<IFollowRepository, FollowRepository>();
         builder.Services.AddScoped<ILikeRepository, LikeRepository>();
         builder.Services.AddScoped<IMediaRepository, MediaRepository>();
+        builder.Services.AddScoped<IObjectStorageService, S3ObjectStorageService>();
         builder.Services.AddScoped<IPollRepository, PollRepository>();
         builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 
@@ -49,6 +50,7 @@ public class Program
         builder.Services.AddScoped<ICommentService, CommentService>();
         builder.Services.AddScoped<IFollowService, FollowService>();
         builder.Services.AddScoped<ILikeService, LikeService>();
+        builder.Services.AddScoped<IMediaService, MediaService>();
         builder.Services.AddScoped<IAuthService, AuthService>();
 
         builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();

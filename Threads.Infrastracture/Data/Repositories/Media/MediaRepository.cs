@@ -25,4 +25,10 @@ public class MediaRepository : IMediaRepository
             .Where(media => ids.Contains(media.Id))
             .ToListAsync(cancellationToken);
     }
+
+    public async Task AddAsync(Domain.Entities.Media media, CancellationToken cancellationToken = default)
+    {
+        await _dbContext.Medias.AddAsync(media, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
 }

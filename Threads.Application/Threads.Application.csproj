@@ -9,6 +9,7 @@
     <ItemGroup>
       <Folder Include="DTOs\Auth\" />
       <Folder Include="DTOs\Comments\" />
+      <Folder Include="DTOs\Media\" />
       <Folder Include="DTOs\Polls\" />
       <Folder Include="DTOs\Posts\" />
       <Folder Include="DTOs\Users\" />
@@ -26,6 +27,7 @@
     </ItemGroup>
 
     <ItemGroup>
+      <Compile Update="DTOs\Media\UploadMediaResponse.cs" />
       <Compile Update="DTOs\Polls\PollOptionResponse.cs" />
       <Compile Update="DTOs\Polls\PollResponse.cs" />
       <Compile Update="DTOs\Polls\PollVoteResult.cs" />
@@ -33,9 +35,12 @@
       <Compile Update="DTOs\Polls\VotePollRequest.cs" />
       <Compile Update="Interfaces\Follows\IFollowRepository.cs" />
       <Compile Update="Interfaces\Follows\IFollowService.cs" />
+      <Compile Update="Interfaces\Media\IMediaService.cs" />
+      <Compile Update="Interfaces\Media\IObjectStorageService.cs" />
       <Compile Update="Interfaces\Polls\IPollRepository.cs" />
       <Compile Update="Interfaces\Polls\IPollService.cs" />
       <Compile Update="Services\FollowService.cs" />
+      <Compile Update="Services\MediaService.cs" />
       <Compile Update="Services\PollService.cs" />
     </ItemGroup>
 
