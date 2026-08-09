@@ -9,6 +9,7 @@
     <ItemGroup>
       <Folder Include="Data\Configurations\" />
       <Folder Include="Data\Repositories\Comments\" />
+      <Folder Include="Data\Repositories\Likes\" />
       <Folder Include="Data\Repositories\Media\" />
       <Folder Include="Data\Repositories\Posts\" />
       <Folder Include="Data\Repositories\RefreshTokens\" />

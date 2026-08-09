@@ -33,6 +33,15 @@ public class UsersController : ControllerBase
             ? NotFound(new { message = "User was not found." })
             : Ok(user);
     }
+    [HttpGet("{username}")]
+    public async Task<ActionResult<UserResponse>> GetByUsername(string username, CancellationToken cancellationToken)
+    {
+        var user = await _userService.GetByUsernameAsync(username, cancellationToken);
+
+        return user is null
+            ? NotFound(new { message = "User was not found." })
+            : Ok(user);
+    }
 
     [Authorize]
     [HttpPut("me")]

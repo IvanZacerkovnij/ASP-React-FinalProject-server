@@ -5,11 +5,13 @@ using Threads.Application.Interfaces.Media;
 using Threads.Application.Interfaces.Posts;
 using Threads.Application.Interfaces.Security;
 using Threads.Application.Interfaces.Users;
+using Threads.Application.Interfaces.Likes;
 using Threads.Application.Mapping;
 using Threads.Application.Services;
 using Threads.Infrastracture.Data;
 using Threads.Infrastracture.Data.Configurations;
 using Threads.Infrastracture.Data.Repositories.Comments;
+using Threads.Infrastracture.Data.Repositories.Likes;
 using Threads.Infrastracture.Data.Repositories.Media;
 using Threads.Infrastracture.Data.Repositories.Posts;
 using Threads.Infrastracture.Data.Repositories.RefreshTokens;
@@ -31,12 +33,14 @@ public class Program
         builder.Services.AddScoped<IUserRepository, UserRepository>();
         builder.Services.AddScoped<IPostRepository, PostRepository>();
         builder.Services.AddScoped<ICommentRepository, CommentRepository>();
+        builder.Services.AddScoped<ILikeRepository, LikeRepository>();
         builder.Services.AddScoped<IMediaRepository, MediaRepository>();
         builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 
         builder.Services.AddScoped<IUserService, UserService>();
         builder.Services.AddScoped<IPostService, PostService>();
         builder.Services.AddScoped<ICommentService, CommentService>();
+        builder.Services.AddScoped<ILikeService, LikeService>();
         builder.Services.AddScoped<IAuthService, AuthService>();
 
         builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();

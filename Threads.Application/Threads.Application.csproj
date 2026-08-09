@@ -13,6 +13,7 @@
       <Folder Include="DTOs\Users\" />
       <Folder Include="Interfaces\Auth\" />
       <Folder Include="Interfaces\Comments\" />
+      <Folder Include="Interfaces\Likes\" />
       <Folder Include="Interfaces\Media\" />
       <Folder Include="Interfaces\Posts\" />
       <Folder Include="Interfaces\Security\" />

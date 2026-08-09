@@ -61,6 +61,18 @@ public class AuthController : ControllerBase
             : Ok(response);
     }
 
+    [HttpPost("logout")]
+    public async Task<IActionResult> Logout(
+        LogoutRequest request,
+        CancellationToken cancellationToken)
+    {
+        var wasLoggedOut = await _authService.LogoutAsync(request, cancellationToken);
+
+        return wasLoggedOut
+            ? NoContent()
+            : Unauthorized(new { message = "Invalid refresh token." });
+    }
+
     [Authorize]
     [HttpGet("me")]
     public async Task<ActionResult<UserResponse>> Me(CancellationToken cancellationToken)

@@ -108,6 +108,23 @@ public class AuthService : IAuthService
         return CreateAuthResponse(currentRefreshToken.User, newRefreshToken);
     }
 
+    public async Task<bool> LogoutAsync(LogoutRequest request, CancellationToken cancellationToken = default)
+    {
+        var refreshTokenHash = HashRefreshToken(request.RefreshToken);
+
+        var refreshToken = await _refreshTokenRepository.GetByTokenHashAsync(refreshTokenHash, cancellationToken);
+
+        if (refreshToken is null || !refreshToken.IsActive)
+        {
+            return false;
+        }
+
+        refreshToken.RevokedAt = DateTimeOffset.UtcNow;
+        await _refreshTokenRepository.UpdateAsync(refreshToken, cancellationToken);
+
+        return true;
+    }
+
     private async Task<User?> GetUserByEmailOrUsernameAsync(string emailOrUsername, CancellationToken cancellationToken)
     {
         var normalizedValue = emailOrUsername.Trim();

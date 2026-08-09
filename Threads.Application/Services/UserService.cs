@@ -33,6 +33,15 @@ public class UserService : IUserService
             : _mapper.Map<UserResponse>(user);
     }
 
+    public async Task<UserResponse?> GetByUsernameAsync(string username, CancellationToken cancellationToken = default)
+    {
+        var user = await _userRepository.GetByUsernameAsync(username, cancellationToken);
+
+        return user is null
+            ? null : _mapper.Map<UserResponse>(user);
+        
+    }
+
     public async Task<UserResponse?> UpdateAsync(Guid id, UpdateUserRequest request, CancellationToken cancellationToken = default)
     {
         var user = await _userRepository.GetByIdAsync(id, cancellationToken);
