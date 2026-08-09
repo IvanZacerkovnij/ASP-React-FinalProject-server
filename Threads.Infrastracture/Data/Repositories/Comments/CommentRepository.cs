@@ -22,6 +22,7 @@ public class CommentRepository : ICommentRepository
             .Include(comment => comment.Author)
             .Include(comment => comment.Replies)
             .Where(comment => comment.PostId == postId)
+            .OrderBy(comment => comment.CreatedAt)
             .ToListAsync(cancellationToken);
     }
 

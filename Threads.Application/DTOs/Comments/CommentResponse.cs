@@ -8,6 +8,8 @@ public class CommentResponse
 
     public Guid PostId { get; init; }
 
+    public Guid? ParentCommentId { get; init; }
+
     public required string Content { get; init; }
 
     public required UserShortResponse Author { get; init; }

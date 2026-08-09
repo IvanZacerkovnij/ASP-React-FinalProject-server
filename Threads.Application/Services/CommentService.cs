@@ -33,11 +33,25 @@ public class CommentService : ICommentService
             .ToList();
     }
 
+    public async Task<CommentResponse?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var comment = await _commentRepository.GetByIdAsync(id, cancellationToken);
+
+        return comment is null
+            ? null
+            : _mapper.Map<CommentResponse>(comment);
+    }
+
     public async Task<CommentResponse> CreateAsync(
         Guid authorId,
         CreateCommentRequest request,
         CancellationToken cancellationToken = default)
     {
+        if (string.IsNullOrWhiteSpace(request.Content))
+        {
+            throw new InvalidOperationException("Comment content is required.");
+        }
+
         var post = await _postRepository.GetByIdAsync(request.PostId, cancellationToken);
 
         if (post is null)
@@ -45,8 +59,27 @@ public class CommentService : ICommentService
             throw new InvalidOperationException("Post was not found.");
         }
 
+        Comment? parentComment = null;
+
+        if (request.ParentCommentId.HasValue)
+        {
+            parentComment = await _commentRepository.GetByIdAsync(request.ParentCommentId.Value, cancellationToken);
+
+            if (parentComment is null)
+            {
+                throw new InvalidOperationException("Parent comment was not found.");
+            }
+
+            if (parentComment.PostId != request.PostId)
+            {
+                throw new InvalidOperationException("Parent comment does not belong to the specified post.");
+            }
+        }
+
         var comment = _mapper.Map<Comment>(request);
         comment.AuthorId = authorId;
+        comment.Content = request.Content.Trim();
+        comment.ParentCommentId = parentComment?.Id;
 
         await _commentRepository.AddAsync(comment, cancellationToken);
 
@@ -60,6 +93,11 @@ public class CommentService : ICommentService
         UpdateCommentRequest request,
         CancellationToken cancellationToken = default)
     {
+        if (string.IsNullOrWhiteSpace(request.Content))
+        {
+            throw new InvalidOperationException("Comment content is required.");
+        }
+
         var comment = await _commentRepository.GetByIdAsync(id, cancellationToken);
 
         if (comment is null)
@@ -67,7 +105,7 @@ public class CommentService : ICommentService
             return null;
         }
 
-        comment.Content = request.Content;
+        comment.Content = request.Content.Trim();
         comment.UpdatedAt = DateTimeOffset.UtcNow;
 
         await _commentRepository.UpdateAsync(comment, cancellationToken);

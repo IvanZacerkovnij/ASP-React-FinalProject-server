@@ -19,11 +19,11 @@ public class CommentProfile : Profile
             .ForMember(destination => destination.AuthorId, options => options.Ignore())
             .ForMember(destination => destination.Author, options => options.Ignore())
             .ForMember(destination => destination.Post, options => options.Ignore())
-            .ForMember(destination => destination.ParentCommentId, options => options.Ignore())
             .ForMember(destination => destination.ParentComment, options => options.Ignore())
             .ForMember(destination => destination.Replies, options => options.Ignore());
 
         CreateMap<UpdateCommentRequest, Comment>()
+            .ForMember(destination => destination.PostId, options => options.Ignore())
             .ForMember(destination => destination.AuthorId, options => options.Ignore())
             .ForMember(destination => destination.Author, options => options.Ignore())
             .ForMember(destination => destination.Post, options => options.Ignore())
