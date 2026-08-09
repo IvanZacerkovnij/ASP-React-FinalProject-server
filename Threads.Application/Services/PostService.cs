@@ -31,6 +31,15 @@ public class PostService : IPostService
             .ToList();
     }
 
+    public async Task<IReadOnlyCollection<PostResponse>> GetByAuthorIdAsync(Guid authorId, CancellationToken cancellationToken = default)
+    {
+        var posts = await _postRepository.GetByAuthorIdAsync(authorId, cancellationToken);
+
+        return posts
+            .Select(_mapper.Map<PostResponse>)
+            .ToList();
+    }
+
     public async Task<PostResponse?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var post = await _postRepository.GetByIdAsync(id, cancellationToken);

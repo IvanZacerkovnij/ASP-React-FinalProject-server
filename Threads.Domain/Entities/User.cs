@@ -29,6 +29,9 @@ public class User : BaseEntity
     public ICollection<Like> Likes { get; set; } =
         new List<Like>();
 
+    public ICollection<PollVote> PollVotes { get; set; } =
+        new List<PollVote>();
+
     public ICollection<Follow> FollowingRelations { get; set; } =
         new List<Follow>();
 

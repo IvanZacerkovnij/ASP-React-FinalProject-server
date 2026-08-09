@@ -3,6 +3,7 @@ using Threads.Application.Interfaces.Auth;
 using Threads.Application.Interfaces.Comments;
 using Threads.Application.Interfaces.Follows;
 using Threads.Application.Interfaces.Media;
+using Threads.Application.Interfaces.Polls;
 using Threads.Application.Interfaces.Posts;
 using Threads.Application.Interfaces.Security;
 using Threads.Application.Interfaces.Users;
@@ -15,6 +16,7 @@ using Threads.Infrastracture.Data.Repositories.Comments;
 using Threads.Infrastracture.Data.Repositories.Follows;
 using Threads.Infrastracture.Data.Repositories.Likes;
 using Threads.Infrastracture.Data.Repositories.Media;
+using Threads.Infrastracture.Data.Repositories.Polls;
 using Threads.Infrastracture.Data.Repositories.Posts;
 using Threads.Infrastracture.Data.Repositories.RefreshTokens;
 using Threads.Infrastracture.Data.Repositories.Users;
@@ -38,10 +40,12 @@ public class Program
         builder.Services.AddScoped<IFollowRepository, FollowRepository>();
         builder.Services.AddScoped<ILikeRepository, LikeRepository>();
         builder.Services.AddScoped<IMediaRepository, MediaRepository>();
+        builder.Services.AddScoped<IPollRepository, PollRepository>();
         builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 
         builder.Services.AddScoped<IUserService, UserService>();
         builder.Services.AddScoped<IPostService, PostService>();
+        builder.Services.AddScoped<IPollService, PollService>();
         builder.Services.AddScoped<ICommentService, CommentService>();
         builder.Services.AddScoped<IFollowService, FollowService>();
         builder.Services.AddScoped<ILikeService, LikeService>();

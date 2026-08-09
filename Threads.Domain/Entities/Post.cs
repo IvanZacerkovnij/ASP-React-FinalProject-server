@@ -19,4 +19,6 @@ public class Post : BaseEntity
 
     public ICollection<Like> Likes { get; set; } =
         new List<Like>();
+
+    public Poll? Poll { get; set; }
 }

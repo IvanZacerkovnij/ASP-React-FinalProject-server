@@ -1,8 +1,10 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Threads.Application.DTOs.Polls;
 using Threads.Application.DTOs.Posts;
 using Threads.Application.Interfaces.Likes;
+using Threads.Application.Interfaces.Polls;
 using Threads.Application.Interfaces.Posts;
 
 namespace Threads.Api.Controllers;
@@ -13,11 +15,13 @@ public class PostsController : ControllerBase
 {
     private readonly IPostService _postService;
     private readonly ILikeService _likeService;
+    private readonly IPollService _pollService;
 
-    public PostsController(IPostService postService, ILikeService likeService)
+    public PostsController(IPostService postService, ILikeService likeService, IPollService pollService)
     {
         _postService = postService;
         _likeService = likeService;
+        _pollService = pollService;
     }
 
     [HttpGet]
@@ -85,6 +89,34 @@ public class PostsController : ControllerBase
         return wasRemoved
             ? NoContent()
             : NotFound(new { message = "Like was not found." });
+    }
+
+    [Authorize]
+    [HttpPost("{id:guid}/poll/vote")]
+    public async Task<ActionResult<PollResponse>> VotePoll(
+        Guid id,
+        VotePollRequest request,
+        CancellationToken cancellationToken)
+    {
+        var currentUserId = GetCurrentUserId();
+
+        if (currentUserId is null)
+        {
+            return Unauthorized(new { message = "Invalid token claims." });
+        }
+
+        var result = await _pollService.VoteAsync(currentUserId.Value, id, request, cancellationToken);
+
+        return result.Status switch
+        {
+            PollVoteStatus.Success => Ok(result.Poll),
+            PollVoteStatus.PostNotFound => NotFound(new { message = "Post was not found." }),
+            PollVoteStatus.PollNotFound => NotFound(new { message = "Poll was not found." }),
+            PollVoteStatus.InvalidOption => BadRequest(new { message = "Poll option is invalid." }),
+            PollVoteStatus.AlreadyVoted => Conflict(new { message = "You have already voted in this poll." }),
+            PollVoteStatus.PollClosed => Conflict(new { message = "Poll is already closed." }),
+            _ => BadRequest(new { message = "Unable to vote in poll." })
+        };
     }
 
     [Authorize]

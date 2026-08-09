@@ -24,6 +24,19 @@ public class PostRepository : IPostRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyCollection<Post>> GetByAuthorIdAsync(Guid authorId, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Posts
+            .AsNoTracking()
+            .Where(post => post.AuthorId == authorId)
+            .Include(post => post.Author)
+            .Include(post => post.Media)
+            .Include(post => post.Comments)
+            .Include(post => post.Likes)
+            .OrderByDescending(post => post.CreatedAt)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<Post?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return await _dbContext.Posts

@@ -12,6 +12,7 @@
       <Folder Include="Data\Repositories\Follows\" />
       <Folder Include="Data\Repositories\Likes\" />
       <Folder Include="Data\Repositories\Media\" />
+      <Folder Include="Data\Repositories\Polls\" />
       <Folder Include="Data\Repositories\Posts\" />
       <Folder Include="Data\Repositories\RefreshTokens\" />
       <Folder Include="Data\Repositories\Users\" />
@@ -20,7 +21,11 @@
     </ItemGroup>
 
     <ItemGroup>
+      <Compile Update="Data\Configurations\TableConfigurations\PollConfigurator.cs" />
+      <Compile Update="Data\Configurations\TableConfigurations\PollOptionConfigurator.cs" />
+      <Compile Update="Data\Configurations\TableConfigurations\PollVoteConfigurator.cs" />
       <Compile Update="Data\Repositories\Follows\FollowRepository.cs" />
+      <Compile Update="Data\Repositories\Polls\PollRepository.cs" />
     </ItemGroup>
 
     <ItemGroup>

@@ -7,6 +7,9 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <Compile Update="Entities\Poll.cs" />
+      <Compile Update="Entities\PollOption.cs" />
+      <Compile Update="Entities\PollVote.cs" />
       <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.10">
         <PrivateAssets>all</PrivateAssets>
         <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

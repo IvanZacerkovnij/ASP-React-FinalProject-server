@@ -57,6 +57,11 @@ public class UserConfigurator : IEntityTypeConfiguration<User>
             .HasForeignKey(like => like.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        builder.HasMany(user => user.PollVotes)
+            .WithOne(vote => vote.User)
+            .HasForeignKey(vote => vote.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         builder.HasMany(user => user.FollowingRelations)
             .WithOne(follow => follow.Follower)
             .HasForeignKey(follow => follow.FollowerId)

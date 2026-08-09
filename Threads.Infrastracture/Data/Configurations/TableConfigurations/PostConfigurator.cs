@@ -39,5 +39,10 @@ public class PostConfigurator : IEntityTypeConfiguration<Post>
             .WithOne(media => media.Post)
             .HasForeignKey(media => media.PostId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasOne(post => post.Poll)
+            .WithOne(poll => poll.Post)
+            .HasForeignKey<Poll>(poll => poll.PostId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

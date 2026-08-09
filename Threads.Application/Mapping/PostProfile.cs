@@ -26,13 +26,15 @@ public class PostProfile : Profile
             .ForMember(destination => destination.Author, options => options.Ignore())
             .ForMember(destination => destination.Media, options => options.Ignore())
             .ForMember(destination => destination.Comments, options => options.Ignore())
-            .ForMember(destination => destination.Likes, options => options.Ignore());
+            .ForMember(destination => destination.Likes, options => options.Ignore())
+            .ForMember(destination => destination.Poll, options => options.Ignore());
 
         CreateMap<UpdatePostRequest, Post>()
             .ForMember(destination => destination.AuthorId, options => options.Ignore())
             .ForMember(destination => destination.Author, options => options.Ignore())
             .ForMember(destination => destination.Media, options => options.Ignore())
             .ForMember(destination => destination.Comments, options => options.Ignore())
-            .ForMember(destination => destination.Likes, options => options.Ignore());
+            .ForMember(destination => destination.Likes, options => options.Ignore())
+            .ForMember(destination => destination.Poll, options => options.Ignore());
     }
 }

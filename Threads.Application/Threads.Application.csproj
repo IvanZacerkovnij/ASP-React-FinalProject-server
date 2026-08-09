@@ -9,6 +9,7 @@
     <ItemGroup>
       <Folder Include="DTOs\Auth\" />
       <Folder Include="DTOs\Comments\" />
+      <Folder Include="DTOs\Polls\" />
       <Folder Include="DTOs\Posts\" />
       <Folder Include="DTOs\Users\" />
       <Folder Include="Interfaces\Auth\" />
@@ -16,6 +17,7 @@
       <Folder Include="Interfaces\Follows\" />
       <Folder Include="Interfaces\Likes\" />
       <Folder Include="Interfaces\Media\" />
+      <Folder Include="Interfaces\Polls\" />
       <Folder Include="Interfaces\Posts\" />
       <Folder Include="Interfaces\Security\" />
       <Folder Include="Interfaces\Users\" />
@@ -24,9 +26,17 @@
     </ItemGroup>
 
     <ItemGroup>
+      <Compile Update="DTOs\Polls\PollOptionResponse.cs" />
+      <Compile Update="DTOs\Polls\PollResponse.cs" />
+      <Compile Update="DTOs\Polls\PollVoteResult.cs" />
+      <Compile Update="DTOs\Polls\PollVoteStatus.cs" />
+      <Compile Update="DTOs\Polls\VotePollRequest.cs" />
       <Compile Update="Interfaces\Follows\IFollowRepository.cs" />
       <Compile Update="Interfaces\Follows\IFollowService.cs" />
+      <Compile Update="Interfaces\Polls\IPollRepository.cs" />
+      <Compile Update="Interfaces\Polls\IPollService.cs" />
       <Compile Update="Services\FollowService.cs" />
+      <Compile Update="Services\PollService.cs" />
     </ItemGroup>
 
     <ItemGroup>
