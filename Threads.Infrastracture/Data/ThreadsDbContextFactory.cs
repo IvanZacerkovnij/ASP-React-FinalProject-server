@@ -12,7 +12,7 @@ public class ThreadsDbContextFactory : IDesignTimeDbContextFactory<ThreadsDbCont
     {
         var configuration = new ConfigurationBuilder()
             .SetBasePath(Path.Combine(Directory.GetCurrentDirectory(), "../Threads.Api"))
-            .AddJsonFile("appsettings.json")
+            .AddJsonFile("appsettings.Development.json")
             .Build();
 
         var connectionString = configuration.GetConnectionString(ConnectionStringName);
@@ -25,7 +25,7 @@ public class ThreadsDbContextFactory : IDesignTimeDbContextFactory<ThreadsDbCont
         
         var optionsBuilder = new DbContextOptionsBuilder<ThreadsDbContext>();
         
-        optionsBuilder.UseNpgsql(connectionString);
+        optionsBuilder.UseNpgsql(connectionString, npgsqlOptions => npgsqlOptions.UseAdminDatabase("defaultdb"));
         return new ThreadsDbContext(optionsBuilder.Options);
     }
 }
