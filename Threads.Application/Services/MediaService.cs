@@ -30,6 +30,21 @@ public class MediaService : IMediaService
         _objectStorageService = objectStorageService;
     }
 
+    public async Task<MediaUrlResponse?> GetUrlAsync(
+        Guid mediaId,
+        CancellationToken cancellationToken = default)
+    {
+        var media = await _mediaRepository.GetByIdAsync(mediaId, cancellationToken);
+
+        return media is null
+            ? null
+            : new MediaUrlResponse
+            {
+                Id = media.Id,
+                Url = _objectStorageService.GetReadUrl(media.StorageKey)
+            };
+    }
+
     public async Task<UploadMediaResponse> UploadAsync(
         Guid uploadedByUserId,
         Stream content,
@@ -84,7 +99,8 @@ public class MediaService : IMediaService
             FileName = media.FileName,
             ContentType = media.ContentType,
             SizeInBytes = media.SizeInBytes,
-            Type = media.Type.ToString()
+            Type = media.Type.ToString(),
+            Url = _objectStorageService.GetReadUrl(media.StorageKey)
         };
     }
 

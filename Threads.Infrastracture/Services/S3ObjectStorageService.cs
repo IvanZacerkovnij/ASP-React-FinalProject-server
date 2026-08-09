@@ -10,11 +10,17 @@ public class S3ObjectStorageService : IObjectStorageService
 {
     private readonly IAmazonS3 _s3Client;
     private readonly string _bucketName;
+    private readonly int _readUrlExpirationMinutes;
 
     public S3ObjectStorageService(IConfiguration configuration)
     {
         var regionName = configuration["AWS:S3:Region"];
         _bucketName = configuration["AWS:S3:BucketName"]!;
+        _readUrlExpirationMinutes = int.TryParse(
+            configuration["AWS:S3:ReadUrlExpirationMinutes"],
+            out var expirationMinutes)
+            ? expirationMinutes
+            : 60;
 
         var region = RegionEndpoint.GetBySystemName(regionName);
         _s3Client = new AmazonS3Client(region);
@@ -42,5 +48,17 @@ public class S3ObjectStorageService : IObjectStorageService
         };
 
         await _s3Client.PutObjectAsync(request, cancellationToken);
+    }
+
+    public string GetReadUrl(string objectKey)
+    {
+        var request = new GetPreSignedUrlRequest
+        {
+            BucketName = _bucketName,
+            Key = objectKey,
+            Expires = DateTime.UtcNow.AddMinutes(_readUrlExpirationMinutes)
+        };
+
+        return _s3Client.GetPreSignedURL(request);
     }
 }

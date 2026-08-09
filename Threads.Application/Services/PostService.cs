@@ -10,15 +10,18 @@ public class PostService : IPostService
 {
     private readonly IPostRepository _postRepository;
     private readonly IMediaRepository _mediaRepository;
+    private readonly IObjectStorageService _objectStorageService;
     private readonly IMapper _mapper;
 
     public PostService(
         IPostRepository postRepository,
         IMediaRepository mediaRepository,
+        IObjectStorageService objectStorageService,
         IMapper mapper)
     {
         _postRepository = postRepository;
         _mediaRepository = mediaRepository;
+        _objectStorageService = objectStorageService;
         _mapper = mapper;
     }
 
@@ -27,7 +30,7 @@ public class PostService : IPostService
         var posts = await _postRepository.GetAllAsync(cancellationToken);
 
         return posts
-            .Select(_mapper.Map<PostResponse>)
+            .Select(MapPostResponse)
             .ToList();
     }
 
@@ -36,7 +39,7 @@ public class PostService : IPostService
         var posts = await _postRepository.GetByAuthorIdAsync(authorId, cancellationToken);
 
         return posts
-            .Select(_mapper.Map<PostResponse>)
+            .Select(MapPostResponse)
             .ToList();
     }
 
@@ -46,7 +49,7 @@ public class PostService : IPostService
 
         return post is null
             ? null
-            : _mapper.Map<PostResponse>(post);
+            : MapPostResponse(post);
     }
 
     public async Task<PostResponse> CreateAsync(
@@ -92,7 +95,7 @@ public class PostService : IPostService
 
         var createdPost = await _postRepository.GetByIdAsync(post.Id, cancellationToken);
 
-        return _mapper.Map<PostResponse>(createdPost ?? post);
+        return MapPostResponse(createdPost ?? post);
     }
 
     public async Task<PostResponse?> UpdateAsync(Guid id, UpdatePostRequest request, CancellationToken cancellationToken = default)
@@ -111,7 +114,7 @@ public class PostService : IPostService
 
         var updatedPost = await _postRepository.GetByIdAsync(post.Id, cancellationToken);
 
-        return _mapper.Map<PostResponse>(updatedPost ?? post);
+        return MapPostResponse(updatedPost ?? post);
     }
 
     public async Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default)
@@ -126,5 +129,27 @@ public class PostService : IPostService
         await _postRepository.DeleteAsync(post, cancellationToken);
 
         return true;
+    }
+
+    private PostResponse MapPostResponse(Post post)
+    {
+        var response = _mapper.Map<PostResponse>(post);
+
+        return new PostResponse
+        {
+            Id = response.Id,
+            Content = response.Content,
+            Author = response.Author,
+            MediaUrls = post.Media
+                .OrderBy(media => media.SortOrder)
+                .Select(media => _objectStorageService.GetReadUrl(media.StorageKey))
+                .ToList(),
+            LikesCount = response.LikesCount,
+            CommentsCount = response.CommentsCount,
+            RepostsCount = response.RepostsCount,
+            IsLikedByCurrentUser = response.IsLikedByCurrentUser,
+            CreatedAt = response.CreatedAt,
+            UpdatedAt = response.UpdatedAt
+        };
     }
 }

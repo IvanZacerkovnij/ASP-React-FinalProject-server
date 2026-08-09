@@ -27,6 +27,7 @@
     </ItemGroup>
 
     <ItemGroup>
+      <Compile Update="DTOs\Media\MediaUrlResponse.cs" />
       <Compile Update="DTOs\Media\UploadMediaResponse.cs" />
       <Compile Update="DTOs\Polls\PollOptionResponse.cs" />
       <Compile Update="DTOs\Polls\PollResponse.cs" />

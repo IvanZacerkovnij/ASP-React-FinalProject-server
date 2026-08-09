@@ -7,4 +7,6 @@ public interface IObjectStorageService
         string objectKey,
         string contentType,
         CancellationToken cancellationToken = default);
+
+    string GetReadUrl(string objectKey);
 }

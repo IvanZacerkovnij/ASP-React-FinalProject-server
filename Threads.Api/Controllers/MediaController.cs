@@ -18,6 +18,18 @@ public class MediaController : ControllerBase
         _mediaService = mediaService;
     }
 
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<MediaUrlResponse>> GetById(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var media = await _mediaService.GetUrlAsync(id, cancellationToken);
+
+        return media is null
+            ? NotFound(new { message = "Media was not found." })
+            : Ok(media);
+    }
+
     [Authorize]
     [HttpPost("upload")]
     [RequestFormLimits(MultipartBodyLengthLimit = 104_857_600)]

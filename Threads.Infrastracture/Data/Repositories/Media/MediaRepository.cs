@@ -12,6 +12,14 @@ public class MediaRepository : IMediaRepository
         _dbContext = dbContext;
     }
 
+    public async Task<Domain.Entities.Media?> GetByIdAsync(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Medias
+            .FirstOrDefaultAsync(media => media.Id == id, cancellationToken);
+    }
+
     public async Task<IReadOnlyCollection<Domain.Entities.Media>> GetByIdsAsync(
         IReadOnlyCollection<Guid> ids,
         CancellationToken cancellationToken = default)

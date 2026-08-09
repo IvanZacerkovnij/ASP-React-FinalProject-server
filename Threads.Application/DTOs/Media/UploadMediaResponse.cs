@@ -13,4 +13,6 @@ public class UploadMediaResponse
     public long SizeInBytes { get; init; }
 
     public string Type { get; init; } = null!;
+
+    public required string Url { get; init; }
 }
