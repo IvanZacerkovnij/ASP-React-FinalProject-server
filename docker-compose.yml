@@ -1,9 +1,9 @@
 services:
   api:
-#    build:
-#      context: .
-#      dockerfile: Dockerfile
-    image: ${IMAGE_URI:-registry.example.com/your-namespace/threads-api}:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+
     container_name: threads-api
 
     restart: unless-stopped
