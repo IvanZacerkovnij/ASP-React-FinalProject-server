@@ -67,7 +67,7 @@ public class Program
 
         var app = builder.Build();
 
-        app.UseCors("Frontend");
+        app.UseCors("AllowAll");
         
         app.UseHttpsRedirection();
         app.UseAuthentication();

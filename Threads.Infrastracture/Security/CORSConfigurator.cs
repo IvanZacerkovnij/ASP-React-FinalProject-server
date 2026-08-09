@@ -5,7 +5,7 @@ namespace Threads.Infrastracture.Security;
 
 public static  class CORSConfigurator
 {
-    private const string FrontendCorsPolicyName = "Frontend";
+    private const string FrontendCorsPolicyName = "AllowAll";
     
     public static void Configure(CorsOptions options, IConfiguration configuration)
     {
@@ -15,10 +15,9 @@ public static  class CORSConfigurator
         
         options.AddPolicy(FrontendCorsPolicyName, policy =>
         {
-            policy
-                .WithOrigins(allowedOrigins)
-                .AllowAnyHeader()
-                .AllowAnyMethod();
+            policy.AllowAnyOrigin()
+                .AllowAnyMethod()
+                .AllowAnyHeader();
         });
     }
 }
