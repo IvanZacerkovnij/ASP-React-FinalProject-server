@@ -9,6 +9,7 @@
     <ItemGroup>
       <Folder Include="Data\Configurations\" />
       <Folder Include="Data\Repositories\Comments\" />
+      <Folder Include="Data\Repositories\Follows\" />
       <Folder Include="Data\Repositories\Likes\" />
       <Folder Include="Data\Repositories\Media\" />
       <Folder Include="Data\Repositories\Posts\" />
@@ -16,6 +17,10 @@
       <Folder Include="Data\Repositories\Users\" />
       <Folder Include="Security\" />
       <Folder Include="Services\" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Compile Update="Data\Repositories\Follows\FollowRepository.cs" />
     </ItemGroup>
 
     <ItemGroup>

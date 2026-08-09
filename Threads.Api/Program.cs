@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Threads.Application.Interfaces.Auth;
 using Threads.Application.Interfaces.Comments;
+using Threads.Application.Interfaces.Follows;
 using Threads.Application.Interfaces.Media;
 using Threads.Application.Interfaces.Posts;
 using Threads.Application.Interfaces.Security;
@@ -11,6 +12,7 @@ using Threads.Application.Services;
 using Threads.Infrastracture.Data;
 using Threads.Infrastracture.Data.Configurations;
 using Threads.Infrastracture.Data.Repositories.Comments;
+using Threads.Infrastracture.Data.Repositories.Follows;
 using Threads.Infrastracture.Data.Repositories.Likes;
 using Threads.Infrastracture.Data.Repositories.Media;
 using Threads.Infrastracture.Data.Repositories.Posts;
@@ -33,6 +35,7 @@ public class Program
         builder.Services.AddScoped<IUserRepository, UserRepository>();
         builder.Services.AddScoped<IPostRepository, PostRepository>();
         builder.Services.AddScoped<ICommentRepository, CommentRepository>();
+        builder.Services.AddScoped<IFollowRepository, FollowRepository>();
         builder.Services.AddScoped<ILikeRepository, LikeRepository>();
         builder.Services.AddScoped<IMediaRepository, MediaRepository>();
         builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
@@ -40,6 +43,7 @@ public class Program
         builder.Services.AddScoped<IUserService, UserService>();
         builder.Services.AddScoped<IPostService, PostService>();
         builder.Services.AddScoped<ICommentService, CommentService>();
+        builder.Services.AddScoped<IFollowService, FollowService>();
         builder.Services.AddScoped<ILikeService, LikeService>();
         builder.Services.AddScoped<IAuthService, AuthService>();
 

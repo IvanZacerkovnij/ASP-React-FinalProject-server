@@ -13,6 +13,7 @@
       <Folder Include="DTOs\Users\" />
       <Folder Include="Interfaces\Auth\" />
       <Folder Include="Interfaces\Comments\" />
+      <Folder Include="Interfaces\Follows\" />
       <Folder Include="Interfaces\Likes\" />
       <Folder Include="Interfaces\Media\" />
       <Folder Include="Interfaces\Posts\" />
@@ -20,6 +21,12 @@
       <Folder Include="Interfaces\Users\" />
       <Folder Include="Mapping\" />
       <Folder Include="Services\" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Compile Update="Interfaces\Follows\IFollowRepository.cs" />
+      <Compile Update="Interfaces\Follows\IFollowService.cs" />
+      <Compile Update="Services\FollowService.cs" />
     </ItemGroup>
 
     <ItemGroup>

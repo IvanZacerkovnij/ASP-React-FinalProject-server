@@ -1,0 +1,92 @@
+using AutoMapper;
+using Threads.Application.DTOs.Users;
+using Threads.Application.Interfaces.Follows;
+using Threads.Application.Interfaces.Users;
+using Threads.Domain.Entities;
+
+namespace Threads.Application.Services;
+
+public class FollowService : IFollowService
+{
+    private readonly IFollowRepository _followRepository;
+    private readonly IUserRepository _userRepository;
+    private readonly IMapper _mapper;
+
+    public FollowService(IFollowRepository followRepository, IUserRepository userRepository, IMapper mapper)
+    {
+        _followRepository = followRepository;
+        _userRepository = userRepository;
+        _mapper = mapper;
+    }
+
+    public async Task<bool> AddFollowAsync(Guid followerId, Guid followingId, CancellationToken cancellationToken = default)
+    {
+        if (followerId == followingId)
+        {
+            return false;
+        }
+
+        var follower = await _userRepository.GetByIdAsync(followerId, cancellationToken);
+        var following = await _userRepository.GetByIdAsync(followingId, cancellationToken);
+
+        if (follower is null || following is null)
+        {
+            return false;
+        }
+
+        var existingFollow = await _followRepository.GetByFollowerAndFollowingAsync(
+            followerId,
+            followingId,
+            cancellationToken);
+
+        if (existingFollow is not null)
+        {
+            return false;
+        }
+
+        var follow = new Follow
+        {
+            FollowerId = followerId,
+            FollowingId = followingId
+        };
+
+        await _followRepository.AddAsync(follow, cancellationToken);
+
+        return true;
+    }
+
+    public async Task<bool> RemoveFollowAsync(Guid followerId, Guid followingId, CancellationToken cancellationToken = default)
+    {
+        var existingFollow = await _followRepository.GetByFollowerAndFollowingAsync(
+            followerId,
+            followingId,
+            cancellationToken);
+
+        if (existingFollow is null)
+        {
+            return false;
+        }
+
+        await _followRepository.DeleteAsync(existingFollow, cancellationToken);
+
+        return true;
+    }
+
+    public async Task<IReadOnlyCollection<UserShortResponse>> GetFollowersAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var followers = await _followRepository.GetFollowersAsync(userId, cancellationToken);
+
+        return followers
+            .Select(_mapper.Map<UserShortResponse>)
+            .ToList();
+    }
+
+    public async Task<IReadOnlyCollection<UserShortResponse>> GetFollowingAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var following = await _followRepository.GetFollowingAsync(userId, cancellationToken);
+
+        return following
+            .Select(_mapper.Map<UserShortResponse>)
+            .ToList();
+    }
+}
