@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Resend;
 using Threads.Application.Interfaces.Auth;
 using Threads.Application.Interfaces.Comments;
 using Threads.Application.Interfaces.Follows;
@@ -44,6 +45,7 @@ public class Program
         builder.Services.AddScoped<IObjectStorageService, S3ObjectStorageService>();
         builder.Services.AddScoped<IPollRepository, PollRepository>();
         builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+        builder.Services.AddScoped<IPasswordResetEmailService, ResendPasswordResetEmailService>();
 
         builder.Services.AddScoped<IUserService, UserService>();
         builder.Services.AddScoped<IPostService, PostService>();
@@ -64,6 +66,7 @@ public class Program
         builder.Services.AddControllers();
         
         builder.Services.AddCors(options => CORSConfigurator.Configure(options, builder.Configuration));
+        builder.Services.AddResend(options => ResendConfigurator.Configure(options, builder.Configuration));
 
         var app = builder.Build();
 

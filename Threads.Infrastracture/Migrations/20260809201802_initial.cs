@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Threads.Infrastracture.Migrations
 {
     /// <inheritdoc />
-    public partial class Initial : Migration
+    public partial class initial : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -19,6 +19,8 @@ namespace Threads.Infrastracture.Migrations
                     Username = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
                     Email = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
                     PasswordHash = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
+                    PasswordResetCodeHash = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
+                    PasswordResetCodeExpiresAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     DisplayName = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
                     Bio = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
                     AvatarObjectKey = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),

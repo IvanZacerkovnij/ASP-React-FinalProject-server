@@ -12,9 +12,11 @@ namespace Threads.Application.Services;
 public class AuthService : IAuthService
 {
     private const int RefreshTokenLifetimeDays = 7;
+    private const int PasswordResetCodeLifetimeMinutes = 15;
 
     private readonly IUserRepository _userRepository;
     private readonly IRefreshTokenRepository _refreshTokenRepository;
+    private readonly IPasswordResetEmailService _passwordResetEmailService;
     private readonly IPasswordHasher _passwordHasher;
     private readonly ITokenService _tokenService;
     private readonly IMapper _mapper;
@@ -22,12 +24,14 @@ public class AuthService : IAuthService
     public AuthService(
         IUserRepository userRepository,
         IRefreshTokenRepository refreshTokenRepository,
+        IPasswordResetEmailService passwordResetEmailService,
         IPasswordHasher passwordHasher,
         ITokenService tokenService,
         IMapper mapper)
     {
         _userRepository = userRepository;
         _refreshTokenRepository = refreshTokenRepository;
+        _passwordResetEmailService = passwordResetEmailService;
         _passwordHasher = passwordHasher;
         _tokenService = tokenService;
         _mapper = mapper;
@@ -125,6 +129,64 @@ public class AuthService : IAuthService
         return true;
     }
 
+    public async Task ForgotPasswordAsync(ForgotPasswordRequest request, CancellationToken cancellationToken = default)
+    {
+        var normalizedEmail = NormalizeEmail(request.Email);
+        var user = await _userRepository.GetByEmailAsync(normalizedEmail, cancellationToken);
+
+        if (user is null || !user.IsActive)
+        {
+            return;
+        }
+
+        var code = GeneratePasswordResetCode();
+        user.PasswordResetCodeHash = HashPasswordResetCode(code);
+        user.PasswordResetCodeExpiresAt = DateTimeOffset.UtcNow.AddMinutes(PasswordResetCodeLifetimeMinutes);
+        user.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await _userRepository.UpdateAsync(user, cancellationToken);
+        await _passwordResetEmailService.SendPasswordResetCodeAsync(user.Email, code, cancellationToken);
+    }
+
+    public async Task<bool> VerifyResetCodeAsync(
+        VerifyResetCodeRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await _userRepository.GetByEmailAsync(NormalizeEmail(request.Email), cancellationToken);
+
+        return IsPasswordResetCodeValid(user, request.Code);
+    }
+
+    public async Task<bool> ResetPasswordAsync(
+        ResetPasswordRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedEmail = NormalizeEmail(request.Email);
+        var normalizedCode = NormalizePasswordResetCode(request.Code);
+
+        if (string.IsNullOrWhiteSpace(request.NewPassword))
+        {
+            throw new ArgumentException("New password is required.", nameof(request.NewPassword));
+        }
+
+        var user = await _userRepository.GetByEmailAsync(normalizedEmail, cancellationToken);
+
+        if (!IsPasswordResetCodeValid(user, normalizedCode))
+        {
+            return false;
+        }
+
+        user!.PasswordHash = _passwordHasher.HashPassword(request.NewPassword);
+        user.PasswordResetCodeHash = null;
+        user.PasswordResetCodeExpiresAt = null;
+        user.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await _userRepository.UpdateAsync(user, cancellationToken);
+        await _refreshTokenRepository.RevokeAllByUserIdAsync(user.Id, DateTimeOffset.UtcNow, cancellationToken);
+
+        return true;
+    }
+
     private async Task<User?> GetUserByEmailOrUsernameAsync(string emailOrUsername, CancellationToken cancellationToken)
     {
         var normalizedValue = emailOrUsername.Trim();
@@ -169,5 +231,62 @@ public class AuthService : IAuthService
     {
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(refreshToken));
         return Convert.ToBase64String(bytes);
+    }
+
+    private static string NormalizeEmail(string email)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            throw new ArgumentException("Email is required.", nameof(email));
+        }
+
+        var normalizedEmail = email.Trim();
+
+        return normalizedEmail;
+    }
+
+    private static string NormalizePasswordResetCode(string code)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            throw new ArgumentException("Reset code is required.", nameof(code));
+        }
+
+        var normalizedCode = code.Trim();
+
+        if (normalizedCode.Length != 6 || normalizedCode.Any(character => !char.IsDigit(character)))
+        {
+            throw new ArgumentException("Reset code must contain exactly 6 digits.", nameof(code));
+        }
+
+        return normalizedCode;
+    }
+
+    private static string GeneratePasswordResetCode()
+    {
+        return RandomNumberGenerator
+            .GetInt32(0, 1_000_000)
+            .ToString("D6");
+    }
+
+    private static string HashPasswordResetCode(string code)
+    {
+        var normalizedCode = NormalizePasswordResetCode(code);
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(normalizedCode));
+        return Convert.ToBase64String(bytes);
+    }
+
+    private static bool IsPasswordResetCodeValid(User? user, string code)
+    {
+        if (user is null ||
+            !user.IsActive ||
+            string.IsNullOrWhiteSpace(user.PasswordResetCodeHash) ||
+            user.PasswordResetCodeExpiresAt is null ||
+            user.PasswordResetCodeExpiresAt <= DateTimeOffset.UtcNow)
+        {
+            return false;
+        }
+
+        return user.PasswordResetCodeHash == HashPasswordResetCode(code);
     }
 }

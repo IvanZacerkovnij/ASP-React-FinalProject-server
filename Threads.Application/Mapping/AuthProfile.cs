@@ -10,6 +10,8 @@ public class AuthProfile : Profile
     {
         CreateMap<RegisterRequest, User>()
             .ForMember(destination => destination.PasswordHash, options => options.Ignore())
+            .ForMember(destination => destination.PasswordResetCodeHash, options => options.Ignore())
+            .ForMember(destination => destination.PasswordResetCodeExpiresAt, options => options.Ignore())
             .ForMember(destination => destination.Bio, options => options.Ignore())
             .ForMember(destination => destination.AvatarObjectKey, options => options.Ignore())
             .ForMember(destination => destination.IsVerified, options => options.Ignore())

@@ -24,6 +24,9 @@ public class UserConfigurator : IEntityTypeConfiguration<User>
             .IsRequired()
             .HasMaxLength(512);
 
+        builder.Property(user => user.PasswordResetCodeHash)
+            .HasMaxLength(128);
+
         builder.Property(user => user.DisplayName)
             .HasMaxLength(100);
 

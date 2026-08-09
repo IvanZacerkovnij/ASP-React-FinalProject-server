@@ -16,7 +16,6 @@
       <Folder Include="Data\Repositories\Posts\" />
       <Folder Include="Data\Repositories\RefreshTokens\" />
       <Folder Include="Data\Repositories\Users\" />
-      <Folder Include="Services\" />
     </ItemGroup>
 
     <ItemGroup>
@@ -40,6 +39,7 @@
       <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.10" />
       <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.10" />
       <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
+      <PackageReference Include="Resend" Version="0.8.0" />
     </ItemGroup>
 
     <ItemGroup>

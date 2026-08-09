@@ -73,6 +73,60 @@ public class AuthController : ControllerBase
             : Unauthorized(new { message = "Invalid refresh token." });
     }
 
+    [HttpPost("forgot-password")]
+    public async Task<IActionResult> ForgotPassword(
+        ForgotPasswordRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _authService.ForgotPasswordAsync(request, cancellationToken);
+            return Ok(new { message = "If the email exists, a reset code has been sent." });
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+    }
+
+    [HttpPost("verify-reset-code")]
+    public async Task<IActionResult> VerifyResetCode(
+        VerifyResetCodeRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var isValid = await _authService.VerifyResetCodeAsync(request, cancellationToken);
+
+            return isValid
+                ? Ok(new { message = "Reset code is valid." })
+                : BadRequest(new { message = "Reset code is invalid or expired." });
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+    }
+
+    [HttpPost("reset-password")]
+    public async Task<IActionResult> ResetPassword(
+        ResetPasswordRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var wasReset = await _authService.ResetPasswordAsync(request, cancellationToken);
+
+            return wasReset
+                ? Ok(new { message = "Password reset successfully." })
+                : BadRequest(new { message = "Reset code is invalid or expired." });
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+    }
+
     [Authorize]
     [HttpGet("me")]
     public async Task<ActionResult<UserResponse>> Me(CancellationToken cancellationToken)

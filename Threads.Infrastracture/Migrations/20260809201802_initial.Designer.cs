@@ -12,8 +12,8 @@ using Threads.Infrastracture.Data;
 namespace Threads.Infrastracture.Migrations
 {
     [DbContext(typeof(ThreadsDbContext))]
-    [Migration("20260809124328_Initial")]
-    partial class Initial
+    [Migration("20260809201802_initial")]
+    partial class initial
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -368,6 +368,13 @@ namespace Threads.Infrastracture.Migrations
                         .IsRequired()
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)");
+
+                    b.Property<DateTimeOffset?>("PasswordResetCodeExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PasswordResetCodeHash")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
 
                     b.Property<DateTimeOffset?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");

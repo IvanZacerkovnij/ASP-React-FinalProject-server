@@ -10,6 +10,10 @@ public class User : BaseEntity
 
     public string PasswordHash { get; set; } = null!;
 
+    public string? PasswordResetCodeHash { get; set; }
+
+    public DateTimeOffset? PasswordResetCodeExpiresAt { get; set; }
+
     public string? DisplayName { get; set; }
 
     public string? Bio { get; set; }
