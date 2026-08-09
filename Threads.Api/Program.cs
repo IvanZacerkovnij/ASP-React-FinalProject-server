@@ -25,7 +25,7 @@ public class Program
     {
         var builder = WebApplication.CreateBuilder(args);
 
-        builder.Services.AddDbContext<ThreadsDbContext>(options => DbConfigurator.Configure(options));
+        builder.Services.AddDbContext<ThreadsDbContext>(options => DbConfigurator.Configure(options, builder.Configuration));
         builder.Services.AddAutoMapper(cfg => { }, typeof(UserProfile));
 
         builder.Services.AddScoped<IUserRepository, UserRepository>();
