@@ -27,9 +27,14 @@ namespace Threads.Api;
 
 public class Program
 {
+    private const string FrontendCorsPolicyName = "Frontend";
+
     public static void Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
+        var allowedOrigins = builder.Configuration
+            .GetSection("Cors:AllowedOrigins")
+            .Get<string[]>() ?? [];
 
         builder.Services.AddDbContext<ThreadsDbContext>(options => DbConfigurator.Configure(options, builder.Configuration));
         builder.Services.AddAutoMapper(cfg => { }, typeof(UserProfile));
@@ -64,12 +69,10 @@ public class Program
         
         builder.Services.AddCors(options =>
         {
-            options.AddPolicy("Frontend", policy =>
+            options.AddPolicy(FrontendCorsPolicyName, policy =>
             {
                 policy
-                    .WithOrigins(
-                        "https://your-project.vercel.app"
-                    )
+                    .WithOrigins(allowedOrigins)
                     .AllowAnyHeader()
                     .AllowAnyMethod();
             });
@@ -77,7 +80,7 @@ public class Program
 
         var app = builder.Build();
 
-        app.UseCors("Frontend");
+        app.UseCors(FrontendCorsPolicyName);
         
         app.UseHttpsRedirection();
         app.UseAuthentication();
