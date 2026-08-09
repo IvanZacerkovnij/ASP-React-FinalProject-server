@@ -61,9 +61,24 @@ public class Program
 
         builder.Services.AddAuthorization();
         builder.Services.AddControllers();
+        
+        builder.Services.AddCors(options =>
+        {
+            options.AddPolicy("Frontend", policy =>
+            {
+                policy
+                    .WithOrigins(
+                        "https://your-project.vercel.app"
+                    )
+                    .AllowAnyHeader()
+                    .AllowAnyMethod();
+            });
+        });
 
         var app = builder.Build();
 
+        app.UseCors("Frontend");
+        
         app.UseHttpsRedirection();
         app.UseAuthentication();
         app.UseAuthorization();
