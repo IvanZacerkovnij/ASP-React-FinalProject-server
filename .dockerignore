@@ -1,7 +1,11 @@
-.dockerignore
-
-**/bin/
-**/obj/
+.git
+.github
+.idea
+.vs
+.vscode
+**/bin
+**/obj
+**/.DS_Store
 .env
-.git/
-.idea/
+.env.*
+deploy

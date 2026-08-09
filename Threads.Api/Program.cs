@@ -27,14 +27,10 @@ namespace Threads.Api;
 
 public class Program
 {
-    private const string FrontendCorsPolicyName = "Frontend";
 
     public static void Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
-        var allowedOrigins = builder.Configuration
-            .GetSection("Cors:AllowedOrigins")
-            .Get<string[]>() ?? [];
 
         builder.Services.AddDbContext<ThreadsDbContext>(options => DbConfigurator.Configure(options, builder.Configuration));
         builder.Services.AddAutoMapper(cfg => { }, typeof(UserProfile));
@@ -67,20 +63,11 @@ public class Program
         builder.Services.AddAuthorization();
         builder.Services.AddControllers();
         
-        builder.Services.AddCors(options =>
-        {
-            options.AddPolicy(FrontendCorsPolicyName, policy =>
-            {
-                policy
-                    .WithOrigins(allowedOrigins)
-                    .AllowAnyHeader()
-                    .AllowAnyMethod();
-            });
-        });
+        builder.Services.AddCors(options => CORSConfigurator.Configure(options, builder.Configuration));
 
         var app = builder.Build();
 
-        app.UseCors(FrontendCorsPolicyName);
+        app.UseCors("Frontend");
         
         app.UseHttpsRedirection();
         app.UseAuthentication();

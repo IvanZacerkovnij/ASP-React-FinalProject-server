@@ -1,15 +1,15 @@
 services:
   api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-
+#    build:
+#      context: .
+#      dockerfile: Dockerfile
+    image: ${IMAGE_URI:-registry.example.com/your-namespace/threads-api}:${IMAGE_TAG:-latest}
     container_name: threads-api
 
     restart: unless-stopped
 
     ports:
-      - "127.0.0.1:45000:8080"
+      - "127.0.0.1:7000:8080"
 
     env_file:
       - .env

@@ -16,7 +16,6 @@
       <Folder Include="Data\Repositories\Posts\" />
       <Folder Include="Data\Repositories\RefreshTokens\" />
       <Folder Include="Data\Repositories\Users\" />
-      <Folder Include="Security\" />
       <Folder Include="Services\" />
     </ItemGroup>
 
