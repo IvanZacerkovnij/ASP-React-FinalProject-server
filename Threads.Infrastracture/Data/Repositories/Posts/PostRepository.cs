@@ -24,6 +24,38 @@ public class PostRepository : IPostRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyCollection<Post>> GetRandomAsync(int count, CancellationToken cancellationToken = default)
+    {
+        var postIds = await _dbContext.Posts
+            .AsNoTracking()
+            .OrderBy(_ => EF.Functions.Random())
+            .Select(post => post.Id)
+            .Take(count)
+            .ToListAsync(cancellationToken);
+
+        if (postIds.Count == 0)
+        {
+            return [];
+        }
+
+        var posts = await _dbContext.Posts
+            .AsNoTracking()
+            .Where(post => postIds.Contains(post.Id))
+            .Include(post => post.Author)
+            .Include(post => post.Media)
+            .Include(post => post.Comments)
+            .Include(post => post.Likes)
+            .ToListAsync(cancellationToken);
+
+        var postOrder = postIds
+            .Select((id, index) => new { id, index })
+            .ToDictionary(item => item.id, item => item.index);
+
+        return posts
+            .OrderBy(post => postOrder[post.Id])
+            .ToList();
+    }
+
     public async Task<IReadOnlyCollection<Post>> GetByAuthorIdAsync(Guid authorId, CancellationToken cancellationToken = default)
     {
         return await _dbContext.Posts

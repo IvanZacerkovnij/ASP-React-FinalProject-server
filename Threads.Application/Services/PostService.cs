@@ -8,6 +8,7 @@ namespace Threads.Application.Services;
 
 public class PostService : IPostService
 {
+    private const int FeedSize = 10;
     private readonly IPostRepository _postRepository;
     private readonly IMediaRepository _mediaRepository;
     private readonly IObjectStorageService _objectStorageService;
@@ -28,6 +29,15 @@ public class PostService : IPostService
     public async Task<IReadOnlyCollection<PostResponse>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         var posts = await _postRepository.GetAllAsync(cancellationToken);
+
+        return posts
+            .Select(MapPostResponse)
+            .ToList();
+    }
+
+    public async Task<IReadOnlyCollection<PostResponse>> GetFeedAsync(CancellationToken cancellationToken = default)
+    {
+        var posts = await _postRepository.GetRandomAsync(FeedSize, cancellationToken);
 
         return posts
             .Select(MapPostResponse)

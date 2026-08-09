@@ -31,6 +31,13 @@ public class PostsController : ControllerBase
         return Ok(posts);
     }
 
+    [HttpGet("feed")]
+    public async Task<ActionResult<IReadOnlyCollection<PostResponse>>> GetFeed(CancellationToken cancellationToken)
+    {
+        var posts = await _postService.GetFeedAsync(cancellationToken);
+        return Ok(posts);
+    }
+
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<PostResponse>> GetById(Guid id, CancellationToken cancellationToken)
     {
