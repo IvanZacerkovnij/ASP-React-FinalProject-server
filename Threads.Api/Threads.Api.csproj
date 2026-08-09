@@ -9,11 +9,13 @@
 
     <ItemGroup>
       <Folder Include="Controllers\" />
+      <Folder Include="Requests\" />
     </ItemGroup>
 
     <ItemGroup>
       <Compile Update="Controllers\FollowsController.cs" />
       <Compile Update="Controllers\MediaController.cs" />
+      <Compile Update="Requests\UploadMediaRequest.cs" />
     </ItemGroup>
 
     <ItemGroup>

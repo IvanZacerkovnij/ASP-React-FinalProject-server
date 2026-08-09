@@ -61,13 +61,8 @@ public class MediaService : IMediaService
         var mediaType = ResolveMediaType(contentType);
         ValidateFileSize(sizeInBytes, mediaType);
 
-        var objectKey = GenerateObjectKey(uploadedByUserId, fileName, mediaType);
-
-        await _objectStorageService.UploadAsync(content, objectKey, contentType, cancellationToken);
-
         var media = new MediaEntity
         {
-            StorageKey = objectKey,
             FileName = Path.GetFileName(fileName),
             ContentType = contentType,
             Type = mediaType,
@@ -75,6 +70,10 @@ public class MediaService : IMediaService
             SortOrder = 0,
             UploadedByUserId = uploadedByUserId
         };
+
+        media.StorageKey = GenerateObjectKey(uploadedByUserId, media.Id, fileName, mediaType);
+
+        await _objectStorageService.UploadAsync(content, media.StorageKey, contentType, cancellationToken);
 
         await _mediaRepository.AddAsync(media, cancellationToken);
 
@@ -108,7 +107,7 @@ public class MediaService : IMediaService
         }
     }
 
-    private static string GenerateObjectKey(Guid uploadedByUserId, string fileName, MediaType mediaType)
+    private static string GenerateObjectKey(Guid uploadedByUserId, Guid mediaId, string fileName, MediaType mediaType)
     {
         var extension = Path.GetExtension(fileName);
         var category = mediaType == MediaType.Image ? "images" : "videos";
@@ -117,6 +116,6 @@ public class MediaService : IMediaService
             "users",
             uploadedByUserId.ToString(),
             category,
-            $"{Guid.NewGuid()}{extension.ToLowerInvariant()}");
+            $"{mediaId}{extension.ToLowerInvariant()}");
     }
 }

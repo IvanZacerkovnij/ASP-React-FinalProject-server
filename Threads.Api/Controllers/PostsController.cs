@@ -132,9 +132,16 @@ public class PostsController : ControllerBase
             return Unauthorized(new { message = "Invalid token claims." });
         }
 
-        var post = await _postService.CreateAsync(currentUserId.Value, request, cancellationToken);
+        try
+        {
+            var post = await _postService.CreateAsync(currentUserId.Value, request, cancellationToken);
 
-        return CreatedAtAction(nameof(GetById), new { id = post.Id }, post);
+            return CreatedAtAction(nameof(GetById), new { id = post.Id }, post);
+        }
+        catch (InvalidOperationException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
     }
 
     [Authorize]

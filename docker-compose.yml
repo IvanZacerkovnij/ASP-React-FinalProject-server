@@ -9,7 +9,7 @@ services:
     restart: unless-stopped
 
     ports:
-      - "127.0.0.1:7000:8080"
+      - "127.0.0.1:45000:8080"
 
     env_file:
       - .env

@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Threads.Api.Requests;
 using Threads.Application.DTOs.Media;
 using Threads.Application.Interfaces.Media;
 
@@ -21,7 +22,7 @@ public class MediaController : ControllerBase
     [HttpPost("upload")]
     [RequestFormLimits(MultipartBodyLengthLimit = 104_857_600)]
     public async Task<ActionResult<UploadMediaResponse>> Upload(
-        IFormFile file,
+        [FromForm] UploadMediaRequest request,
         CancellationToken cancellationToken)
     {
         var currentUserId = GetCurrentUserId();
@@ -31,21 +32,21 @@ public class MediaController : ControllerBase
             return Unauthorized(new { message = "Invalid token claims." });
         }
 
-        if (file is null || file.Length == 0)
+        if (request.File is null || request.File.Length == 0)
         {
             return BadRequest(new { message = "File is required." });
         }
 
         try
         {
-            await using var stream = file.OpenReadStream();
+            await using var stream = request.File.OpenReadStream();
 
             var media = await _mediaService.UploadAsync(
                 currentUserId.Value,
                 stream,
-                file.FileName,
-                file.ContentType,
-                file.Length,
+                request.File.FileName,
+                request.File.ContentType,
+                request.File.Length,
                 cancellationToken);
 
             return Ok(media);

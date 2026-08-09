@@ -177,6 +177,96 @@ namespace Threads.Infrastracture.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Threads.Domain.Entities.Poll", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("EndsAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("PostId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PostId")
+                        .IsUnique();
+
+                    b.ToTable("Polls", (string)null);
+                });
+
+            modelBuilder.Entity("Threads.Domain.Entities.PollOption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("PollId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(280)
+                        .HasColumnType("character varying(280)");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PollId", "Position")
+                        .IsUnique();
+
+                    b.ToTable("PollOptions", (string)null);
+                });
+
+            modelBuilder.Entity("Threads.Domain.Entities.PollVote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("PollId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PollOptionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PollOptionId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("PollId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("PollVotes", (string)null);
+                });
+
             modelBuilder.Entity("Threads.Domain.Entities.Post", b =>
                 {
                     b.Property<Guid>("Id")
@@ -377,6 +467,55 @@ namespace Threads.Infrastracture.Migrations
                     b.Navigation("UploadedByUser");
                 });
 
+            modelBuilder.Entity("Threads.Domain.Entities.Poll", b =>
+                {
+                    b.HasOne("Threads.Domain.Entities.Post", "Post")
+                        .WithOne("Poll")
+                        .HasForeignKey("Threads.Domain.Entities.Poll", "PostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Post");
+                });
+
+            modelBuilder.Entity("Threads.Domain.Entities.PollOption", b =>
+                {
+                    b.HasOne("Threads.Domain.Entities.Poll", "Poll")
+                        .WithMany("Options")
+                        .HasForeignKey("PollId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Poll");
+                });
+
+            modelBuilder.Entity("Threads.Domain.Entities.PollVote", b =>
+                {
+                    b.HasOne("Threads.Domain.Entities.Poll", "Poll")
+                        .WithMany("Votes")
+                        .HasForeignKey("PollId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Threads.Domain.Entities.PollOption", "PollOption")
+                        .WithMany("Votes")
+                        .HasForeignKey("PollOptionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Threads.Domain.Entities.User", "User")
+                        .WithMany("PollVotes")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Poll");
+
+                    b.Navigation("PollOption");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("Threads.Domain.Entities.Post", b =>
                 {
                     b.HasOne("Threads.Domain.Entities.User", "Author")
@@ -404,6 +543,18 @@ namespace Threads.Infrastracture.Migrations
                     b.Navigation("Replies");
                 });
 
+            modelBuilder.Entity("Threads.Domain.Entities.Poll", b =>
+                {
+                    b.Navigation("Options");
+
+                    b.Navigation("Votes");
+                });
+
+            modelBuilder.Entity("Threads.Domain.Entities.PollOption", b =>
+                {
+                    b.Navigation("Votes");
+                });
+
             modelBuilder.Entity("Threads.Domain.Entities.Post", b =>
                 {
                     b.Navigation("Comments");
@@ -411,6 +562,8 @@ namespace Threads.Infrastracture.Migrations
                     b.Navigation("Likes");
 
                     b.Navigation("Media");
+
+                    b.Navigation("Poll");
                 });
 
             modelBuilder.Entity("Threads.Domain.Entities.User", b =>
@@ -422,6 +575,8 @@ namespace Threads.Infrastracture.Migrations
                     b.Navigation("FollowingRelations");
 
                     b.Navigation("Likes");
+
+                    b.Navigation("PollVotes");
 
                     b.Navigation("Posts");
 

@@ -59,7 +59,32 @@ public class PostService : IPostService
 
         if (request.MediaIds.Count > 0)
         {
-            var media = await _mediaRepository.GetByIdsAsync(request.MediaIds, cancellationToken);
+            var mediaIds = request.MediaIds
+                .Distinct()
+                .ToArray();
+
+            if (mediaIds.Length != request.MediaIds.Count)
+            {
+                throw new InvalidOperationException("Media ids must be unique.");
+            }
+
+            var media = await _mediaRepository.GetByIdsAsync(mediaIds, cancellationToken);
+
+            if (media.Count != mediaIds.Length)
+            {
+                throw new InvalidOperationException("One or more media items were not found.");
+            }
+
+            if (media.Any(item => item.UploadedByUserId != authorId))
+            {
+                throw new InvalidOperationException("One or more media items do not belong to the current user.");
+            }
+
+            if (media.Any(item => item.PostId.HasValue))
+            {
+                throw new InvalidOperationException("One or more media items are already attached to another post.");
+            }
+
             post.Media = media.ToList();
         }
 
