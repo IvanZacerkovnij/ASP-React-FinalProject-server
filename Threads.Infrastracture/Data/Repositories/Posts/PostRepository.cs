@@ -55,6 +55,35 @@ public class PostRepository : IPostRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyCollection<Post>> GetLikedByUserIdAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        var likedPostIds = await _dbContext.Likes
+            .AsNoTracking()
+            .Where(like => like.UserId == userId)
+            .OrderByDescending(like => like.CreatedAt)
+            .Select(like => like.PostId)
+            .ToListAsync(cancellationToken);
+
+        if (likedPostIds.Count == 0)
+        {
+            return [];
+        }
+
+        var posts = await BuildPostQuery(trackChanges: false)
+            .Where(post => likedPostIds.Contains(post.Id))
+            .ToListAsync(cancellationToken);
+
+        var postOrder = likedPostIds
+            .Select((id, index) => new { id, index })
+            .ToDictionary(item => item.id, item => item.index);
+
+        return posts
+            .OrderBy(post => postOrder[post.Id])
+            .ToList();
+    }
+
     public async Task<IReadOnlyCollection<Post>> SearchAsync(
         string query,
         int take = 20,

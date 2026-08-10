@@ -38,6 +38,25 @@ public class PostsController : ControllerBase
         return Ok(posts);
     }
 
+    [Authorize]
+    [HttpGet("liked")]
+    public async Task<ActionResult<IReadOnlyCollection<PostResponse>>> GetLiked(CancellationToken cancellationToken)
+    {
+        var currentUserId = GetCurrentUserId();
+
+        if (currentUserId is null)
+        {
+            return Unauthorized(new { message = "Invalid token claims." });
+        }
+
+        var posts = await _postService.GetLikedByUserIdAsync(
+            currentUserId.Value,
+            cancellationToken,
+            currentUserId.Value);
+
+        return Ok(posts);
+    }
+
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<PostResponse>> GetById(Guid id, CancellationToken cancellationToken)
     {

@@ -70,6 +70,18 @@ public class PostService : IPostService
             .ToList();
     }
 
+    public async Task<IReadOnlyCollection<PostResponse>> GetLikedByUserIdAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default,
+        Guid? currentUserId = null)
+    {
+        var posts = await _postRepository.GetLikedByUserIdAsync(userId, cancellationToken);
+
+        return posts
+            .Select(post => MapPostResponse(post, currentUserId))
+            .ToList();
+    }
+
     public async Task<IReadOnlyCollection<PostResponse>> SearchAsync(
         string query,
         CancellationToken cancellationToken = default,
