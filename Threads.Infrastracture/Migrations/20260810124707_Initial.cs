@@ -279,6 +279,33 @@ namespace Threads.Infrastracture.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "Reposts",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    UserId = table.Column<Guid>(type: "uuid", nullable: false),
+                    PostId = table.Column<Guid>(type: "uuid", nullable: false),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Reposts", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Reposts_Posts_PostId",
+                        column: x => x.PostId,
+                        principalTable: "Posts",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_Reposts_Users_UserId",
+                        column: x => x.UserId,
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "PollOptions",
                 columns: table => new
                 {
@@ -443,6 +470,17 @@ namespace Threads.Infrastracture.Migrations
                 columns: new[] { "UserId", "ExpiresAt" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_Reposts_PostId",
+                table: "Reposts",
+                column: "PostId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Reposts_UserId_PostId",
+                table: "Reposts",
+                columns: new[] { "UserId", "PostId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Users_Email",
                 table: "Users",
                 column: "Email",
@@ -478,6 +516,9 @@ namespace Threads.Infrastracture.Migrations
 
             migrationBuilder.DropTable(
                 name: "RefreshTokens");
+
+            migrationBuilder.DropTable(
+                name: "Reposts");
 
             migrationBuilder.DropTable(
                 name: "PollOptions");

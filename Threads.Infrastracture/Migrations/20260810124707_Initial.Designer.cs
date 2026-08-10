@@ -12,7 +12,7 @@ using Threads.Infrastracture.Data;
 namespace Threads.Infrastracture.Migrations
 {
     [DbContext(typeof(ThreadsDbContext))]
-    [Migration("20260810113335_Initial")]
+    [Migration("20260810124707_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -424,6 +424,34 @@ namespace Threads.Infrastracture.Migrations
                     b.ToTable("RefreshTokens", (string)null);
                 });
 
+            modelBuilder.Entity("Threads.Domain.Entities.Repost", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("PostId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PostId");
+
+                    b.HasIndex("UserId", "PostId")
+                        .IsUnique();
+
+                    b.ToTable("Reposts", (string)null);
+                });
+
             modelBuilder.Entity("Threads.Domain.Entities.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -483,16 +511,16 @@ namespace Threads.Infrastracture.Migrations
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)");
 
-                    b.Property<string>("PendingPasswordHash")
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
-
                     b.Property<DateTimeOffset?>("PasswordResetCodeExpiresAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("PasswordResetCodeHash")
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
+
+                    b.Property<string>("PendingPasswordHash")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
 
                     b.Property<DateTimeOffset?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -685,6 +713,25 @@ namespace Threads.Infrastracture.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Threads.Domain.Entities.Repost", b =>
+                {
+                    b.HasOne("Threads.Domain.Entities.Post", "Post")
+                        .WithMany("Reposts")
+                        .HasForeignKey("PostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Threads.Domain.Entities.User", "User")
+                        .WithMany("Reposts")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Post");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("Threads.Domain.Entities.Comment", b =>
                 {
                     b.Navigation("Replies");
@@ -712,6 +759,8 @@ namespace Threads.Infrastracture.Migrations
 
                     b.Navigation("Poll");
 
+                    b.Navigation("Reposts");
+
                     b.Navigation("Views");
                 });
 
@@ -732,6 +781,8 @@ namespace Threads.Infrastracture.Migrations
                     b.Navigation("Posts");
 
                     b.Navigation("RefreshTokens");
+
+                    b.Navigation("Reposts");
 
                     b.Navigation("UploadedMedia");
                 });

@@ -1,0 +1,447 @@
+BackEndForFinalProject Documentation
+
+1. Overview
+
+This repository contains a layered ASP.NET Core Web API backend for a Threads-like social platform.
+The API supports:
+- authentication with JWT and refresh tokens
+- user profiles and profile updates
+- posts with media, embeds, locations, polls, likes, reposts, and views
+- comments
+- follow relationships
+- GIF search via Giphy
+- location search via Geoapify
+- media upload and processing
+
+The solution is split into 4 projects:
+- Threads.Api: HTTP entrypoint, controllers, request models, DI registration
+- Threads.Application: DTOs, interfaces, services, mapping profiles, business logic
+- Threads.Domain: core entities and shared base classes
+- Threads.Infrastracture: EF Core, repositories, external integrations, auth/security configuration
+
+
+2. Architecture
+
+The project follows a classic layered structure:
+- Controllers in Threads.Api handle HTTP concerns
+- Services in Threads.Application contain business logic
+- Repositories in Threads.Infrastracture provide persistence via EF Core
+- Entities in Threads.Domain represent the data model
+
+Runtime flow:
+1. Request enters controller
+2. Controller resolves current user from JWT if needed
+3. Controller calls application service
+4. Service uses repositories and external services
+5. DTO response is returned to the controller
+6. Controller maps business result to HTTP response code and payload
+
+Persistence:
+- PostgreSQL via Entity Framework Core and Npgsql
+- DbContext: Threads.Infrastracture/Data/ThreadsDbContext.cs
+
+External integrations:
+- AWS S3 for media storage and signed read URLs
+- ffmpeg/ffprobe for media metadata and video thumbnails
+- Resend for password reset and password change email codes
+- Giphy API for GIF search
+- Geoapify API for location search
+
+
+3. Main Domain Entities
+
+User
+- account data, profile data, password hash
+- password reset code state
+- pending password hash for email-confirmed password change
+- relations: posts, comments, likes, reposts, follows, refresh tokens, uploaded media
+
+Post
+- content
+- optional location
+- optional embed
+- counters: views, reposts
+- relations: author, media, comments, likes, reposts, poll, views
+
+Like
+- relation between user and post
+
+Repost
+- relation between user and post
+- current code expects a unique pair of UserId + PostId
+
+Comment
+- post comments, including parent comment support
+
+Follow
+- relation between follower and following user
+
+Poll / PollOption / PollVote
+- post poll model
+
+Media
+- uploaded image/video/gif metadata
+
+RefreshToken
+- persisted refresh tokens with revoke/expire support
+
+PostView
+- unique viewer/post view tracking
+
+
+4. API Base Route
+
+All controllers are exposed under:
+- /api/auth
+- /api/users
+- /api/posts
+- /api/comments
+- /api/media
+- /api/search
+- /api/follows
+
+
+5. API Endpoints
+
+5.1 Auth
+
+Base route: /api/auth
+
+POST /register
+- register user
+
+POST /login
+- login by email or username
+
+POST /refresh
+- exchange refresh token for a new token pair
+
+POST /logout
+- revoke refresh token
+
+POST /forgot-password
+- send reset code to email via Resend
+
+POST /verify-reset-code
+- verify password reset code
+
+POST /reset-password
+- reset password using email + code
+
+POST /change-password
+- authenticated 2-step password change flow
+- first call: currentPassword + newPassword
+- second call: currentPassword + code
+
+GET /me
+- current authenticated user profile
+
+
+5.2 Users
+
+Base route: /api/users
+
+GET /
+- list users
+
+GET /{id}
+- user by Guid
+
+GET /{username}
+- user by username
+
+GET /by-username/{username}
+- explicit username route variant
+
+GET /{id}/posts
+- posts by author id
+
+GET /{username}/likes
+- posts liked by user
+
+GET /{username}/reposts
+- posts reposted by user
+
+PUT /me
+- authenticated multipart/form-data profile update
+- supports avatar and banner upload
+
+DELETE /me
+- authenticated self-delete
+
+
+5.3 Posts
+
+Base route: /api/posts
+
+GET /
+- all posts
+
+GET /feed
+- random feed selection
+
+GET /liked
+- authenticated posts liked by current user
+
+GET /user/{username}
+- posts by username
+
+GET /reposted
+- authenticated posts reposted by current user
+
+GET /{id}
+- post by id
+
+POST /{id}/view
+- authenticated unique view registration
+
+POST /{id}/like
+- like post
+
+DELETE /{id}/like
+- unlike post
+
+POST /{id}/repost
+- repost post
+- returns 409 if already reposted
+
+DELETE /{id}/repost
+- remove repost
+- returns 404 if repost does not exist
+
+POST /{id}/poll/vote
+- vote in poll
+
+POST /
+- create post
+
+PUT /{id}
+- update own post
+
+DELETE /{id}
+- delete own post
+
+
+5.4 Comments
+
+Base route: /api/comments
+
+GET /post/{postId}
+- comments for a post
+
+POST /
+- create comment
+
+PUT /{id}
+- update own comment
+
+DELETE /{id}
+- delete own comment
+
+
+5.5 Follows
+
+Base route: /api/follows
+
+POST /{userId}
+- follow user
+
+DELETE /{userId}
+- unfollow user
+
+GET /{userId}/followers
+- list followers
+
+GET /{userId}/following
+- list following
+
+DELETE /{userId}/followers/{followId}
+- remove follower from own followers list
+
+
+5.6 Media
+
+Base route: /api/media
+
+GET /{id}
+- resolve media read URL
+
+POST /upload
+- authenticated multipart upload
+- max request size configured to 100 MB
+
+
+5.7 Search
+
+Base route: /api/search
+
+GET /users?q=...
+- search users
+
+GET /posts?q=...
+- search posts
+
+GET /gifs?q=...
+- search GIFs through Giphy
+
+GET /locations?q=...
+- search locations through Geoapify
+
+
+6. Authentication Model
+
+Access tokens:
+- JWT bearer tokens
+- generated by JwtTokenService
+- payload includes NameIdentifier, Name, Email, and standard JWT fields
+
+Refresh tokens:
+- random 32-byte token
+- SHA-256 hash persisted in database
+- old refresh token is revoked on refresh
+- all refresh tokens are revoked after password reset or confirmed password change
+
+Required JWT configuration:
+- Jwt:Issuer
+- Jwt:Audience
+- Jwt:Key
+- Jwt:AccessTokenLifetimeMinutes, optional, defaults to 60
+
+
+7. Media Flow
+
+Media uploads are processed by:
+- MediaController
+- MediaService
+- FfmpegMediaProcessingService
+- S3ObjectStorageService
+
+Current behavior:
+- uploaded file is analyzed with ffprobe
+- videos may get generated thumbnail image via ffmpeg
+- metadata is stored in DB
+- original media and optional thumbnail are uploaded to S3
+- responses expose signed read URLs, not raw storage keys
+
+Relevant config:
+- MediaProcessing:FfmpegPath
+- MediaProcessing:FfprobePath
+- AWS:S3:Region
+- AWS:S3:BucketName
+- AWS:S3:ReadUrlExpirationMinutes
+
+
+8. Email and Password Recovery
+
+Password reset and password change confirmation emails are sent through Resend.
+
+Required config:
+- RESEND_APITOKEN
+- RESEND_FROM_EMAIL
+- RESEND_FROM_NAME, optional
+
+Current code lifetime for reset/change codes:
+- 15 minutes
+
+
+9. Search Providers
+
+GIF search:
+- Giphy
+- required config: GIPHY_API_KEY
+- optional config: GIPHY_RATING
+
+Location search:
+- Geoapify
+- required config: GEOAPIFY_API_KEY
+
+
+10. CORS
+
+CORS is configured in:
+- Threads.Infrastracture/Security/CORSConfigurator.cs
+
+Current appsettings.json includes:
+- http://localhost:8000
+- http://127.0.0.1:8000
+
+
+11. Database and Migrations
+
+DbContext configuration:
+- connection string name: DefaultConnection
+
+Current repository already contains EF migration artifacts.
+
+Important current note:
+- the Repost entity and repost endpoints were added in code
+- if the database schema does not yet include the Reposts table and related indexes, you must create and apply a new EF migration before using repost endpoints
+
+
+12. Dependency Injection
+
+All repositories and services are registered in Threads.Api/Program.cs.
+
+Notable registrations:
+- repositories for users, posts, comments, follows, likes, reposts, polls, refresh tokens, media
+- services for auth, users, posts, comments, follows, likes, reposts, polls, media
+- HttpClient registrations for Giphy and Geoapify
+- Resend integration
+
+
+13. Deployment
+
+Container:
+- Dockerfile builds and publishes Threads.Api
+- runtime image installs ffmpeg
+- app listens on port 8080 in container
+
+docker-compose:
+- binds 127.0.0.1:7000 to container 8080
+- reads environment from .env
+- sets ASPNETCORE_ENVIRONMENT=Production
+
+Nginx deployment instructions:
+- see deploy/README.md
+
+
+14. Local Run Checklist
+
+Minimum requirements:
+- .NET SDK 10
+- PostgreSQL
+- ffmpeg and ffprobe available, unless custom paths are configured
+- valid AWS credentials/environment for S3 access
+- valid Resend API token if password recovery/change mail flow is used
+- Giphy and Geoapify API keys if corresponding search endpoints are used
+
+Typical setup steps:
+1. configure ConnectionStrings:DefaultConnection
+2. configure Jwt section
+3. configure AWS S3 values
+4. configure Resend values
+5. configure Giphy and Geoapify keys if needed
+6. apply migrations
+7. run the API
+
+
+15. Known Implementation Notes
+
+- PostsController currently supports repost add and remove on the same route with POST and DELETE.
+- Reposted post list query now deduplicates PostId values before ordering, which protects reads before the unique DB constraint is applied.
+- RepostsCount is stored on Post as a denormalized counter, so schema and service logic should stay consistent with the Reposts relation.
+- There are both /api/users/{username} and /api/users/by-username/{username} routes.
+- Search endpoints are under /api/search/*, not under /api/gifs or /api/locations directly.
+- Media upload endpoint is /api/media/upload, not /api/media.
+
+
+16. Suggested Next Maintenance Items
+
+- generate and apply the EF migration for Reposts if it has not been done yet
+- run a clean dotnet build and test pass locally
+- consider adding automated integration tests for:
+  - auth flows
+  - repost add/remove/list flows
+  - media upload
+  - poll voting
+  - password change via email confirmation code
