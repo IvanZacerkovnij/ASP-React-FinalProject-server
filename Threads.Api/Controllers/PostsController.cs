@@ -6,6 +6,8 @@ using Threads.Application.DTOs.Posts;
 using Threads.Application.Interfaces.Likes;
 using Threads.Application.Interfaces.Polls;
 using Threads.Application.Interfaces.Posts;
+using Threads.Application.Interfaces.Reposts;
+using Threads.Application.Interfaces.Users;
 
 namespace Threads.Api.Controllers;
 
@@ -15,13 +17,22 @@ public class PostsController : ControllerBase
 {
     private readonly IPostService _postService;
     private readonly ILikeService _likeService;
+    private readonly IRepostService _repostService;
     private readonly IPollService _pollService;
+    private readonly IUserService _userService;
 
-    public PostsController(IPostService postService, ILikeService likeService, IPollService pollService)
+    public PostsController(
+        IPostService postService,
+        ILikeService likeService,
+        IRepostService repostService,
+        IPollService pollService,
+        IUserService userService)
     {
         _postService = postService;
         _likeService = likeService;
+        _repostService = repostService;
         _pollService = pollService;
+        _userService = userService;
     }
 
     [HttpGet]
@@ -50,6 +61,42 @@ public class PostsController : ControllerBase
         }
 
         var posts = await _postService.GetLikedByUserIdAsync(
+            currentUserId.Value,
+            cancellationToken,
+            currentUserId.Value);
+
+        return Ok(posts);
+    }
+
+    [HttpGet("user/{username}")]
+    public async Task<ActionResult<IReadOnlyCollection<PostResponse>>> GetByUsername(
+        string username,
+        CancellationToken cancellationToken)
+    {
+        var user = await _userService.GetByUsernameAsync(username, cancellationToken, GetCurrentUserId());
+
+        if (user is null)
+        {
+            return NotFound(new { message = "User was not found." });
+        }
+
+        var posts = await _postService.GetByAuthorIdAsync(user.Id, cancellationToken, GetCurrentUserId());
+
+        return Ok(posts);
+    }
+
+    [Authorize]
+    [HttpGet("reposted")]
+    public async Task<ActionResult<IReadOnlyCollection<PostResponse>>> GetReposted(CancellationToken cancellationToken)
+    {
+        var currentUserId = GetCurrentUserId();
+
+        if (currentUserId is null)
+        {
+            return Unauthorized(new { message = "Invalid token claims." });
+        }
+
+        var posts = await _postService.GetRepostedByUserIdAsync(
             currentUserId.Value,
             cancellationToken,
             currentUserId.Value);
@@ -109,6 +156,78 @@ public class PostsController : ControllerBase
         return updatedPost is null
             ? NotFound(new { message = "Post was not found." })
             : Ok(MapLikeStateResponse(updatedPost));
+    }
+
+    [Authorize]
+    [HttpPost("{id:guid}/repost")]
+    public async Task<ActionResult<PostRepostStateResponse>> RepostPost(Guid id, CancellationToken cancellationToken)
+    {
+        var currentUserId = GetCurrentUserId();
+
+        if (currentUserId is null)
+        {
+            return Unauthorized(new { message = "Invalid token claims." });
+        }
+
+        var currentPost = await _postService.GetByIdAsync(id, cancellationToken, currentUserId);
+
+        if (currentPost is null)
+        {
+            return NotFound(new { message = "Post was not found." });
+        }
+
+        var wasAdded = await _repostService.AddRepostAsync(currentUserId.Value, id, cancellationToken);
+
+        if (!wasAdded)
+        {
+            var postAfterFailedRepost = await _postService.GetByIdAsync(id, cancellationToken, currentUserId.Value);
+
+            return postAfterFailedRepost is null
+                ? NotFound(new { message = "Post was not found." })
+                : Conflict(new { message = "You have already reposted this post." });
+        }
+
+        var updatedPost = await _postService.GetByIdAsync(id, cancellationToken, currentUserId.Value);
+
+        return updatedPost is null
+            ? NotFound(new { message = "Post was not found." })
+            : Ok(MapRepostStateResponse(updatedPost));
+    }
+
+    [Authorize]
+    [HttpDelete("{id:guid}/repost")]
+    public async Task<ActionResult<PostRepostStateResponse>> UndoRepostPost(Guid id, CancellationToken cancellationToken)
+    {
+        var currentUserId = GetCurrentUserId();
+
+        if (currentUserId is null)
+        {
+            return Unauthorized(new { message = "Invalid token claims." });
+        }
+
+        var currentPost = await _postService.GetByIdAsync(id, cancellationToken, currentUserId);
+
+        if (currentPost is null)
+        {
+            return NotFound(new { message = "Post was not found." });
+        }
+
+        var wasRemoved = await _repostService.RemoveRepostAsync(currentUserId.Value, id, cancellationToken);
+
+        if (!wasRemoved)
+        {
+            var postAfterFailedUndo = await _postService.GetByIdAsync(id, cancellationToken, currentUserId.Value);
+
+            return postAfterFailedUndo is null
+                ? NotFound(new { message = "Post was not found." })
+                : NotFound(new { message = "Repost was not found." });
+        }
+
+        var updatedPost = await _postService.GetByIdAsync(id, cancellationToken, currentUserId.Value);
+
+        return updatedPost is null
+            ? NotFound(new { message = "Post was not found." })
+            : Ok(MapRepostStateResponse(updatedPost));
     }
 
     [Authorize]
@@ -273,6 +392,15 @@ public class PostsController : ControllerBase
         {
             LikedByMe = post.IsLikedByCurrentUser,
             LikesCount = post.LikesCount
+        };
+    }
+
+    private static PostRepostStateResponse MapRepostStateResponse(PostResponse post)
+    {
+        return new PostRepostStateResponse
+        {
+            RepostedByMe = post.IsRepostedByCurrentUser,
+            RepostsCount = post.RepostsCount
         };
     }
 }

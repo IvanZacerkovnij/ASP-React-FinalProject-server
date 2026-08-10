@@ -42,6 +42,9 @@ public class Post : BaseEntity
     public ICollection<Like> Likes { get; set; } =
         new List<Like>();
 
+    public ICollection<Repost> Reposts { get; set; } =
+        new List<Repost>();
+
     public ICollection<PostView> Views { get; set; } =
         new List<PostView>();
 

@@ -72,6 +72,11 @@ public class PostConfigurator : IEntityTypeConfiguration<Post>
             .HasForeignKey(like => like.PostId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        builder.HasMany(post => post.Reposts)
+            .WithOne(repost => repost.Post)
+            .HasForeignKey(repost => repost.PostId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         builder.HasMany(post => post.Views)
             .WithOne(view => view.Post)
             .HasForeignKey(view => view.PostId)

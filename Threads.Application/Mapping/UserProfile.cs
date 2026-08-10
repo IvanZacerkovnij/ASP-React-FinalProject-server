@@ -37,6 +37,7 @@ public class UserProfile : Profile
             .ForMember(destination => destination.Posts, options => options.Ignore())
             .ForMember(destination => destination.Comments, options => options.Ignore())
             .ForMember(destination => destination.Likes, options => options.Ignore())
+            .ForMember(destination => destination.Reposts, options => options.Ignore())
             .ForMember(destination => destination.FollowingRelations, options => options.Ignore())
             .ForMember(destination => destination.FollowerRelations, options => options.Ignore())
             .ForMember(destination => destination.RefreshTokens, options => options.Ignore())

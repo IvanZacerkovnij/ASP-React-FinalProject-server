@@ -82,6 +82,18 @@ public class PostService : IPostService
             .ToList();
     }
 
+    public async Task<IReadOnlyCollection<PostResponse>> GetRepostedByUserIdAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default,
+        Guid? currentUserId = null)
+    {
+        var posts = await _postRepository.GetRepostedByUserIdAsync(userId, cancellationToken);
+
+        return posts
+            .Select(post => MapPostResponse(post, currentUserId))
+            .ToList();
+    }
+
     public async Task<IReadOnlyCollection<PostResponse>> SearchAsync(
         string query,
         CancellationToken cancellationToken = default,
@@ -542,6 +554,8 @@ public class PostService : IPostService
             ViewsCount = response.ViewsCount,
             IsLikedByCurrentUser = currentUserId.HasValue &&
                 post.Likes.Any(like => like.UserId == currentUserId.Value),
+            IsRepostedByCurrentUser = currentUserId.HasValue &&
+                post.Reposts.Any(repost => repost.UserId == currentUserId.Value),
             CreatedAt = response.CreatedAt,
             UpdatedAt = response.UpdatedAt
         };

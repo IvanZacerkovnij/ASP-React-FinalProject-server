@@ -47,6 +47,9 @@ public class User : BaseEntity
     public ICollection<Like> Likes { get; set; } =
         new List<Like>();
 
+    public ICollection<Repost> Reposts { get; set; } =
+        new List<Repost>();
+
     public ICollection<PostView> PostViews { get; set; } =
         new List<PostView>();
 

@@ -31,6 +31,8 @@ public class PostResponse
 
     public bool IsLikedByCurrentUser { get; init; }
 
+    public bool IsRepostedByCurrentUser { get; init; }
+
     public DateTime CreatedAt { get; init; }
 
     public DateTime? UpdatedAt { get; init; }

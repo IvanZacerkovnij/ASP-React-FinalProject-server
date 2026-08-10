@@ -94,6 +94,24 @@ public class UsersController : ControllerBase
         return Ok(posts);
     }
 
+    [HttpGet("{username}/reposts")]
+    public async Task<ActionResult<IReadOnlyCollection<PostResponse>>> GetRepostedPostsByUsername(
+        string username,
+        CancellationToken cancellationToken)
+    {
+        var user = await _userService.GetByUsernameAsync(username, cancellationToken);
+
+        if (user is null)
+        {
+            return NotFound(new { message = "User was not found." });
+        }
+
+        var currentUserId = GetCurrentUserId();
+        var posts = await _postService.GetRepostedByUserIdAsync(user.Id, cancellationToken, currentUserId);
+
+        return Ok(posts);
+    }
+
     [Authorize]
     [Consumes("multipart/form-data")]
     [HttpPut("me")]

@@ -84,6 +84,39 @@ public class PostRepository : IPostRepository
             .ToList();
     }
 
+    public async Task<IReadOnlyCollection<Post>> GetRepostedByUserIdAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        var repostedPostIds = await _dbContext.Reposts
+            .AsNoTracking()
+            .Where(repost => repost.UserId == userId)
+            .OrderByDescending(repost => repost.CreatedAt)
+            .Select(repost => repost.PostId)
+            .ToListAsync(cancellationToken);
+
+        repostedPostIds = repostedPostIds
+            .Distinct()
+            .ToList();
+
+        if (repostedPostIds.Count == 0)
+        {
+            return [];
+        }
+
+        var posts = await BuildPostQuery(trackChanges: false)
+            .Where(post => repostedPostIds.Contains(post.Id))
+            .ToListAsync(cancellationToken);
+
+        var postOrder = repostedPostIds
+            .Select((id, index) => new { id, index })
+            .ToDictionary(item => item.id, item => item.index);
+
+        return posts
+            .OrderBy(post => postOrder[post.Id])
+            .ToList();
+    }
+
     public async Task<IReadOnlyCollection<Post>> SearchAsync(
         string query,
         int take = 20,
@@ -188,6 +221,7 @@ public class PostRepository : IPostRepository
             .Include(post => post.Media)
             .Include(post => post.Comments)
             .Include(post => post.Likes)
+            .Include(post => post.Reposts)
             .Include(post => post.Poll)
                 .ThenInclude(poll => poll!.Options)
                     .ThenInclude(option => option.Votes)

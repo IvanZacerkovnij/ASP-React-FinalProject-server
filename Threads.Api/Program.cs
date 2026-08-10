@@ -9,6 +9,7 @@ using Threads.Application.Interfaces.Media;
 using Threads.Application.Interfaces.Locations;
 using Threads.Application.Interfaces.Polls;
 using Threads.Application.Interfaces.Posts;
+using Threads.Application.Interfaces.Reposts;
 using Threads.Application.Interfaces.Security;
 using Threads.Application.Interfaces.Users;
 using Threads.Application.Interfaces.Likes;
@@ -22,6 +23,7 @@ using Threads.Infrastracture.Data.Repositories.Likes;
 using Threads.Infrastracture.Data.Repositories.Media;
 using Threads.Infrastracture.Data.Repositories.Polls;
 using Threads.Infrastracture.Data.Repositories.Posts;
+using Threads.Infrastracture.Data.Repositories.Reposts;
 using Threads.Infrastracture.Data.Repositories.RefreshTokens;
 using Threads.Infrastracture.Data.Repositories.Users;
 using Threads.Infrastracture.Security;
@@ -46,6 +48,7 @@ public class Program
         builder.Services.AddScoped<ICommentRepository, CommentRepository>();
         builder.Services.AddScoped<IFollowRepository, FollowRepository>();
         builder.Services.AddScoped<ILikeRepository, LikeRepository>();
+        builder.Services.AddScoped<IRepostRepository, RepostRepository>();
         builder.Services.AddScoped<IMediaRepository, MediaRepository>();
         builder.Services.AddScoped<IMediaProcessingService, FfmpegMediaProcessingService>();
         builder.Services.AddScoped<IObjectStorageService, S3ObjectStorageService>();
@@ -67,6 +70,7 @@ public class Program
             client.BaseAddress = new Uri("https://api.geoapify.com/");
         });
         builder.Services.AddScoped<ILikeService, LikeService>();
+        builder.Services.AddScoped<IRepostService, RepostService>();
         builder.Services.AddScoped<IMediaService, MediaService>();
         builder.Services.AddScoped<IAuthService, AuthService>();
 
