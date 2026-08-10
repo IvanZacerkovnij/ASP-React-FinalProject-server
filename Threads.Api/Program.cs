@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Http.Features;
 using Resend;
 using Threads.Application.Interfaces.Auth;
 using Threads.Application.Interfaces.Comments;
@@ -30,12 +31,14 @@ namespace Threads.Api;
 
 public class Program
 {
-
     public static void Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
 
+        builder.WebHost.ConfigureKestrel(UploadConfigurator.Configure);
+
         builder.Services.AddDbContext<ThreadsDbContext>(options => DbConfigurator.Configure(options, builder.Configuration));
+        builder.Services.Configure<FormOptions>(UploadConfigurator.Configure);
         builder.Services.AddAutoMapper(cfg => { }, typeof(UserProfile));
 
         builder.Services.AddScoped<IUserRepository, UserRepository>();

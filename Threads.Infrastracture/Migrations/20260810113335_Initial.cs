@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Threads.Infrastracture.Migrations
 {
     /// <inheritdoc />
-    public partial class initial : Migration
+    public partial class Initial : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -23,7 +23,13 @@ namespace Threads.Infrastracture.Migrations
                     PasswordResetCodeExpiresAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     DisplayName = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
                     Bio = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    Location = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
+                    LocationPlaceId = table.Column<string>(type: "character varying(1024)", maxLength: 1024, nullable: true),
+                    LocationCountry = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
+                    LocationLatitude = table.Column<double>(type: "double precision", nullable: true),
+                    LocationLongitude = table.Column<double>(type: "double precision", nullable: true),
                     AvatarObjectKey = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
+                    BannerObjectKey = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
                     IsVerified = table.Column<bool>(type: "boolean", nullable: false),
                     IsActive = table.Column<bool>(type: "boolean", nullable: false),
                     CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
@@ -68,6 +74,17 @@ namespace Threads.Infrastracture.Migrations
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     Content = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
+                    LocationName = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
+                    LocationPlaceId = table.Column<string>(type: "character varying(1024)", maxLength: 1024, nullable: true),
+                    LocationCountry = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
+                    LocationLatitude = table.Column<double>(type: "double precision", nullable: true),
+                    LocationLongitude = table.Column<double>(type: "double precision", nullable: true),
+                    EmbedUrl = table.Column<string>(type: "character varying(2048)", maxLength: 2048, nullable: true),
+                    EmbedTitle = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
+                    EmbedDescription = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
+                    EmbedThumbnailUrl = table.Column<string>(type: "character varying(2048)", maxLength: 2048, nullable: true),
+                    ViewsCount = table.Column<int>(type: "integer", nullable: false),
+                    RepostsCount = table.Column<int>(type: "integer", nullable: false),
                     AuthorId = table.Column<Guid>(type: "uuid", nullable: false),
                     CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
@@ -75,6 +92,8 @@ namespace Threads.Infrastracture.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Posts", x => x.Id);
+                    table.CheckConstraint("CK_Posts_RepostsCount", "\"RepostsCount\" >= 0");
+                    table.CheckConstraint("CK_Posts_ViewsCount", "\"ViewsCount\" >= 0");
                     table.ForeignKey(
                         name: "FK_Posts_Users_AuthorId",
                         column: x => x.AuthorId,
@@ -178,6 +197,10 @@ namespace Threads.Infrastracture.Migrations
                     ContentType = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
                     Type = table.Column<int>(type: "integer", nullable: false),
                     SizeInBytes = table.Column<long>(type: "bigint", nullable: false),
+                    Width = table.Column<int>(type: "integer", nullable: true),
+                    Height = table.Column<int>(type: "integer", nullable: true),
+                    DurationSeconds = table.Column<double>(type: "double precision", nullable: true),
+                    ThumbnailStorageKey = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
                     SortOrder = table.Column<int>(type: "integer", nullable: false),
                     UploadedByUserId = table.Column<Guid>(type: "uuid", nullable: false),
                     PostId = table.Column<Guid>(type: "uuid", nullable: true),
@@ -187,8 +210,11 @@ namespace Threads.Infrastracture.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Media", x => x.Id);
+                    table.CheckConstraint("CK_Media_DurationSeconds", "\"DurationSeconds\" IS NULL OR \"DurationSeconds\" >= 0");
+                    table.CheckConstraint("CK_Media_Height", "\"Height\" IS NULL OR \"Height\" >= 0");
                     table.CheckConstraint("CK_Media_SizeInBytes", "\"SizeInBytes\" >= 0");
                     table.CheckConstraint("CK_Media_SortOrder", "\"SortOrder\" >= 0");
+                    table.CheckConstraint("CK_Media_Width", "\"Width\" IS NULL OR \"Width\" >= 0");
                     table.ForeignKey(
                         name: "FK_Media_Posts_PostId",
                         column: x => x.PostId,
@@ -220,6 +246,33 @@ namespace Threads.Infrastracture.Migrations
                         name: "FK_Polls_Posts_PostId",
                         column: x => x.PostId,
                         principalTable: "Posts",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "PostViews",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    PostId = table.Column<Guid>(type: "uuid", nullable: false),
+                    ViewerId = table.Column<Guid>(type: "uuid", nullable: false),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_PostViews", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_PostViews_Posts_PostId",
+                        column: x => x.PostId,
+                        principalTable: "Posts",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_PostViews_Users_ViewerId",
+                        column: x => x.ViewerId,
+                        principalTable: "Users",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -367,6 +420,17 @@ namespace Threads.Infrastracture.Migrations
                 column: "AuthorId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_PostViews_PostId_ViewerId",
+                table: "PostViews",
+                columns: new[] { "PostId", "ViewerId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_PostViews_ViewerId",
+                table: "PostViews",
+                column: "ViewerId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_RefreshTokens_TokenHash",
                 table: "RefreshTokens",
                 column: "TokenHash",
@@ -407,6 +471,9 @@ namespace Threads.Infrastracture.Migrations
 
             migrationBuilder.DropTable(
                 name: "PollVotes");
+
+            migrationBuilder.DropTable(
+                name: "PostViews");
 
             migrationBuilder.DropTable(
                 name: "RefreshTokens");

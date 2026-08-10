@@ -33,6 +33,7 @@ public class MediaController : ControllerBase
 
     [Authorize]
     [HttpPost("upload")]
+    [RequestSizeLimit(104_857_600)]
     [RequestFormLimits(MultipartBodyLengthLimit = 104_857_600)]
     public async Task<ActionResult<UploadMediaResponse>> Upload(
         [FromForm] UploadMediaRequest request,

@@ -12,8 +12,8 @@ using Threads.Infrastracture.Data;
 namespace Threads.Infrastracture.Migrations
 {
     [DbContext(typeof(ThreadsDbContext))]
-    [Migration("20260809201802_initial")]
-    partial class initial
+    [Migration("20260810113335_Initial")]
+    partial class Initial
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -135,10 +135,16 @@ namespace Threads.Infrastracture.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<double?>("DurationSeconds")
+                        .HasColumnType("double precision");
+
                     b.Property<string>("FileName")
                         .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
+
+                    b.Property<int?>("Height")
+                        .HasColumnType("integer");
 
                     b.Property<Guid?>("PostId")
                         .HasColumnType("uuid");
@@ -154,6 +160,10 @@ namespace Threads.Infrastracture.Migrations
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)");
 
+                    b.Property<string>("ThumbnailStorageKey")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
                     b.Property<int>("Type")
                         .HasColumnType("integer");
 
@@ -162,6 +172,9 @@ namespace Threads.Infrastracture.Migrations
 
                     b.Property<Guid>("UploadedByUserId")
                         .HasColumnType("uuid");
+
+                    b.Property<int?>("Width")
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
@@ -174,9 +187,15 @@ namespace Threads.Infrastracture.Migrations
 
                     b.ToTable("Media", null, t =>
                         {
+                            t.HasCheckConstraint("CK_Media_DurationSeconds", "\"DurationSeconds\" IS NULL OR \"DurationSeconds\" >= 0");
+
+                            t.HasCheckConstraint("CK_Media_Height", "\"Height\" IS NULL OR \"Height\" >= 0");
+
                             t.HasCheckConstraint("CK_Media_SizeInBytes", "\"SizeInBytes\" >= 0");
 
                             t.HasCheckConstraint("CK_Media_SortOrder", "\"SortOrder\" >= 0");
+
+                            t.HasCheckConstraint("CK_Media_Width", "\"Width\" IS NULL OR \"Width\" >= 0");
                         });
                 });
 
@@ -286,14 +305,87 @@ namespace Threads.Infrastracture.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("EmbedDescription")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("EmbedThumbnailUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<string>("EmbedTitle")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<string>("EmbedUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<string>("LocationCountry")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<double?>("LocationLatitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("LocationLongitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("LocationName")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<string>("LocationPlaceId")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
+                    b.Property<int>("RepostsCount")
+                        .HasColumnType("integer");
+
                     b.Property<DateTimeOffset?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("ViewsCount")
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
                     b.HasIndex("AuthorId");
 
-                    b.ToTable("Posts", (string)null);
+                    b.ToTable("Posts", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Posts_RepostsCount", "\"RepostsCount\" >= 0");
+
+                            t.HasCheckConstraint("CK_Posts_ViewsCount", "\"ViewsCount\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("Threads.Domain.Entities.PostView", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("PostId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ViewerId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ViewerId");
+
+                    b.HasIndex("PostId", "ViewerId")
+                        .IsUnique();
+
+                    b.ToTable("PostViews", (string)null);
                 });
 
             modelBuilder.Entity("Threads.Domain.Entities.RefreshToken", b =>
@@ -342,6 +434,10 @@ namespace Threads.Infrastracture.Migrations
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)");
 
+                    b.Property<string>("BannerObjectKey")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
                     b.Property<string>("Bio")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
@@ -363,6 +459,24 @@ namespace Threads.Infrastracture.Migrations
 
                     b.Property<bool>("IsVerified")
                         .HasColumnType("boolean");
+
+                    b.Property<string>("Location")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<string>("LocationCountry")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<double?>("LocationLatitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("LocationLongitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("LocationPlaceId")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
@@ -537,6 +651,25 @@ namespace Threads.Infrastracture.Migrations
                     b.Navigation("Author");
                 });
 
+            modelBuilder.Entity("Threads.Domain.Entities.PostView", b =>
+                {
+                    b.HasOne("Threads.Domain.Entities.Post", "Post")
+                        .WithMany("Views")
+                        .HasForeignKey("PostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Threads.Domain.Entities.User", "Viewer")
+                        .WithMany("PostViews")
+                        .HasForeignKey("ViewerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Post");
+
+                    b.Navigation("Viewer");
+                });
+
             modelBuilder.Entity("Threads.Domain.Entities.RefreshToken", b =>
                 {
                     b.HasOne("Threads.Domain.Entities.User", "User")
@@ -574,6 +707,8 @@ namespace Threads.Infrastracture.Migrations
                     b.Navigation("Media");
 
                     b.Navigation("Poll");
+
+                    b.Navigation("Views");
                 });
 
             modelBuilder.Entity("Threads.Domain.Entities.User", b =>
@@ -587,6 +722,8 @@ namespace Threads.Infrastracture.Migrations
                     b.Navigation("Likes");
 
                     b.Navigation("PollVotes");
+
+                    b.Navigation("PostViews");
 
                     b.Navigation("Posts");
 
