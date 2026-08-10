@@ -1,447 +1,575 @@
 BackEndForFinalProject Documentation
 
-1. Overview
+1. Purpose
 
-This repository contains a layered ASP.NET Core Web API backend for a Threads-like social platform.
-The API supports:
-- authentication with JWT and refresh tokens
-- user profiles and profile updates
+This repository contains an ASP.NET Core Web API backend for a Threads-like social app.
+
+Main features:
+- JWT authentication with refresh tokens
+- user profiles
 - posts with media, embeds, locations, polls, likes, reposts, and views
 - comments
-- follow relationships
+- follows
+- media upload to S3
 - GIF search via Giphy
 - location search via Geoapify
-- media upload and processing
-
-The solution is split into 4 projects:
-- Threads.Api: HTTP entrypoint, controllers, request models, DI registration
-- Threads.Application: DTOs, interfaces, services, mapping profiles, business logic
-- Threads.Domain: core entities and shared base classes
-- Threads.Infrastracture: EF Core, repositories, external integrations, auth/security configuration
+- password reset and password change confirmation via Resend
 
 
-2. Architecture
+2. Solution Structure
 
-The project follows a classic layered structure:
-- Controllers in Threads.Api handle HTTP concerns
-- Services in Threads.Application contain business logic
-- Repositories in Threads.Infrastracture provide persistence via EF Core
-- Entities in Threads.Domain represent the data model
+- Threads.Api
+  HTTP entrypoint, controllers, request models, dependency injection
 
-Runtime flow:
-1. Request enters controller
-2. Controller resolves current user from JWT if needed
+- Threads.Application
+  DTOs, interfaces, services, business logic, AutoMapper profiles
+
+- Threads.Domain
+  Core entities and base classes
+
+- Threads.Infrastracture
+  EF Core, repositories, external services, security/configuration
+
+
+3. Request Flow
+
+1. HTTP request reaches controller in Threads.Api
+2. Controller validates route/authentication context
 3. Controller calls application service
-4. Service uses repositories and external services
-5. DTO response is returned to the controller
-6. Controller maps business result to HTTP response code and payload
-
-Persistence:
-- PostgreSQL via Entity Framework Core and Npgsql
-- DbContext: Threads.Infrastracture/Data/ThreadsDbContext.cs
-
-External integrations:
-- AWS S3 for media storage and signed read URLs
-- ffmpeg/ffprobe for media metadata and video thumbnails
-- Resend for password reset and password change email codes
-- Giphy API for GIF search
-- Geoapify API for location search
+4. Service uses repositories and integrations
+5. Service returns DTO or business result
+6. Controller maps the result to HTTP status code + JSON response
 
 
-3. Main Domain Entities
+4. Main Technologies
+
+- ASP.NET Core Web API
+- Entity Framework Core + Npgsql
+- PostgreSQL
+- AWS S3
+- ffmpeg / ffprobe
+- Resend
+- Giphy API
+- Geoapify API
+- Docker + Nginx
+
+
+5. Main Domain Entities
 
 User
-- account data, profile data, password hash
+- account and profile data
+- avatar and banner
+- password hash
 - password reset code state
-- pending password hash for email-confirmed password change
-- relations: posts, comments, likes, reposts, follows, refresh tokens, uploaded media
+- pending password hash for confirmed password changes
 
 Post
 - content
-- optional location
-- optional embed
-- counters: views, reposts
-- relations: author, media, comments, likes, reposts, poll, views
-
-Like
-- relation between user and post
-
-Repost
-- relation between user and post
-- current code expects a unique pair of UserId + PostId
+- location
+- embed
+- media
+- poll
+- counters: likes, comments, reposts, views
 
 Comment
-- post comments, including parent comment support
+- belongs to a post
+- can have a parent comment
+
+Like
+- user to post relation
+
+Repost
+- user to post relation
 
 Follow
-- relation between follower and following user
-
-Poll / PollOption / PollVote
-- post poll model
+- follower to following relation
 
 Media
-- uploaded image/video/gif metadata
+- uploaded image/video metadata
+
+Poll / PollOption / PollVote
+- poll support for posts
 
 RefreshToken
-- persisted refresh tokens with revoke/expire support
+- persistent refresh token with revoke state
 
 PostView
-- unique viewer/post view tracking
+- unique post view tracking
 
 
-4. API Base Route
+6. Runtime Configuration
 
-All controllers are exposed under:
-- /api/auth
-- /api/users
-- /api/posts
-- /api/comments
-- /api/media
-- /api/search
-- /api/follows
+Required or relevant configuration keys:
 
+Database
+- ConnectionStrings:DefaultConnection
 
-5. API Endpoints
-
-5.1 Auth
-
-Base route: /api/auth
-
-POST /register
-- register user
-
-POST /login
-- login by email or username
-
-POST /refresh
-- exchange refresh token for a new token pair
-
-POST /logout
-- revoke refresh token
-
-POST /forgot-password
-- send reset code to email via Resend
-
-POST /verify-reset-code
-- verify password reset code
-
-POST /reset-password
-- reset password using email + code
-
-POST /change-password
-- authenticated 2-step password change flow
-- first call: currentPassword + newPassword
-- second call: currentPassword + code
-
-GET /me
-- current authenticated user profile
-
-
-5.2 Users
-
-Base route: /api/users
-
-GET /
-- list users
-
-GET /{id}
-- user by Guid
-
-GET /{username}
-- user by username
-
-GET /by-username/{username}
-- explicit username route variant
-
-GET /{id}/posts
-- posts by author id
-
-GET /{username}/likes
-- posts liked by user
-
-GET /{username}/reposts
-- posts reposted by user
-
-PUT /me
-- authenticated multipart/form-data profile update
-- supports avatar and banner upload
-
-DELETE /me
-- authenticated self-delete
-
-
-5.3 Posts
-
-Base route: /api/posts
-
-GET /
-- all posts
-
-GET /feed
-- random feed selection
-
-GET /liked
-- authenticated posts liked by current user
-
-GET /user/{username}
-- posts by username
-
-GET /reposted
-- authenticated posts reposted by current user
-
-GET /{id}
-- post by id
-
-POST /{id}/view
-- authenticated unique view registration
-
-POST /{id}/like
-- like post
-
-DELETE /{id}/like
-- unlike post
-
-POST /{id}/repost
-- repost post
-- returns 409 if already reposted
-
-DELETE /{id}/repost
-- remove repost
-- returns 404 if repost does not exist
-
-POST /{id}/poll/vote
-- vote in poll
-
-POST /
-- create post
-
-PUT /{id}
-- update own post
-
-DELETE /{id}
-- delete own post
-
-
-5.4 Comments
-
-Base route: /api/comments
-
-GET /post/{postId}
-- comments for a post
-
-POST /
-- create comment
-
-PUT /{id}
-- update own comment
-
-DELETE /{id}
-- delete own comment
-
-
-5.5 Follows
-
-Base route: /api/follows
-
-POST /{userId}
-- follow user
-
-DELETE /{userId}
-- unfollow user
-
-GET /{userId}/followers
-- list followers
-
-GET /{userId}/following
-- list following
-
-DELETE /{userId}/followers/{followId}
-- remove follower from own followers list
-
-
-5.6 Media
-
-Base route: /api/media
-
-GET /{id}
-- resolve media read URL
-
-POST /upload
-- authenticated multipart upload
-- max request size configured to 100 MB
-
-
-5.7 Search
-
-Base route: /api/search
-
-GET /users?q=...
-- search users
-
-GET /posts?q=...
-- search posts
-
-GET /gifs?q=...
-- search GIFs through Giphy
-
-GET /locations?q=...
-- search locations through Geoapify
-
-
-6. Authentication Model
-
-Access tokens:
-- JWT bearer tokens
-- generated by JwtTokenService
-- payload includes NameIdentifier, Name, Email, and standard JWT fields
-
-Refresh tokens:
-- random 32-byte token
-- SHA-256 hash persisted in database
-- old refresh token is revoked on refresh
-- all refresh tokens are revoked after password reset or confirmed password change
-
-Required JWT configuration:
+JWT
 - Jwt:Issuer
 - Jwt:Audience
 - Jwt:Key
-- Jwt:AccessTokenLifetimeMinutes, optional, defaults to 60
+- Jwt:AccessTokenLifetimeMinutes
 
-
-7. Media Flow
-
-Media uploads are processed by:
-- MediaController
-- MediaService
-- FfmpegMediaProcessingService
-- S3ObjectStorageService
-
-Current behavior:
-- uploaded file is analyzed with ffprobe
-- videos may get generated thumbnail image via ffmpeg
-- metadata is stored in DB
-- original media and optional thumbnail are uploaded to S3
-- responses expose signed read URLs, not raw storage keys
-
-Relevant config:
-- MediaProcessing:FfmpegPath
-- MediaProcessing:FfprobePath
+AWS S3
 - AWS:S3:Region
 - AWS:S3:BucketName
 - AWS:S3:ReadUrlExpirationMinutes
 
+Media processing
+- MediaProcessing:FfmpegPath
+- MediaProcessing:FfprobePath
+- MediaProcessing:VideoCompression:Preset
+- MediaProcessing:VideoCompression:Crf
+- MediaProcessing:VideoCompression:AudioBitrateKbps
+- MediaProcessing:VideoCompression:MaxWidth
 
-8. Email and Password Recovery
-
-Password reset and password change confirmation emails are sent through Resend.
-
-Required config:
+Email
 - RESEND_APITOKEN
 - RESEND_FROM_EMAIL
-- RESEND_FROM_NAME, optional
+- RESEND_FROM_NAME
 
-Current code lifetime for reset/change codes:
-- 15 minutes
+External search
+- GIPHY_API_KEY
+- GIPHY_RATING
+- GEOAPIFY_API_KEY
 
-
-9. Search Providers
-
-GIF search:
-- Giphy
-- required config: GIPHY_API_KEY
-- optional config: GIPHY_RATING
-
-Location search:
-- Geoapify
-- required config: GEOAPIFY_API_KEY
+CORS
+- Cors:AllowedOrigins
 
 
-10. CORS
+7. Media Processing Behavior
 
-CORS is configured in:
-- Threads.Infrastracture/Security/CORSConfigurator.cs
+Images:
+- validated
+- metadata extracted
+- uploaded as-is
 
-Current appsettings.json includes:
-- http://localhost:8000
-- http://127.0.0.1:8000
+Videos:
+- accepted as uploaded file
+- compressed with ffmpeg to MP4 before S3 upload
+- metadata extracted from the compressed file
+- thumbnail generated from the compressed file
+- stored response uses compressed file size/content type
 
-
-11. Database and Migrations
-
-DbContext configuration:
-- connection string name: DefaultConnection
-
-Current repository already contains EF migration artifacts.
-
-Important current note:
-- the Repost entity and repost endpoints were added in code
-- if the database schema does not yet include the Reposts table and related indexes, you must create and apply a new EF migration before using repost endpoints
+Current upload limit:
+- request body limit: 100 MB in ASP.NET
+- Nginx must also allow at least 100 MB
 
 
-12. Dependency Injection
+8. API Routes
 
-All repositories and services are registered in Threads.Api/Program.cs.
+8.1 Auth
 
-Notable registrations:
-- repositories for users, posts, comments, follows, likes, reposts, polls, refresh tokens, media
-- services for auth, users, posts, comments, follows, likes, reposts, polls, media
-- HttpClient registrations for Giphy and Geoapify
-- Resend integration
+Base route: /api/auth
 
-
-13. Deployment
-
-Container:
-- Dockerfile builds and publishes Threads.Api
-- runtime image installs ffmpeg
-- app listens on port 8080 in container
-
-docker-compose:
-- binds 127.0.0.1:7000 to container 8080
-- reads environment from .env
-- sets ASPNETCORE_ENVIRONMENT=Production
-
-Nginx deployment instructions:
-- see deploy/README.md
+- POST /register
+- POST /login
+- POST /refresh
+- POST /logout
+- POST /forgot-password
+- POST /verify-reset-code
+- POST /reset-password
+- POST /change-password
+- GET /me
 
 
-14. Local Run Checklist
+8.2 Users
 
-Minimum requirements:
-- .NET SDK 10
-- PostgreSQL
-- ffmpeg and ffprobe available, unless custom paths are configured
-- valid AWS credentials/environment for S3 access
-- valid Resend API token if password recovery/change mail flow is used
-- Giphy and Geoapify API keys if corresponding search endpoints are used
+Base route: /api/users
 
-Typical setup steps:
-1. configure ConnectionStrings:DefaultConnection
-2. configure Jwt section
-3. configure AWS S3 values
-4. configure Resend values
-5. configure Giphy and Geoapify keys if needed
-6. apply migrations
-7. run the API
+- GET /
+- GET /{id}
+- GET /{username}
+- GET /by-username/{username}
+- GET /{id}/posts
+- GET /{username}/likes
+- GET /{username}/reposts
+- PUT /me
+- DELETE /me
 
 
-15. Known Implementation Notes
+8.3 Posts
 
-- PostsController currently supports repost add and remove on the same route with POST and DELETE.
-- Reposted post list query now deduplicates PostId values before ordering, which protects reads before the unique DB constraint is applied.
-- RepostsCount is stored on Post as a denormalized counter, so schema and service logic should stay consistent with the Reposts relation.
-- There are both /api/users/{username} and /api/users/by-username/{username} routes.
-- Search endpoints are under /api/search/*, not under /api/gifs or /api/locations directly.
-- Media upload endpoint is /api/media/upload, not /api/media.
+Base route: /api/posts
+
+- GET /
+- GET /feed
+- GET /liked
+- GET /user/{username}
+- GET /reposted
+- GET /{id}
+- POST /{id}/view
+- POST /{id}/like
+- DELETE /{id}/like
+- POST /{id}/repost
+- DELETE /{id}/repost
+- POST /{id}/poll/vote
+- POST /
+- PUT /{id}
+- DELETE /{id}
 
 
-16. Suggested Next Maintenance Items
+8.4 Comments
 
-- generate and apply the EF migration for Reposts if it has not been done yet
-- run a clean dotnet build and test pass locally
-- consider adding automated integration tests for:
-  - auth flows
-  - repost add/remove/list flows
-  - media upload
-  - poll voting
-  - password change via email confirmation code
+Base route: /api/comments
+
+- GET /post/{postId}
+- POST /
+- PUT /{id}
+- DELETE /{id}
+
+
+8.5 Follows
+
+Base route: /api/follows
+
+- POST /{userId}
+- DELETE /{userId}
+- GET /{userId}/followers
+- GET /{userId}/following
+- DELETE /{userId}/followers/{followId}
+
+
+8.6 Media
+
+Base route: /api/media
+
+- GET /{id}
+- POST /upload
+
+
+8.7 Search
+
+Base route: /api/search
+
+- GET /users?q=...
+- GET /posts?q=...
+- GET /gifs?q=...
+- GET /locations?q=...
+
+
+9. Response DTO Examples
+
+9.1 AuthResponse
+
+Returned by:
+- POST /api/auth/register
+- POST /api/auth/login
+- POST /api/auth/refresh
+
+```json
+{
+  "userId": "7d3b43e3-f1b0-4a17-a6ab-4ab9e78a4bc4",
+  "username": "ivan",
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refreshToken": "m4zz4s8V4fN7w7I2H6m3xP1KQ0...",
+  "accessTokenExpiresAt": "2026-08-10T18:30:00Z"
+}
+```
+
+
+9.2 UserShortResponse
+
+Returned inside:
+- GET /api/users
+- follow/follower lists
+- post author fields
+- comment author fields
+
+```json
+{
+  "id": "7d3b43e3-f1b0-4a17-a6ab-4ab9e78a4bc4",
+  "username": "ivan",
+  "displayName": "Ivan Z",
+  "location": {
+    "id": "kyiv-ua",
+    "name": "Kyiv",
+    "country": "Ukraine",
+    "latitude": 50.4501,
+    "longitude": 30.5234
+  },
+  "avatarUrl": "https://bucket.example.com/...",
+  "isVerified": false
+}
+```
+
+
+9.3 UserResponse
+
+Returned by:
+- GET /api/auth/me
+- GET /api/users/{id}
+- GET /api/users/{username}
+- PUT /api/users/me
+
+```json
+{
+  "id": "7d3b43e3-f1b0-4a17-a6ab-4ab9e78a4bc4",
+  "username": "ivan",
+  "displayName": "Ivan Z",
+  "bio": "Backend developer",
+  "location": {
+    "id": "kyiv-ua",
+    "name": "Kyiv",
+    "country": "Ukraine",
+    "latitude": 50.4501,
+    "longitude": 30.5234
+  },
+  "avatarUrl": "https://bucket.example.com/avatar.jpg",
+  "bannerUrl": "https://bucket.example.com/banner.jpg",
+  "followersCount": 12,
+  "followingCount": 8,
+  "postsCount": 5,
+  "isFollowedByCurrentUser": true,
+  "isVerified": false,
+  "createdAt": "2026-08-01T12:00:00Z"
+}
+```
+
+
+9.4 UploadMediaResponse
+
+Returned by:
+- POST /api/media/upload
+
+```json
+{
+  "id": "87a7f980-f8b9-4b6f-8ea9-4e9f64f1e58a",
+  "type": "video",
+  "url": "https://bucket.example.com/users/.../videos/87a7f980.mp4",
+  "thumbnailUrl": "https://bucket.example.com/users/.../video-thumbnails/87a7f980.jpg",
+  "width": 1280,
+  "height": 720,
+  "duration": 12.43,
+  "mimeType": "video/mp4",
+  "storageKey": "users/7d3b43e3-f1b0-4a17-a6ab-4ab9e78a4bc4/videos/87a7f980.mp4",
+  "fileName": "demo.mp4",
+  "sizeInBytes": 2489210
+}
+```
+
+
+9.5 MediaUrlResponse
+
+Returned by:
+- GET /api/media/{id}
+
+```json
+{
+  "id": "87a7f980-f8b9-4b6f-8ea9-4e9f64f1e58a",
+  "url": "https://bucket.example.com/users/.../videos/87a7f980.mp4"
+}
+```
+
+
+9.6 PostMediaResponse
+
+Returned inside:
+- PostResponse.media
+
+```json
+{
+  "id": "87a7f980-f8b9-4b6f-8ea9-4e9f64f1e58a",
+  "type": "video",
+  "url": "https://bucket.example.com/users/.../videos/87a7f980.mp4",
+  "thumbnailUrl": "https://bucket.example.com/users/.../video-thumbnails/87a7f980.jpg",
+  "width": 1280,
+  "height": 720,
+  "duration": 12.43,
+  "mimeType": "video/mp4",
+  "fileName": "demo.mp4",
+  "sizeInBytes": 2489210,
+  "sortOrder": 0
+}
+```
+
+
+9.7 PollResponse
+
+Returned by:
+- POST /api/posts/{id}/poll/vote
+- inside PostResponse.poll
+
+```json
+{
+  "id": "f58cccf3-58ef-4b58-97fb-c38f032c4e44",
+  "postId": "5b75c9b7-1d30-4773-8a0d-2ca6308d92bc",
+  "endsAt": "2026-08-15T18:00:00Z",
+  "totalVotes": 21,
+  "hasVotedByCurrentUser": true,
+  "selectedOptionId": "0ef467c3-65dc-4e44-81f7-502fc463b0f2",
+  "options": [
+    {
+      "id": "0ef467c3-65dc-4e44-81f7-502fc463b0f2",
+      "text": "Yes",
+      "position": 0,
+      "votesCount": 15
+    },
+    {
+      "id": "aebd3d18-8b42-4c97-b8f8-9ff5bb7ef35d",
+      "text": "No",
+      "position": 1,
+      "votesCount": 6
+    }
+  ]
+}
+```
+
+
+9.8 PostResponse
+
+Returned by:
+- GET post endpoints
+- create/update post endpoints
+- likes/reposts list endpoints
+- feed endpoints
+
+```json
+{
+  "id": "5b75c9b7-1d30-4773-8a0d-2ca6308d92bc",
+  "content": "Hello from backend",
+  "author": {
+    "id": "7d3b43e3-f1b0-4a17-a6ab-4ab9e78a4bc4",
+    "username": "ivan",
+    "displayName": "Ivan Z",
+    "location": null,
+    "avatarUrl": "https://bucket.example.com/avatar.jpg",
+    "isVerified": false
+  },
+  "media": [
+    {
+      "id": "87a7f980-f8b9-4b6f-8ea9-4e9f64f1e58a",
+      "type": "video",
+      "url": "https://bucket.example.com/users/.../videos/87a7f980.mp4",
+      "thumbnailUrl": "https://bucket.example.com/users/.../video-thumbnails/87a7f980.jpg",
+      "width": 1280,
+      "height": 720,
+      "duration": 12.43,
+      "mimeType": "video/mp4",
+      "fileName": "demo.mp4",
+      "sizeInBytes": 2489210,
+      "sortOrder": 0
+    }
+  ],
+  "poll": null,
+  "location": {
+    "id": "kyiv-ua",
+    "name": "Kyiv",
+    "country": "Ukraine",
+    "latitude": 50.4501,
+    "longitude": 30.5234
+  },
+  "embed": {
+    "url": "https://example.com/article",
+    "title": "Article title",
+    "description": "Short description",
+    "thumbnailUrl": "https://example.com/thumb.jpg"
+  },
+  "likesCount": 14,
+  "commentsCount": 3,
+  "repostsCount": 2,
+  "viewsCount": 57,
+  "isLikedByCurrentUser": true,
+  "isRepostedByCurrentUser": false,
+  "createdAt": "2026-08-10T10:30:00Z",
+  "updatedAt": null
+}
+```
+
+
+9.9 PostLikeStateResponse
+
+Returned by:
+- POST /api/posts/{id}/like
+- DELETE /api/posts/{id}/like
+
+```json
+{
+  "likedByMe": true,
+  "likesCount": 15
+}
+```
+
+
+9.10 PostRepostStateResponse
+
+Returned by:
+- POST /api/posts/{id}/repost
+- DELETE /api/posts/{id}/repost
+
+```json
+{
+  "repostedByMe": true,
+  "repostsCount": 3
+}
+```
+
+
+9.11 PostViewResponse
+
+Returned by:
+- POST /api/posts/{id}/view
+
+```json
+{
+  "postId": "5b75c9b7-1d30-4773-8a0d-2ca6308d92bc",
+  "viewsCount": 58
+}
+```
+
+
+9.12 CommentResponse
+
+Returned by:
+- GET /api/comments/post/{postId}
+- POST /api/comments
+- PUT /api/comments/{id}
+
+```json
+{
+  "id": "f74dd4c4-5014-4bc2-a1ab-0a7668a8f76a",
+  "postId": "5b75c9b7-1d30-4773-8a0d-2ca6308d92bc",
+  "parentCommentId": null,
+  "content": "Nice post",
+  "author": {
+    "id": "7d3b43e3-f1b0-4a17-a6ab-4ab9e78a4bc4",
+    "username": "ivan",
+    "displayName": "Ivan Z",
+    "location": null,
+    "avatarUrl": "https://bucket.example.com/avatar.jpg",
+    "isVerified": false
+  },
+  "likesCount": 0,
+  "isLikedByCurrentUser": false,
+  "createdAt": "2026-08-10T11:00:00Z",
+  "updatedAt": null
+}
+```
+
+
+10. Important Behavioral Notes
+
+- Nginx must allow large uploads, otherwise media upload can fail with 413 even if ASP.NET allows 100 MB.
+- Reposts use a dedicated Reposts relation plus a denormalized Post.RepostsCount counter.
+- Videos are now compressed before upload and stored as MP4.
+- Search routes are under /api/search/*, not /api/gifs or /api/locations directly.
+- Media upload route is /api/media/upload.
+
+
+11. Local Run Checklist
+
+1. Configure database connection string
+2. Configure JWT settings
+3. Configure AWS S3 settings
+4. Configure Resend
+5. Configure Giphy and Geoapify if needed
+6. Apply EF migrations
+7. Run the API
+
+
+12. Deployment Notes
+
+- Docker container listens on port 8080
+- docker-compose binds 127.0.0.1:7000 to container port 8080
+- Nginx proxies public traffic to 127.0.0.1:7000
+- If you update deploy/nginx/threads.conf in the repository, the server-side active nginx config must also be synchronized

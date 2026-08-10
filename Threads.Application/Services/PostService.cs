@@ -516,17 +516,11 @@ public class PostService : IPostService
                     Width = media.Width,
                     Height = media.Height,
                     Duration = media.DurationSeconds,
-                    Size = media.SizeInBytes,
                     MimeType = media.ContentType,
                     FileName = media.FileName,
-                    ContentType = media.ContentType,
                     SizeInBytes = media.SizeInBytes,
                     SortOrder = media.SortOrder
                 })
-                .ToList(),
-            MediaUrls = post.Media
-                .OrderBy(media => media.SortOrder)
-                .Select(media => _objectStorageService.GetReadUrl(media.StorageKey))
                 .ToList(),
             Poll = MapPollResponse(post.Poll, currentUserId),
             Location = string.IsNullOrWhiteSpace(post.LocationName)

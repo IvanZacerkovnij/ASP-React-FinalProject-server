@@ -9,13 +9,24 @@ namespace Threads.Infrastracture.Services;
 
 public class FfmpegMediaProcessingService : IMediaProcessingService
 {
+    private const string CompressedVideoContentType = "video/mp4";
     private readonly string _ffprobePath;
     private readonly string _ffmpegPath;
+    private readonly string _videoCompressionPreset;
+    private readonly int _videoCompressionCrf;
+    private readonly int _videoCompressionAudioBitrateKbps;
+    private readonly int _videoCompressionMaxWidth;
 
     public FfmpegMediaProcessingService(IConfiguration configuration)
     {
         _ffprobePath = configuration["MediaProcessing:FfprobePath"] ?? "ffprobe";
         _ffmpegPath = configuration["MediaProcessing:FfmpegPath"] ?? "ffmpeg";
+        _videoCompressionPreset = configuration["MediaProcessing:VideoCompression:Preset"] ?? "medium";
+        _videoCompressionCrf = configuration.GetValue<int?>("MediaProcessing:VideoCompression:Crf") ?? 28;
+        _videoCompressionAudioBitrateKbps =
+            configuration.GetValue<int?>("MediaProcessing:VideoCompression:AudioBitrateKbps") ?? 128;
+        _videoCompressionMaxWidth =
+            configuration.GetValue<int?>("MediaProcessing:VideoCompression:MaxWidth") ?? 1280;
     }
 
     public async Task<MediaProcessingResult> ProcessAsync(
@@ -23,19 +34,76 @@ public class FfmpegMediaProcessingService : IMediaProcessingService
         string contentType,
         CancellationToken cancellationToken = default)
     {
-        var metadata = await ExtractMetadataAsync(sourceFilePath, cancellationToken);
-
         if (!contentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase))
         {
-            return metadata;
+            return await ExtractMetadataAsync(sourceFilePath, cancellationToken);
         }
 
-        var thumbnailFilePath = await TryGenerateThumbnailAsync(sourceFilePath, cancellationToken);
+        var compressedFilePath = await CompressVideoAsync(sourceFilePath, cancellationToken);
+        var metadata = await ExtractMetadataAsync(compressedFilePath, cancellationToken);
+        var thumbnailFilePath = await TryGenerateThumbnailAsync(compressedFilePath, cancellationToken);
 
         return metadata with
         {
+            ProcessedFilePath = compressedFilePath,
+            OutputContentType = CompressedVideoContentType,
+            OutputSizeInBytes = GetFileSizeInBytes(compressedFilePath),
             ThumbnailFilePath = thumbnailFilePath
         };
+    }
+
+    private async Task<string> CompressVideoAsync(
+        string sourceFilePath,
+        CancellationToken cancellationToken)
+    {
+        var compressedFilePath = Path.Combine(
+            Path.GetTempPath(),
+            $"threads-video-{Guid.NewGuid():N}.mp4");
+
+        var arguments = new[]
+        {
+            "-y",
+            "-i",
+            sourceFilePath,
+            "-vf",
+            $"scale='min({_videoCompressionMaxWidth},iw)':-2",
+            "-c:v",
+            "libx264",
+            "-preset",
+            _videoCompressionPreset,
+            "-crf",
+            _videoCompressionCrf.ToString(CultureInfo.InvariantCulture),
+            "-c:a",
+            "aac",
+            "-b:a",
+            $"{_videoCompressionAudioBitrateKbps}k",
+            "-movflags",
+            "+faststart",
+            compressedFilePath
+        };
+
+        try
+        {
+            await RunProcessAsync(
+                _ffmpegPath,
+                arguments,
+                "Unable to compress video.",
+                cancellationToken);
+
+            var compressedFile = new FileInfo(compressedFilePath);
+
+            if (!compressedFile.Exists || compressedFile.Length == 0)
+            {
+                throw new InvalidOperationException("Unable to compress video.");
+            }
+
+            return compressedFilePath;
+        }
+        catch
+        {
+            TryDeleteLocalFile(compressedFilePath);
+            throw;
+        }
     }
 
     private async Task<MediaProcessingResult> ExtractMetadataAsync(
@@ -55,7 +123,11 @@ public class FfmpegMediaProcessingService : IMediaProcessingService
             sourceFilePath
         };
 
-        var output = await RunProcessAsync(_ffprobePath, arguments, cancellationToken);
+        var output = await RunProcessAsync(
+            _ffprobePath,
+            arguments,
+            "Unable to extract media metadata.",
+            cancellationToken);
 
         var probeResponse = JsonSerializer.Deserialize<ProbeResponse>(
             output,
@@ -150,6 +222,7 @@ public class FfmpegMediaProcessingService : IMediaProcessingService
     private async Task<string> RunProcessAsync(
         string fileName,
         IReadOnlyCollection<string> arguments,
+        string failureMessage,
         CancellationToken cancellationToken)
     {
         var processStartInfo = BuildProcessStartInfo(fileName, arguments);
@@ -172,13 +245,18 @@ public class FfmpegMediaProcessingService : IMediaProcessingService
         if (process.ExitCode != 0)
         {
             var message = string.IsNullOrWhiteSpace(standardError)
-                ? "Unable to extract media metadata."
-                : $"Unable to extract media metadata: {standardError.Trim()}";
+                ? failureMessage
+                : $"{failureMessage} {standardError.Trim()}";
 
             throw new InvalidOperationException(message);
         }
 
         return standardOutput;
+    }
+
+    private static long GetFileSizeInBytes(string filePath)
+    {
+        return new FileInfo(filePath).Length;
     }
 
     private static ProcessStartInfo BuildProcessStartInfo(string fileName, IReadOnlyCollection<string> arguments)

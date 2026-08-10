@@ -16,15 +16,11 @@ public class UploadMediaResponse
 
     public double? Duration { get; init; }
 
-    public long Size { get; init; }
-
     public required string MimeType { get; init; }
 
     public required string StorageKey { get; init; }
 
     public required string FileName { get; init; }
-
-    public required string ContentType { get; init; }
 
     public long SizeInBytes { get; init; }
 }

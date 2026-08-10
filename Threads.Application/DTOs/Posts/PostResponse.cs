@@ -13,8 +13,6 @@ public class PostResponse
 
     public IReadOnlyCollection<PostMediaResponse> Media { get; init; } = [];
 
-    public IReadOnlyCollection<string> MediaUrls { get; init; } = [];
-
     public PollResponse? Poll { get; init; }
 
     public PostLocationResponse? Location { get; init; }

@@ -1,447 +1,575 @@
 Документація BackEndForFinalProject
 
-1. Огляд
+1. Призначення
 
-Цей репозиторій містить багатошаровий ASP.NET Core Web API backend для соціальної платформи у стилі Threads.
-API підтримує:
-- автентифікацію через JWT і refresh tokens
-- профілі користувачів та оновлення профілю
+Цей репозиторій містить ASP.NET Core Web API backend для соціального застосунку у стилі Threads.
+
+Основні можливості:
+- JWT-автентифікація з refresh tokens
+- профілі користувачів
 - пости з медіа, embed, локаціями, опитуваннями, лайками, репостами та переглядами
 - коментарі
-- підписки між користувачами
+- підписки
+- завантаження медіа в S3
 - пошук GIF через Giphy
 - пошук локацій через Geoapify
-- завантаження та обробку медіа
-
-Solution поділено на 4 проєкти:
-- Threads.Api: HTTP-вхід, контролери, request-моделі, реєстрація DI
-- Threads.Application: DTO, інтерфейси, сервіси, mapping profiles, бізнес-логіка
-- Threads.Domain: основні сутності та спільні базові класи
-- Threads.Infrastracture: EF Core, репозиторії, зовнішні інтеграції, конфігурація auth/security
+- відновлення пароля та підтвердження зміни пароля через Resend
 
 
-2. Архітектура
+2. Структура Solution
 
-Проєкт використовує класичну багатошарову структуру:
-- контролери в Threads.Api обробляють HTTP-рівень
-- сервіси в Threads.Application містять бізнес-логіку
-- репозиторії в Threads.Infrastracture працюють з persistence через EF Core
-- сутності в Threads.Domain описують модель даних
+- Threads.Api
+  HTTP-вхід, контролери, request-моделі, dependency injection
 
-Runtime flow:
-1. Запит потрапляє в контролер
-2. Контролер, якщо потрібно, дістає поточного користувача з JWT
+- Threads.Application
+  DTO, інтерфейси, сервіси, бізнес-логіка, AutoMapper profiles
+
+- Threads.Domain
+  Базові сутності та спільні класи
+
+- Threads.Infrastracture
+  EF Core, репозиторії, зовнішні сервіси, security/configuration
+
+
+3. Flow Запиту
+
+1. HTTP-запит потрапляє в контролер у Threads.Api
+2. Контролер перевіряє route/auth context
 3. Контролер викликає application service
-4. Сервіс використовує репозиторії та зовнішні сервіси
-5. DTO-відповідь повертається в контролер
-6. Контролер мапить бізнес-результат у HTTP status code і payload
-
-Persistence:
-- PostgreSQL через Entity Framework Core та Npgsql
-- DbContext: Threads.Infrastracture/Data/ThreadsDbContext.cs
-
-Зовнішні інтеграції:
-- AWS S3 для зберігання медіа та signed read URL
-- ffmpeg/ffprobe для метаданих медіа та thumbnail для відео
-- Resend для email-кодів відновлення пароля та зміни пароля
-- Giphy API для пошуку GIF
-- Geoapify API для пошуку локацій
+4. Сервіс використовує репозиторії та інтеграції
+5. Сервіс повертає DTO або бізнес-результат
+6. Контролер мапить результат у HTTP status code + JSON response
 
 
-3. Основні доменні сутності
+4. Основні Технології
+
+- ASP.NET Core Web API
+- Entity Framework Core + Npgsql
+- PostgreSQL
+- AWS S3
+- ffmpeg / ffprobe
+- Resend
+- Giphy API
+- Geoapify API
+- Docker + Nginx
+
+
+5. Основні Доменні Сутності
 
 User
-- дані акаунта та профілю, password hash
-- стан коду для password reset
-- pending password hash для зміни пароля через підтвердження по email
-- зв’язки: posts, comments, likes, reposts, follows, refresh tokens, uploaded media
+- дані акаунта і профілю
+- avatar і banner
+- password hash
+- стан password reset code
+- pending password hash для підтвердженої зміни пароля
 
 Post
 - контент
-- опціональна локація
-- опціональний embed
-- лічильники: views, reposts
-- зв’язки: author, media, comments, likes, reposts, poll, views
-
-Like
-- зв’язок між user і post
-
-Repost
-- зв’язок між user і post
-- поточний код розрахований на унікальну пару UserId + PostId
+- локація
+- embed
+- медіа
+- poll
+- лічильники: likes, comments, reposts, views
 
 Comment
-- коментарі до поста, включно з підтримкою parent comment
+- належить посту
+- може мати parent comment
+
+Like
+- зв’язок user -> post
+
+Repost
+- зв’язок user -> post
 
 Follow
-- зв’язок між follower і following user
-
-Poll / PollOption / PollVote
-- модель опитування для поста
+- зв’язок follower -> following
 
 Media
-- метадані завантаженого image/video/gif
+- метадані завантаженого image/video
+
+Poll / PollOption / PollVote
+- підтримка опитувань у постах
 
 RefreshToken
-- збережені refresh tokens з підтримкою revoke/expire
+- збережений refresh token з revoke-станом
 
 PostView
-- унікальний облік переглядів по viewer/post
+- унікальний облік переглядів постів
 
 
-4. Базовий маршрут API
+6. Runtime Конфігурація
 
-Усі контролери доступні під:
-- /api/auth
-- /api/users
-- /api/posts
-- /api/comments
-- /api/media
-- /api/search
-- /api/follows
+Потрібні або важливі ключі конфігурації:
 
+База даних
+- ConnectionStrings:DefaultConnection
 
-5. API Endpoints
-
-5.1 Auth
-
-Базовий маршрут: /api/auth
-
-POST /register
-- реєстрація користувача
-
-POST /login
-- вхід по email або username
-
-POST /refresh
-- обмін refresh token на нову пару токенів
-
-POST /logout
-- revoke refresh token
-
-POST /forgot-password
-- надсилання reset-коду на email через Resend
-
-POST /verify-reset-code
-- перевірка password reset code
-
-POST /reset-password
-- скидання пароля через email + code
-
-POST /change-password
-- authenticated 2-step flow зміни пароля
-- перший виклик: currentPassword + newPassword
-- другий виклик: currentPassword + code
-
-GET /me
-- профіль поточного автентифікованого користувача
-
-
-5.2 Users
-
-Базовий маршрут: /api/users
-
-GET /
-- список користувачів
-
-GET /{id}
-- користувач по Guid
-
-GET /{username}
-- користувач по username
-
-GET /by-username/{username}
-- явний варіант маршруту по username
-
-GET /{id}/posts
-- пости автора по id
-
-GET /{username}/likes
-- пости, які лайкнув користувач
-
-GET /{username}/reposts
-- пости, які репостнув користувач
-
-PUT /me
-- authenticated multipart/form-data оновлення профілю
-- підтримує avatar і banner upload
-
-DELETE /me
-- authenticated self-delete
-
-
-5.3 Posts
-
-Базовий маршрут: /api/posts
-
-GET /
-- усі пости
-
-GET /feed
-- випадкова вибірка для стрічки
-
-GET /liked
-- authenticated список постів, лайкнутих поточним користувачем
-
-GET /user/{username}
-- пости по username
-
-GET /reposted
-- authenticated список постів, репостнутих поточним користувачем
-
-GET /{id}
-- пост по id
-
-POST /{id}/view
-- authenticated реєстрація унікального перегляду
-
-POST /{id}/like
-- лайк поста
-
-DELETE /{id}/like
-- зняття лайка
-
-POST /{id}/repost
-- репост поста
-- повертає 409, якщо пост уже репостнули
-
-DELETE /{id}/repost
-- зняти репост
-- повертає 404, якщо репоста не існує
-
-POST /{id}/poll/vote
-- голосування в опитуванні
-
-POST /
-- створення поста
-
-PUT /{id}
-- оновлення власного поста
-
-DELETE /{id}
-- видалення власного поста
-
-
-5.4 Comments
-
-Базовий маршрут: /api/comments
-
-GET /post/{postId}
-- коментарі до поста
-
-POST /
-- створення коментаря
-
-PUT /{id}
-- оновлення власного коментаря
-
-DELETE /{id}
-- видалення власного коментаря
-
-
-5.5 Follows
-
-Базовий маршрут: /api/follows
-
-POST /{userId}
-- підписатися на користувача
-
-DELETE /{userId}
-- відписатися від користувача
-
-GET /{userId}/followers
-- список followers
-
-GET /{userId}/following
-- список following
-
-DELETE /{userId}/followers/{followId}
-- видалити follower зі свого списку followers
-
-
-5.6 Media
-
-Базовий маршрут: /api/media
-
-GET /{id}
-- отримати media read URL
-
-POST /upload
-- authenticated multipart upload
-- max request size налаштований на 100 MB
-
-
-5.7 Search
-
-Базовий маршрут: /api/search
-
-GET /users?q=...
-- пошук користувачів
-
-GET /posts?q=...
-- пошук постів
-
-GET /gifs?q=...
-- пошук GIF через Giphy
-
-GET /locations?q=...
-- пошук локацій через Geoapify
-
-
-6. Модель автентифікації
-
-Access tokens:
-- JWT bearer tokens
-- генеруються JwtTokenService
-- payload включає NameIdentifier, Name, Email та стандартні JWT fields
-
-Refresh tokens:
-- випадковий 32-byte token
-- у базі зберігається SHA-256 hash
-- старий refresh token revoke-иться під час refresh
-- усі refresh tokens revoke-яться після password reset або підтвердженої зміни пароля
-
-Обов’язкова JWT-конфігурація:
+JWT
 - Jwt:Issuer
 - Jwt:Audience
 - Jwt:Key
-- Jwt:AccessTokenLifetimeMinutes, опціонально, за замовчуванням 60
+- Jwt:AccessTokenLifetimeMinutes
 
-
-7. Media Flow
-
-Завантаження медіа проходить через:
-- MediaController
-- MediaService
-- FfmpegMediaProcessingService
-- S3ObjectStorageService
-
-Поточна поведінка:
-- завантажений файл аналізується через ffprobe
-- для відео може бути згенерований thumbnail через ffmpeg
-- метадані зберігаються в БД
-- оригінальне медіа і опціональний thumbnail завантажуються в S3
-- у відповідях повертаються signed read URLs, а не raw storage keys
-
-Релевантна конфігурація:
-- MediaProcessing:FfmpegPath
-- MediaProcessing:FfprobePath
+AWS S3
 - AWS:S3:Region
 - AWS:S3:BucketName
 - AWS:S3:ReadUrlExpirationMinutes
 
+Обробка медіа
+- MediaProcessing:FfmpegPath
+- MediaProcessing:FfprobePath
+- MediaProcessing:VideoCompression:Preset
+- MediaProcessing:VideoCompression:Crf
+- MediaProcessing:VideoCompression:AudioBitrateKbps
+- MediaProcessing:VideoCompression:MaxWidth
 
-8. Email та відновлення пароля
-
-Листи для password reset і підтвердження зміни пароля відправляються через Resend.
-
-Обов’язкова конфігурація:
+Email
 - RESEND_APITOKEN
 - RESEND_FROM_EMAIL
-- RESEND_FROM_NAME, опціонально
+- RESEND_FROM_NAME
 
-Поточний lifetime для reset/change code:
-- 15 хвилин
+Зовнішній пошук
+- GIPHY_API_KEY
+- GIPHY_RATING
+- GEOAPIFY_API_KEY
 
-
-9. Пошукові провайдери
-
-Пошук GIF:
-- Giphy
-- обов’язкова конфігурація: GIPHY_API_KEY
-- опціональна конфігурація: GIPHY_RATING
-
-Пошук локацій:
-- Geoapify
-- обов’язкова конфігурація: GEOAPIFY_API_KEY
+CORS
+- Cors:AllowedOrigins
 
 
-10. CORS
+7. Поведінка Media Processing
 
-CORS налаштований у:
-- Threads.Infrastracture/Security/CORSConfigurator.cs
+Зображення:
+- валідуються
+- з них витягуються метадані
+- заливаються як є
 
-Поточний appsettings.json містить:
-- http://localhost:8000
-- http://127.0.0.1:8000
+Відео:
+- приймаються як uploaded file
+- перед завантаженням у S3 стискаються через ffmpeg у MP4
+- метадані витягуються вже зі стисненого файла
+- thumbnail генерується вже зі стисненого файла
+- у response використовуються size/content type стисненого файла
 
-
-11. База даних та міграції
-
-Конфігурація DbContext:
-- ім’я connection string: DefaultConnection
-
-У репозиторії вже є EF migration artifacts.
-
-Важлива поточна примітка:
-- сутність Repost і repost endpoints уже додані в код
-- якщо схема БД ще не містить таблицю Reposts і пов’язані індекси, перед використанням repost endpoints треба створити й застосувати нову EF migration
+Поточний upload limit:
+- request body limit: 100 MB в ASP.NET
+- Nginx також має дозволяти щонайменше 100 MB
 
 
-12. Dependency Injection
+8. API Routes
 
-Усі репозиторії та сервіси зареєстровані в Threads.Api/Program.cs.
+8.1 Auth
 
-Ключові реєстрації:
-- репозиторії для users, posts, comments, follows, likes, reposts, polls, refresh tokens, media
-- сервіси для auth, users, posts, comments, follows, likes, reposts, polls, media
-- HttpClient registrations для Giphy та Geoapify
-- інтеграція Resend
+Базовий маршрут: /api/auth
 
-
-13. Деплой
-
-Контейнер:
-- Dockerfile збирає і публікує Threads.Api
-- runtime image встановлює ffmpeg
-- застосунок слухає порт 8080 всередині контейнера
-
-docker-compose:
-- проброшено 127.0.0.1:7000 на container 8080
-- читає environment з .env
-- встановлює ASPNETCORE_ENVIRONMENT=Production
-
-Інструкції для деплою через Nginx:
-- дивись deploy/README.md
+- POST /register
+- POST /login
+- POST /refresh
+- POST /logout
+- POST /forgot-password
+- POST /verify-reset-code
+- POST /reset-password
+- POST /change-password
+- GET /me
 
 
-14. Чекліст локального запуску
+8.2 Users
 
-Мінімальні вимоги:
-- .NET SDK 10
-- PostgreSQL
-- ffmpeg і ffprobe доступні в системі, якщо не задані кастомні шляхи
-- валідні AWS credentials/environment для доступу до S3
-- валідний Resend API token, якщо використовується mail flow для відновлення/зміни пароля
-- Giphy і Geoapify API keys, якщо використовуються відповідні search endpoints
+Базовий маршрут: /api/users
 
-Типові кроки налаштування:
-1. налаштувати ConnectionStrings:DefaultConnection
-2. налаштувати секцію Jwt
-3. налаштувати AWS S3 values
-4. налаштувати Resend values
-5. налаштувати Giphy і Geoapify keys за потреби
-6. застосувати міграції
-7. запустити API
+- GET /
+- GET /{id}
+- GET /{username}
+- GET /by-username/{username}
+- GET /{id}/posts
+- GET /{username}/likes
+- GET /{username}/reposts
+- PUT /me
+- DELETE /me
 
 
-15. Відомі примітки по реалізації
+8.3 Posts
 
-- PostsController зараз підтримує додавання і зняття репоста на одному route через POST і DELETE.
-- Вибірка reposted-постів тепер дедуплікує PostId перед побудовою порядку, що захищає читання до накочення унікального DB constraint.
-- RepostsCount зберігається в Post як денормалізований лічильник, тому схема і сервісна логіка мають залишатися консистентними з relation Reposts.
-- Є обидва маршрути: /api/users/{username} і /api/users/by-username/{username}.
-- Search endpoints живуть під /api/search/*, а не під /api/gifs чи /api/locations напряму.
-- Endpoint для media upload: /api/media/upload, а не /api/media.
+Базовий маршрут: /api/posts
+
+- GET /
+- GET /feed
+- GET /liked
+- GET /user/{username}
+- GET /reposted
+- GET /{id}
+- POST /{id}/view
+- POST /{id}/like
+- DELETE /{id}/like
+- POST /{id}/repost
+- DELETE /{id}/repost
+- POST /{id}/poll/vote
+- POST /
+- PUT /{id}
+- DELETE /{id}
 
 
-16. Рекомендовані наступні кроки підтримки
+8.4 Comments
 
-- згенерувати і застосувати EF migration для Reposts, якщо це ще не зроблено
-- локально прогнати чистий dotnet build і test pass
-- додати automated integration tests для:
-  - auth flows
-  - repost add/remove/list flows
-  - media upload
-  - poll voting
-  - password change через email confirmation code
+Базовий маршрут: /api/comments
+
+- GET /post/{postId}
+- POST /
+- PUT /{id}
+- DELETE /{id}
+
+
+8.5 Follows
+
+Базовий маршрут: /api/follows
+
+- POST /{userId}
+- DELETE /{userId}
+- GET /{userId}/followers
+- GET /{userId}/following
+- DELETE /{userId}/followers/{followId}
+
+
+8.6 Media
+
+Базовий маршрут: /api/media
+
+- GET /{id}
+- POST /upload
+
+
+8.7 Search
+
+Базовий маршрут: /api/search
+
+- GET /users?q=...
+- GET /posts?q=...
+- GET /gifs?q=...
+- GET /locations?q=...
+
+
+9. Приклади Response DTO
+
+9.1 AuthResponse
+
+Повертається:
+- POST /api/auth/register
+- POST /api/auth/login
+- POST /api/auth/refresh
+
+```json
+{
+  "userId": "7d3b43e3-f1b0-4a17-a6ab-4ab9e78a4bc4",
+  "username": "ivan",
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refreshToken": "m4zz4s8V4fN7w7I2H6m3xP1KQ0...",
+  "accessTokenExpiresAt": "2026-08-10T18:30:00Z"
+}
+```
+
+
+9.2 UserShortResponse
+
+Повертається всередині:
+- GET /api/users
+- списків followers/following
+- author у постах
+- author у коментарях
+
+```json
+{
+  "id": "7d3b43e3-f1b0-4a17-a6ab-4ab9e78a4bc4",
+  "username": "ivan",
+  "displayName": "Ivan Z",
+  "location": {
+    "id": "kyiv-ua",
+    "name": "Kyiv",
+    "country": "Ukraine",
+    "latitude": 50.4501,
+    "longitude": 30.5234
+  },
+  "avatarUrl": "https://bucket.example.com/...",
+  "isVerified": false
+}
+```
+
+
+9.3 UserResponse
+
+Повертається:
+- GET /api/auth/me
+- GET /api/users/{id}
+- GET /api/users/{username}
+- PUT /api/users/me
+
+```json
+{
+  "id": "7d3b43e3-f1b0-4a17-a6ab-4ab9e78a4bc4",
+  "username": "ivan",
+  "displayName": "Ivan Z",
+  "bio": "Backend developer",
+  "location": {
+    "id": "kyiv-ua",
+    "name": "Kyiv",
+    "country": "Ukraine",
+    "latitude": 50.4501,
+    "longitude": 30.5234
+  },
+  "avatarUrl": "https://bucket.example.com/avatar.jpg",
+  "bannerUrl": "https://bucket.example.com/banner.jpg",
+  "followersCount": 12,
+  "followingCount": 8,
+  "postsCount": 5,
+  "isFollowedByCurrentUser": true,
+  "isVerified": false,
+  "createdAt": "2026-08-01T12:00:00Z"
+}
+```
+
+
+9.4 UploadMediaResponse
+
+Повертається:
+- POST /api/media/upload
+
+```json
+{
+  "id": "87a7f980-f8b9-4b6f-8ea9-4e9f64f1e58a",
+  "type": "video",
+  "url": "https://bucket.example.com/users/.../videos/87a7f980.mp4",
+  "thumbnailUrl": "https://bucket.example.com/users/.../video-thumbnails/87a7f980.jpg",
+  "width": 1280,
+  "height": 720,
+  "duration": 12.43,
+  "mimeType": "video/mp4",
+  "storageKey": "users/7d3b43e3-f1b0-4a17-a6ab-4ab9e78a4bc4/videos/87a7f980.mp4",
+  "fileName": "demo.mp4",
+  "sizeInBytes": 2489210
+}
+```
+
+
+9.5 MediaUrlResponse
+
+Повертається:
+- GET /api/media/{id}
+
+```json
+{
+  "id": "87a7f980-f8b9-4b6f-8ea9-4e9f64f1e58a",
+  "url": "https://bucket.example.com/users/.../videos/87a7f980.mp4"
+}
+```
+
+
+9.6 PostMediaResponse
+
+Повертається всередині:
+- PostResponse.media
+
+```json
+{
+  "id": "87a7f980-f8b9-4b6f-8ea9-4e9f64f1e58a",
+  "type": "video",
+  "url": "https://bucket.example.com/users/.../videos/87a7f980.mp4",
+  "thumbnailUrl": "https://bucket.example.com/users/.../video-thumbnails/87a7f980.jpg",
+  "width": 1280,
+  "height": 720,
+  "duration": 12.43,
+  "mimeType": "video/mp4",
+  "fileName": "demo.mp4",
+  "sizeInBytes": 2489210,
+  "sortOrder": 0
+}
+```
+
+
+9.7 PollResponse
+
+Повертається:
+- POST /api/posts/{id}/poll/vote
+- всередині PostResponse.poll
+
+```json
+{
+  "id": "f58cccf3-58ef-4b58-97fb-c38f032c4e44",
+  "postId": "5b75c9b7-1d30-4773-8a0d-2ca6308d92bc",
+  "endsAt": "2026-08-15T18:00:00Z",
+  "totalVotes": 21,
+  "hasVotedByCurrentUser": true,
+  "selectedOptionId": "0ef467c3-65dc-4e44-81f7-502fc463b0f2",
+  "options": [
+    {
+      "id": "0ef467c3-65dc-4e44-81f7-502fc463b0f2",
+      "text": "Yes",
+      "position": 0,
+      "votesCount": 15
+    },
+    {
+      "id": "aebd3d18-8b42-4c97-b8f8-9ff5bb7ef35d",
+      "text": "No",
+      "position": 1,
+      "votesCount": 6
+    }
+  ]
+}
+```
+
+
+9.8 PostResponse
+
+Повертається:
+- GET endpoints для постів
+- create/update post endpoints
+- likes/reposts list endpoints
+- feed endpoints
+
+```json
+{
+  "id": "5b75c9b7-1d30-4773-8a0d-2ca6308d92bc",
+  "content": "Hello from backend",
+  "author": {
+    "id": "7d3b43e3-f1b0-4a17-a6ab-4ab9e78a4bc4",
+    "username": "ivan",
+    "displayName": "Ivan Z",
+    "location": null,
+    "avatarUrl": "https://bucket.example.com/avatar.jpg",
+    "isVerified": false
+  },
+  "media": [
+    {
+      "id": "87a7f980-f8b9-4b6f-8ea9-4e9f64f1e58a",
+      "type": "video",
+      "url": "https://bucket.example.com/users/.../videos/87a7f980.mp4",
+      "thumbnailUrl": "https://bucket.example.com/users/.../video-thumbnails/87a7f980.jpg",
+      "width": 1280,
+      "height": 720,
+      "duration": 12.43,
+      "mimeType": "video/mp4",
+      "fileName": "demo.mp4",
+      "sizeInBytes": 2489210,
+      "sortOrder": 0
+    }
+  ],
+  "poll": null,
+  "location": {
+    "id": "kyiv-ua",
+    "name": "Kyiv",
+    "country": "Ukraine",
+    "latitude": 50.4501,
+    "longitude": 30.5234
+  },
+  "embed": {
+    "url": "https://example.com/article",
+    "title": "Article title",
+    "description": "Short description",
+    "thumbnailUrl": "https://example.com/thumb.jpg"
+  },
+  "likesCount": 14,
+  "commentsCount": 3,
+  "repostsCount": 2,
+  "viewsCount": 57,
+  "isLikedByCurrentUser": true,
+  "isRepostedByCurrentUser": false,
+  "createdAt": "2026-08-10T10:30:00Z",
+  "updatedAt": null
+}
+```
+
+
+9.9 PostLikeStateResponse
+
+Повертається:
+- POST /api/posts/{id}/like
+- DELETE /api/posts/{id}/like
+
+```json
+{
+  "likedByMe": true,
+  "likesCount": 15
+}
+```
+
+
+9.10 PostRepostStateResponse
+
+Повертається:
+- POST /api/posts/{id}/repost
+- DELETE /api/posts/{id}/repost
+
+```json
+{
+  "repostedByMe": true,
+  "repostsCount": 3
+}
+```
+
+
+9.11 PostViewResponse
+
+Повертається:
+- POST /api/posts/{id}/view
+
+```json
+{
+  "postId": "5b75c9b7-1d30-4773-8a0d-2ca6308d92bc",
+  "viewsCount": 58
+}
+```
+
+
+9.12 CommentResponse
+
+Повертається:
+- GET /api/comments/post/{postId}
+- POST /api/comments
+- PUT /api/comments/{id}
+
+```json
+{
+  "id": "f74dd4c4-5014-4bc2-a1ab-0a7668a8f76a",
+  "postId": "5b75c9b7-1d30-4773-8a0d-2ca6308d92bc",
+  "parentCommentId": null,
+  "content": "Nice post",
+  "author": {
+    "id": "7d3b43e3-f1b0-4a17-a6ab-4ab9e78a4bc4",
+    "username": "ivan",
+    "displayName": "Ivan Z",
+    "location": null,
+    "avatarUrl": "https://bucket.example.com/avatar.jpg",
+    "isVerified": false
+  },
+  "likesCount": 0,
+  "isLikedByCurrentUser": false,
+  "createdAt": "2026-08-10T11:00:00Z",
+  "updatedAt": null
+}
+```
+
+
+10. Важливі Поведінкові Нюанси
+
+- Nginx має дозволяти великі upload, інакше media upload може падати з 413 навіть якщо ASP.NET дозволяє 100 MB.
+- Репости використовують окрему Reposts relation плюс денормалізований лічильник Post.RepostsCount.
+- Відео тепер стискаються перед upload і зберігаються як MP4.
+- Search routes живуть під /api/search/*, а не під /api/gifs чи /api/locations напряму.
+- Route для media upload: /api/media/upload.
+
+
+11. Чекліст Локального Запуску
+
+1. Налаштувати connection string до БД
+2. Налаштувати JWT
+3. Налаштувати AWS S3
+4. Налаштувати Resend
+5. Налаштувати Giphy і Geoapify за потреби
+6. Застосувати EF migrations
+7. Запустити API
+
+
+12. Примітки по Деплою
+
+- Docker container слухає порт 8080
+- docker-compose проброшує 127.0.0.1:7000 на container port 8080
+- Nginx проксіює зовнішній трафік на 127.0.0.1:7000
+- Якщо ти оновлюєш deploy/nginx/threads.conf у репозиторії, активний nginx config на сервері теж треба синхронізувати окремо

@@ -92,6 +92,7 @@ public class MediaService : IMediaService
         var mediaType = ResolveMediaType(contentType);
         ValidateFileSize(sizeInBytes, mediaType);
         var tempSourceFilePath = await SaveToTemporaryFileAsync(content, fileName, cancellationToken);
+        string? tempProcessedFilePath = null;
         string? tempThumbnailFilePath = null;
 
         try
@@ -100,14 +101,25 @@ public class MediaService : IMediaService
                 tempSourceFilePath,
                 contentType,
                 cancellationToken);
+            tempProcessedFilePath = processedMedia.ProcessedFilePath;
             tempThumbnailFilePath = processedMedia.ThumbnailFilePath;
+            var uploadFilePath = string.IsNullOrWhiteSpace(tempProcessedFilePath)
+                ? tempSourceFilePath
+                : tempProcessedFilePath;
+            var storedContentType = string.IsNullOrWhiteSpace(processedMedia.OutputContentType)
+                ? contentType
+                : processedMedia.OutputContentType;
+            var storedFileName = string.IsNullOrWhiteSpace(processedMedia.OutputFileName)
+                ? ResolveStoredFileName(fileName, storedContentType)
+                : processedMedia.OutputFileName;
+            var storedSizeInBytes = processedMedia.OutputSizeInBytes ?? sizeInBytes;
 
             var media = new MediaEntity
             {
-                FileName = Path.GetFileName(fileName),
-                ContentType = contentType,
+                FileName = storedFileName,
+                ContentType = storedContentType,
                 Type = mediaType,
-                SizeInBytes = sizeInBytes,
+                SizeInBytes = storedSizeInBytes,
                 Width = processedMedia.Width,
                 Height = processedMedia.Height,
                 DurationSeconds = processedMedia.DurationSeconds,
@@ -115,13 +127,17 @@ public class MediaService : IMediaService
                 UploadedByUserId = uploadedByUserId
             };
 
-            media.StorageKey = GenerateObjectKey(uploadedByUserId, media.Id, fileName, mediaType);
+            media.StorageKey = GenerateObjectKey(uploadedByUserId, media.Id, storedFileName, mediaType);
             media.ThumbnailStorageKey = GenerateThumbnailObjectKey(uploadedByUserId, media, tempThumbnailFilePath);
 
             try
             {
-                await using var uploadStream = File.OpenRead(tempSourceFilePath);
-                await _objectStorageService.UploadAsync(uploadStream, media.StorageKey, contentType, cancellationToken);
+                await using var uploadStream = File.OpenRead(uploadFilePath);
+                await _objectStorageService.UploadAsync(
+                    uploadStream,
+                    media.StorageKey,
+                    storedContentType,
+                    cancellationToken);
 
                 if (!string.IsNullOrWhiteSpace(tempThumbnailFilePath) &&
                     !string.IsNullOrWhiteSpace(media.ThumbnailStorageKey))
@@ -155,17 +171,19 @@ public class MediaService : IMediaService
                 Width = media.Width,
                 Height = media.Height,
                 Duration = media.DurationSeconds,
-                Size = media.SizeInBytes,
                 MimeType = media.ContentType,
                 StorageKey = media.StorageKey,
                 FileName = media.FileName,
-                ContentType = media.ContentType,
                 SizeInBytes = media.SizeInBytes
             };
         }
         finally
         {
             TryDeleteLocalFile(tempSourceFilePath);
+            if (!string.Equals(tempProcessedFilePath, tempSourceFilePath, StringComparison.Ordinal))
+            {
+                TryDeleteLocalFile(tempProcessedFilePath);
+            }
             TryDeleteLocalFile(tempThumbnailFilePath);
         }
     }
@@ -175,6 +193,18 @@ public class MediaService : IMediaService
         return contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)
             ? MediaType.Image
             : MediaType.Video;
+    }
+
+    private static string ResolveStoredFileName(string originalFileName, string storedContentType)
+    {
+        var safeFileName = Path.GetFileName(originalFileName);
+
+        if (storedContentType.Equals("video/mp4", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"{Path.GetFileNameWithoutExtension(safeFileName)}.mp4";
+        }
+
+        return safeFileName;
     }
 
     private static void ValidateFileSize(long sizeInBytes, MediaType mediaType)

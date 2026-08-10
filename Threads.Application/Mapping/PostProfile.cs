@@ -11,9 +11,6 @@ public class PostProfile : Profile
         CreateMap<Post, PostResponse>()
             .ForMember(destination => destination.Content, options => options.MapFrom(source => source.Content ?? string.Empty))
             .ForMember(destination => destination.Media, options => options.Ignore())
-            .ForMember(destination => destination.MediaUrls, options => options.MapFrom(source => source.Media
-                .OrderBy(media => media.SortOrder)
-                .Select(media => media.StorageKey)))
             .ForMember(destination => destination.Poll, options => options.Ignore())
             .ForMember(destination => destination.Location, options => options.Ignore())
             .ForMember(destination => destination.Embed, options => options.Ignore())
