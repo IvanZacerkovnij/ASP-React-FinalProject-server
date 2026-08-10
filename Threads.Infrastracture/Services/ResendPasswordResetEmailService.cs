@@ -20,6 +20,45 @@ public class ResendPasswordResetEmailService : IPasswordResetEmailService
         string code,
         CancellationToken cancellationToken = default)
     {
+        var message = CreateMessage(
+            email,
+            "Your password reset code",
+            $"""
+             <div>
+                 <p>Your password reset code is <strong>{code}</strong>.</p>
+                 <p>This code expires in 15 minutes.</p>
+             </div>
+             """,
+            $"Your password reset code is {code}. This code expires in 15 minutes.");
+
+        await _resend.EmailSendAsync(message, cancellationToken);
+    }
+
+    public async Task SendPasswordChangeCodeAsync(
+        string email,
+        string code,
+        CancellationToken cancellationToken = default)
+    {
+        var message = CreateMessage(
+            email,
+            "Confirm your password change",
+            $"""
+             <div>
+                 <p>Your password change confirmation code is <strong>{code}</strong>.</p>
+                 <p>This code expires in 15 minutes.</p>
+             </div>
+             """,
+            $"Your password change confirmation code is {code}. This code expires in 15 minutes.");
+
+        await _resend.EmailSendAsync(message, cancellationToken);
+    }
+
+    private EmailMessage CreateMessage(
+        string email,
+        string subject,
+        string htmlBody,
+        string textBody)
+    {
         var fromEmail = _configuration["RESEND_FROM_EMAIL"];
 
         if (string.IsNullOrWhiteSpace(fromEmail))
@@ -33,18 +72,13 @@ public class ResendPasswordResetEmailService : IPasswordResetEmailService
             From = string.IsNullOrWhiteSpace(fromName)
                 ? fromEmail
                 : $"{fromName} <{fromEmail}>",
-            Subject = "Your password reset code",
-            HtmlBody = $"""
-                <div>
-                    <p>Your password reset code is <strong>{code}</strong>.</p>
-                    <p>This code expires in 15 minutes.</p>
-                </div>
-                """,
-            TextBody = $"Your password reset code is {code}. This code expires in 15 minutes."
+            Subject = subject,
+            HtmlBody = htmlBody,
+            TextBody = textBody
         };
 
         message.To.Add(email);
 
-        await _resend.EmailSendAsync(message, cancellationToken);
+        return message;
     }
 }

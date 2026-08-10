@@ -151,8 +151,8 @@ public class AuthService : IAuthService
         }
 
         var code = GeneratePasswordResetCode();
-        user.PasswordResetCodeHash = HashPasswordResetCode(code);
-        user.PasswordResetCodeExpiresAt = DateTimeOffset.UtcNow.AddMinutes(PasswordResetCodeLifetimeMinutes);
+        user.PendingPasswordHash = null;
+        SetPasswordResetCode(user, code);
         user.UpdatedAt = DateTimeOffset.UtcNow;
 
         await _userRepository.UpdateAsync(user, cancellationToken);
@@ -185,14 +185,93 @@ public class AuthService : IAuthService
         }
 
         user!.PasswordHash = _passwordHasher.HashPassword(normalizedPassword);
-        user.PasswordResetCodeHash = null;
-        user.PasswordResetCodeExpiresAt = null;
+        ClearPasswordResetCode(user);
+        user.PendingPasswordHash = null;
         user.UpdatedAt = DateTimeOffset.UtcNow;
 
         await _userRepository.UpdateAsync(user, cancellationToken);
         await _refreshTokenRepository.RevokeAllByUserIdAsync(user.Id, DateTimeOffset.UtcNow, cancellationToken);
 
         return true;
+    }
+
+    public async Task<ChangePasswordResult> ChangePasswordAsync(
+        Guid userId,
+        ChangePasswordRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedCurrentPassword = NormalizePassword(request.CurrentPassword, nameof(request.CurrentPassword));
+        var user = await _userRepository.GetByIdAsync(userId, cancellationToken);
+
+        if (user is null || !user.IsActive)
+        {
+            return new ChangePasswordResult
+            {
+                Status = ChangePasswordStatus.UserNotFound
+            };
+        }
+
+        if (!_passwordHasher.VerifyPassword(normalizedCurrentPassword, user.PasswordHash))
+        {
+            return new ChangePasswordResult
+            {
+                Status = ChangePasswordStatus.InvalidCurrentPassword
+            };
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Code))
+        {
+            var normalizedCode = NormalizePasswordResetCode(request.Code);
+
+            if (string.IsNullOrWhiteSpace(user.PendingPasswordHash))
+            {
+                return new ChangePasswordResult
+                {
+                    Status = ChangePasswordStatus.NoPendingPasswordChange
+                };
+            }
+
+            if (!IsPasswordResetCodeValid(user, normalizedCode))
+            {
+                return new ChangePasswordResult
+                {
+                    Status = ChangePasswordStatus.InvalidConfirmationCode
+                };
+            }
+
+            user.PasswordHash = user.PendingPasswordHash;
+            user.PendingPasswordHash = null;
+            ClearPasswordResetCode(user);
+            user.UpdatedAt = DateTimeOffset.UtcNow;
+
+            await _userRepository.UpdateAsync(user, cancellationToken);
+            await _refreshTokenRepository.RevokeAllByUserIdAsync(user.Id, DateTimeOffset.UtcNow, cancellationToken);
+
+            return new ChangePasswordResult
+            {
+                Status = ChangePasswordStatus.PasswordChanged
+            };
+        }
+
+        var normalizedNewPassword = NormalizePassword(request.NewPassword, nameof(request.NewPassword));
+
+        if (_passwordHasher.VerifyPassword(normalizedNewPassword, user.PasswordHash))
+        {
+            throw new InvalidOperationException("New password must be different from the current password.");
+        }
+
+        var code = GeneratePasswordResetCode();
+        user.PendingPasswordHash = _passwordHasher.HashPassword(normalizedNewPassword);
+        SetPasswordResetCode(user, code);
+        user.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await _userRepository.UpdateAsync(user, cancellationToken);
+        await _passwordResetEmailService.SendPasswordChangeCodeAsync(user.Email, code, cancellationToken);
+
+        return new ChangePasswordResult
+        {
+            Status = ChangePasswordStatus.ConfirmationCodeSent
+        };
     }
 
     private async Task<User?> GetUserByEmailOrUsernameAsync(string emailOrUsername, CancellationToken cancellationToken)
@@ -297,6 +376,18 @@ public class AuthService : IAuthService
         return RandomNumberGenerator
             .GetInt32(0, 1_000_000)
             .ToString("D6");
+    }
+
+    private static void SetPasswordResetCode(User user, string code)
+    {
+        user.PasswordResetCodeHash = HashPasswordResetCode(code);
+        user.PasswordResetCodeExpiresAt = DateTimeOffset.UtcNow.AddMinutes(PasswordResetCodeLifetimeMinutes);
+    }
+
+    private static void ClearPasswordResetCode(User user)
+    {
+        user.PasswordResetCodeHash = null;
+        user.PasswordResetCodeExpiresAt = null;
     }
 
     private static string HashPasswordResetCode(string code)

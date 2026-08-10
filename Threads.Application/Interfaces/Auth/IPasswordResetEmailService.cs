@@ -6,4 +6,9 @@ public interface IPasswordResetEmailService
         string email,
         string code,
         CancellationToken cancellationToken = default);
+
+    Task SendPasswordChangeCodeAsync(
+        string email,
+        string code,
+        CancellationToken cancellationToken = default);
 }

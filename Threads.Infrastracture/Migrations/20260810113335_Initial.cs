@@ -21,6 +21,7 @@ namespace Threads.Infrastracture.Migrations
                     PasswordHash = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
                     PasswordResetCodeHash = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
                     PasswordResetCodeExpiresAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    PendingPasswordHash = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
                     DisplayName = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
                     Bio = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
                     Location = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),

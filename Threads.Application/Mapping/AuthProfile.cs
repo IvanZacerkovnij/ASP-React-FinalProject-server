@@ -12,6 +12,7 @@ public class AuthProfile : Profile
             .ForMember(destination => destination.PasswordHash, options => options.Ignore())
             .ForMember(destination => destination.PasswordResetCodeHash, options => options.Ignore())
             .ForMember(destination => destination.PasswordResetCodeExpiresAt, options => options.Ignore())
+            .ForMember(destination => destination.PendingPasswordHash, options => options.Ignore())
             .ForMember(destination => destination.Bio, options => options.Ignore())
             .ForMember(destination => destination.AvatarObjectKey, options => options.Ignore())
             .ForMember(destination => destination.IsVerified, options => options.Ignore())

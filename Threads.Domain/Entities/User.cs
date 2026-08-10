@@ -14,6 +14,8 @@ public class User : BaseEntity
 
     public DateTimeOffset? PasswordResetCodeExpiresAt { get; set; }
 
+    public string? PendingPasswordHash { get; set; }
+
     public string? DisplayName { get; set; }
 
     public string? Bio { get; set; }

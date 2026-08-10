@@ -483,6 +483,10 @@ namespace Threads.Infrastracture.Migrations
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)");
 
+                    b.Property<string>("PendingPasswordHash")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
                     b.Property<DateTimeOffset?>("PasswordResetCodeExpiresAt")
                         .HasColumnType("timestamp with time zone");
 
