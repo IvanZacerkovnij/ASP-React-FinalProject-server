@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Threads.Infrastracture.Data;
@@ -11,9 +12,11 @@ using Threads.Infrastracture.Data;
 namespace Threads.Infrastracture.Migrations
 {
     [DbContext(typeof(ThreadsDbContext))]
-    partial class ThreadsDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260810075448_second")]
+    partial class second
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

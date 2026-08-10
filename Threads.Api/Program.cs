@@ -3,6 +3,7 @@ using Resend;
 using Threads.Application.Interfaces.Auth;
 using Threads.Application.Interfaces.Comments;
 using Threads.Application.Interfaces.Follows;
+using Threads.Application.Interfaces.Gifs;
 using Threads.Application.Interfaces.Media;
 using Threads.Application.Interfaces.Polls;
 using Threads.Application.Interfaces.Posts;
@@ -52,6 +53,10 @@ public class Program
         builder.Services.AddScoped<IPollService, PollService>();
         builder.Services.AddScoped<ICommentService, CommentService>();
         builder.Services.AddScoped<IFollowService, FollowService>();
+        builder.Services.AddHttpClient<IGifSearchService, GiphyGifSearchService>(client =>
+        {
+            client.BaseAddress = new Uri("https://api.giphy.com/");
+        });
         builder.Services.AddScoped<ILikeService, LikeService>();
         builder.Services.AddScoped<IMediaService, MediaService>();
         builder.Services.AddScoped<IAuthService, AuthService>();
