@@ -35,10 +35,10 @@ public class Program
     {
         var builder = WebApplication.CreateBuilder(args);
 
-        builder.WebHost.ConfigureKestrel(UploadConfigurator.Configure);
+        builder.WebHost.ConfigureKestrel(options => UploadConfigurator.Configure(options));
 
         builder.Services.AddDbContext<ThreadsDbContext>(options => DbConfigurator.Configure(options, builder.Configuration));
-        builder.Services.Configure<FormOptions>(UploadConfigurator.Configure);
+        builder.Services.Configure<FormOptions>(options => UploadConfigurator.Configure(options));
         builder.Services.AddAutoMapper(cfg => { }, typeof(UserProfile));
 
         builder.Services.AddScoped<IUserRepository, UserRepository>();
