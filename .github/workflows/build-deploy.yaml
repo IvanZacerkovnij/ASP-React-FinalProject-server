@@ -23,8 +23,13 @@ jobs:
             set -e
 
             cd ~/threads
-
             git pull --ff-only origin main
+
+            sudo cp ~/threads/deploy/nginx/threads.conf /etc/nginx/sites-available/threads
+            sudo ln -sf /etc/nginx/sites-available/threads /etc/nginx/sites-enabled/threads
+
+            sudo nginx -t
+            sudo systemctl reload nginx
 
             cat > .env <<'EOF'
             ${{ secrets.APP_ENV_FILE }}
@@ -32,5 +37,4 @@ jobs:
 
             docker compose down --remove-orphans
             docker compose up -d --build
-
             docker compose ps
