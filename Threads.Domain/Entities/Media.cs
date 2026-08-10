@@ -15,6 +15,14 @@ public class Media : BaseEntity
 
     public long SizeInBytes { get; set; }
 
+    public int? Width { get; set; }
+
+    public int? Height { get; set; }
+
+    public double? DurationSeconds { get; set; }
+
+    public string? ThumbnailStorageKey { get; set; }
+
     public int SortOrder { get; set; }
 
     public Guid UploadedByUserId { get; set; }

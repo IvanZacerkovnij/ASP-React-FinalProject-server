@@ -132,10 +132,16 @@ namespace Threads.Infrastracture.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<double?>("DurationSeconds")
+                        .HasColumnType("double precision");
+
                     b.Property<string>("FileName")
                         .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
+
+                    b.Property<int?>("Height")
+                        .HasColumnType("integer");
 
                     b.Property<Guid?>("PostId")
                         .HasColumnType("uuid");
@@ -151,6 +157,10 @@ namespace Threads.Infrastracture.Migrations
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)");
 
+                    b.Property<string>("ThumbnailStorageKey")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
                     b.Property<int>("Type")
                         .HasColumnType("integer");
 
@@ -159,6 +169,9 @@ namespace Threads.Infrastracture.Migrations
 
                     b.Property<Guid>("UploadedByUserId")
                         .HasColumnType("uuid");
+
+                    b.Property<int?>("Width")
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
@@ -171,9 +184,15 @@ namespace Threads.Infrastracture.Migrations
 
                     b.ToTable("Media", null, t =>
                         {
+                            t.HasCheckConstraint("CK_Media_DurationSeconds", "\"DurationSeconds\" IS NULL OR \"DurationSeconds\" >= 0");
+
+                            t.HasCheckConstraint("CK_Media_Height", "\"Height\" IS NULL OR \"Height\" >= 0");
+
                             t.HasCheckConstraint("CK_Media_SizeInBytes", "\"SizeInBytes\" >= 0");
 
                             t.HasCheckConstraint("CK_Media_SortOrder", "\"SortOrder\" >= 0");
+
+                            t.HasCheckConstraint("CK_Media_Width", "\"Width\" IS NULL OR \"Width\" >= 0");
                         });
                 });
 

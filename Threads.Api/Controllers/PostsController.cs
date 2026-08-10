@@ -68,7 +68,7 @@ public class PostsController : ControllerBase
 
     [Authorize]
     [HttpPost("{id:guid}/like")]
-    public async Task<ActionResult> LikePost(Guid id, CancellationToken cancellationToken)
+    public async Task<ActionResult<PostLikeStateResponse>> LikePost(Guid id, CancellationToken cancellationToken)
     {
         var currentUserId = GetCurrentUserId();
 
@@ -84,16 +84,17 @@ public class PostsController : ControllerBase
             return NotFound(new { message = "Post was not found." });
         }
 
-        var wasAdded = await _likeService.AddLikeAsync(currentUserId.Value, id, cancellationToken);
+        await _likeService.AddLikeAsync(currentUserId.Value, id, cancellationToken);
+        var updatedPost = await _postService.GetByIdAsync(id, cancellationToken, currentUserId.Value);
 
-        return wasAdded
-            ? Ok(new { message = "Post liked successfully." })
-            : Conflict(new { message = "Post is already liked." });
+        return updatedPost is null
+            ? NotFound(new { message = "Post was not found." })
+            : Ok(MapLikeStateResponse(updatedPost));
     }
 
     [Authorize]
     [HttpDelete("{id:guid}/like")]
-    public async Task<ActionResult> UnlikePost(Guid id, CancellationToken cancellationToken)
+    public async Task<ActionResult<PostLikeStateResponse>> UnlikePost(Guid id, CancellationToken cancellationToken)
     {
         var currentUserId = GetCurrentUserId();
 
@@ -109,11 +110,12 @@ public class PostsController : ControllerBase
             return NotFound(new { message = "Post was not found." });
         }
 
-        var wasRemoved = await _likeService.RemoveLikeAsync(currentUserId.Value, id, cancellationToken);
+        await _likeService.RemoveLikeAsync(currentUserId.Value, id, cancellationToken);
+        var updatedPost = await _postService.GetByIdAsync(id, cancellationToken, currentUserId.Value);
 
-        return wasRemoved
-            ? NoContent()
-            : NotFound(new { message = "Like was not found." });
+        return updatedPost is null
+            ? NotFound(new { message = "Post was not found." })
+            : Ok(MapLikeStateResponse(updatedPost));
     }
 
     [Authorize]
@@ -244,5 +246,14 @@ public class PostsController : ControllerBase
         return Guid.TryParse(userId, out var parsedUserId)
             ? parsedUserId
             : null;
+    }
+
+    private static PostLikeStateResponse MapLikeStateResponse(PostResponse post)
+    {
+        return new PostLikeStateResponse
+        {
+            LikedByMe = post.IsLikedByCurrentUser,
+            LikesCount = post.LikesCount
+        };
     }
 }

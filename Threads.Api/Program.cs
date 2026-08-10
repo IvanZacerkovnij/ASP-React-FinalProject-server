@@ -44,6 +44,7 @@ public class Program
         builder.Services.AddScoped<IFollowRepository, FollowRepository>();
         builder.Services.AddScoped<ILikeRepository, LikeRepository>();
         builder.Services.AddScoped<IMediaRepository, MediaRepository>();
+        builder.Services.AddScoped<IMediaProcessingService, FfmpegMediaProcessingService>();
         builder.Services.AddScoped<IObjectStorageService, S3ObjectStorageService>();
         builder.Services.AddScoped<IPollRepository, PollRepository>();
         builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();

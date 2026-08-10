@@ -27,6 +27,15 @@ public class MediaConfigurator : IEntityTypeConfiguration<Media>
         builder.Property(media => media.SizeInBytes)
             .IsRequired();
 
+        builder.Property(media => media.Width);
+
+        builder.Property(media => media.Height);
+
+        builder.Property(media => media.DurationSeconds);
+
+        builder.Property(media => media.ThumbnailStorageKey)
+            .HasMaxLength(512);
+
         builder.Property(media => media.SortOrder)
             .IsRequired();
 
@@ -48,6 +57,21 @@ public class MediaConfigurator : IEntityTypeConfiguration<Media>
             table.HasCheckConstraint(
                 "CK_Media_SortOrder",
                 "\"SortOrder\" >= 0"));
+
+        builder.ToTable(table =>
+            table.HasCheckConstraint(
+                "CK_Media_Width",
+                "\"Width\" IS NULL OR \"Width\" >= 0"));
+
+        builder.ToTable(table =>
+            table.HasCheckConstraint(
+                "CK_Media_Height",
+                "\"Height\" IS NULL OR \"Height\" >= 0"));
+
+        builder.ToTable(table =>
+            table.HasCheckConstraint(
+                "CK_Media_DurationSeconds",
+                "\"DurationSeconds\" IS NULL OR \"DurationSeconds\" >= 0"));
 
         builder.HasOne(media => media.UploadedByUser)
             .WithMany(user => user.UploadedMedia)

@@ -38,11 +38,26 @@ public class MediaRepository : IMediaRepository
         Guid uploadedByUserId,
         CancellationToken cancellationToken = default)
     {
-        return await _dbContext.Medias
+        var mediaFiles = await _dbContext.Medias
             .AsNoTracking()
             .Where(media => media.UploadedByUserId == uploadedByUserId)
-            .Select(media => media.StorageKey)
+            .Select(media => new
+            {
+                media.StorageKey,
+                media.ThumbnailStorageKey
+            })
             .ToListAsync(cancellationToken);
+
+        return mediaFiles
+            .SelectMany(media => new[]
+            {
+                media.StorageKey,
+                media.ThumbnailStorageKey
+            })
+            .Where(storageKey => !string.IsNullOrWhiteSpace(storageKey))
+            .Cast<string>()
+            .Distinct()
+            .ToList();
     }
 
     public async Task AddAsync(Domain.Entities.Media media, CancellationToken cancellationToken = default)

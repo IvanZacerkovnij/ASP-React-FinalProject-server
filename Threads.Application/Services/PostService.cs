@@ -209,8 +209,13 @@ public class PostService : IPostService
         }
 
         var mediaStorageKeys = post.Media
-            .Select(media => media.StorageKey)
+            .SelectMany(media => new[]
+            {
+                media.StorageKey,
+                media.ThumbnailStorageKey
+            })
             .Where(storageKey => !string.IsNullOrWhiteSpace(storageKey))
+            .Cast<string>()
             .Distinct()
             .ToArray();
 
@@ -481,10 +486,16 @@ public class PostService : IPostService
                 .Select(media => new PostMediaResponse
                 {
                     Id = media.Id,
+                    Type = ResolveMediaResponseType(media.ContentType, media.Type),
                     Url = _objectStorageService.GetReadUrl(media.StorageKey),
+                    ThumbnailUrl = ResolveMediaThumbnailUrl(media),
+                    Width = media.Width,
+                    Height = media.Height,
+                    Duration = media.DurationSeconds,
+                    Size = media.SizeInBytes,
+                    MimeType = media.ContentType,
                     FileName = media.FileName,
                     ContentType = media.ContentType,
-                    Type = media.Type.ToString(),
                     SizeInBytes = media.SizeInBytes,
                     SortOrder = media.SortOrder
                 })
@@ -590,5 +601,31 @@ public class PostService : IPostService
                 })
                 .ToList()
         };
+    }
+
+    private static string ResolveMediaResponseType(string contentType, Domain.Enums.MediaType mediaType)
+    {
+        if (contentType.Equals("image/gif", StringComparison.OrdinalIgnoreCase))
+        {
+            return "gif";
+        }
+
+        return mediaType == Domain.Enums.MediaType.Video
+            ? "video"
+            : "image";
+    }
+
+    private string? ResolveMediaThumbnailUrl(Media media)
+    {
+        if (!string.IsNullOrWhiteSpace(media.ThumbnailStorageKey))
+        {
+            return _objectStorageService.GetReadUrl(media.ThumbnailStorageKey);
+        }
+
+        var responseType = ResolveMediaResponseType(media.ContentType, media.Type);
+
+        return responseType is "image" or "gif"
+            ? _objectStorageService.GetReadUrl(media.StorageKey)
+            : null;
     }
 }

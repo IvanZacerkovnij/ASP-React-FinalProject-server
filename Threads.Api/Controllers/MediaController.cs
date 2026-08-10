@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Threads.Api.Requests;
 using Threads.Application.DTOs.Media;
+using Threads.Application.Exceptions;
 using Threads.Application.Interfaces.Media;
 
 namespace Threads.Api.Controllers;
@@ -66,6 +67,10 @@ public class MediaController : ControllerBase
         catch (ArgumentException exception)
         {
             return BadRequest(new { message = exception.Message });
+        }
+        catch (MediaProcessingException exception)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = exception.Message });
         }
         catch (InvalidOperationException exception)
         {

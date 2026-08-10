@@ -22,11 +22,16 @@ public class MediaService : IMediaService
     private const long MaxVideoSizeInBytes = 100 * 1024 * 1024;
 
     private readonly IMediaRepository _mediaRepository;
+    private readonly IMediaProcessingService _mediaProcessingService;
     private readonly IObjectStorageService _objectStorageService;
 
-    public MediaService(IMediaRepository mediaRepository, IObjectStorageService objectStorageService)
+    public MediaService(
+        IMediaRepository mediaRepository,
+        IMediaProcessingService mediaProcessingService,
+        IObjectStorageService objectStorageService)
     {
         _mediaRepository = mediaRepository;
+        _mediaProcessingService = mediaProcessingService;
         _objectStorageService = objectStorageService;
     }
 
@@ -86,41 +91,83 @@ public class MediaService : IMediaService
 
         var mediaType = ResolveMediaType(contentType);
         ValidateFileSize(sizeInBytes, mediaType);
-
-        var media = new MediaEntity
-        {
-            FileName = Path.GetFileName(fileName),
-            ContentType = contentType,
-            Type = mediaType,
-            SizeInBytes = sizeInBytes,
-            SortOrder = 0,
-            UploadedByUserId = uploadedByUserId
-        };
-
-        media.StorageKey = GenerateObjectKey(uploadedByUserId, media.Id, fileName, mediaType);
-
-        await _objectStorageService.UploadAsync(content, media.StorageKey, contentType, cancellationToken);
+        var tempSourceFilePath = await SaveToTemporaryFileAsync(content, fileName, cancellationToken);
+        string? tempThumbnailFilePath = null;
 
         try
         {
-            await _mediaRepository.AddAsync(media, cancellationToken);
-        }
-        catch
-        {
-            await TryDeleteObjectAsync(media.StorageKey, cancellationToken);
-            throw;
-        }
+            var processedMedia = await _mediaProcessingService.ProcessAsync(
+                tempSourceFilePath,
+                contentType,
+                cancellationToken);
+            tempThumbnailFilePath = processedMedia.ThumbnailFilePath;
 
-        return new UploadMediaResponse
+            var media = new MediaEntity
+            {
+                FileName = Path.GetFileName(fileName),
+                ContentType = contentType,
+                Type = mediaType,
+                SizeInBytes = sizeInBytes,
+                Width = processedMedia.Width,
+                Height = processedMedia.Height,
+                DurationSeconds = processedMedia.DurationSeconds,
+                SortOrder = 0,
+                UploadedByUserId = uploadedByUserId
+            };
+
+            media.StorageKey = GenerateObjectKey(uploadedByUserId, media.Id, fileName, mediaType);
+            media.ThumbnailStorageKey = GenerateThumbnailObjectKey(uploadedByUserId, media, tempThumbnailFilePath);
+
+            try
+            {
+                await using var uploadStream = File.OpenRead(tempSourceFilePath);
+                await _objectStorageService.UploadAsync(uploadStream, media.StorageKey, contentType, cancellationToken);
+
+                if (!string.IsNullOrWhiteSpace(tempThumbnailFilePath) &&
+                    !string.IsNullOrWhiteSpace(media.ThumbnailStorageKey))
+                {
+                    await using var thumbnailStream = File.OpenRead(tempThumbnailFilePath);
+                    await _objectStorageService.UploadAsync(
+                        thumbnailStream,
+                        media.ThumbnailStorageKey,
+                        "image/jpeg",
+                        cancellationToken);
+                }
+
+                await _mediaRepository.AddAsync(media, cancellationToken);
+            }
+            catch
+            {
+                await TryDeleteObjectAsync(media.StorageKey, cancellationToken);
+                await TryDeleteObjectAsync(media.ThumbnailStorageKey, cancellationToken);
+                throw;
+            }
+
+            var mediaUrl = _objectStorageService.GetReadUrl(media.StorageKey);
+            var responseType = ResolveResponseType(media.ContentType, media.Type);
+
+            return new UploadMediaResponse
+            {
+                Id = media.Id,
+                Type = responseType,
+                Url = mediaUrl,
+                ThumbnailUrl = GetThumbnailUrl(media, mediaUrl, responseType),
+                Width = media.Width,
+                Height = media.Height,
+                Duration = media.DurationSeconds,
+                Size = media.SizeInBytes,
+                MimeType = media.ContentType,
+                StorageKey = media.StorageKey,
+                FileName = media.FileName,
+                ContentType = media.ContentType,
+                SizeInBytes = media.SizeInBytes
+            };
+        }
+        finally
         {
-            Id = media.Id,
-            StorageKey = media.StorageKey,
-            FileName = media.FileName,
-            ContentType = media.ContentType,
-            SizeInBytes = media.SizeInBytes,
-            Type = media.Type.ToString(),
-            Url = _objectStorageService.GetReadUrl(media.StorageKey)
-        };
+            TryDeleteLocalFile(tempSourceFilePath);
+            TryDeleteLocalFile(tempThumbnailFilePath);
+        }
     }
 
     private static MediaType ResolveMediaType(string contentType)
@@ -154,6 +201,69 @@ public class MediaService : IMediaService
             $"{mediaId}{extension.ToLowerInvariant()}");
     }
 
+    private static string? GenerateThumbnailObjectKey(
+        Guid uploadedByUserId,
+        MediaEntity media,
+        string? thumbnailFilePath)
+    {
+        if (string.IsNullOrWhiteSpace(thumbnailFilePath))
+        {
+            return null;
+        }
+
+        var extension = Path.GetExtension(thumbnailFilePath);
+
+        return string.Join('/',
+            "users",
+            uploadedByUserId.ToString(),
+            "video-thumbnails",
+            $"{media.Id}{extension.ToLowerInvariant()}");
+    }
+
+    private async Task<string> SaveToTemporaryFileAsync(
+        Stream content,
+        string fileName,
+        CancellationToken cancellationToken)
+    {
+        var extension = Path.GetExtension(fileName);
+        var normalizedExtension = string.IsNullOrWhiteSpace(extension)
+            ? ".bin"
+            : extension.ToLowerInvariant();
+        var temporaryFilePath = Path.Combine(
+            Path.GetTempPath(),
+            $"threads-media-{Guid.NewGuid():N}{normalizedExtension}");
+
+        await using var temporaryFileStream = File.Create(temporaryFilePath);
+        await content.CopyToAsync(temporaryFileStream, cancellationToken);
+        await temporaryFileStream.FlushAsync(cancellationToken);
+
+        return temporaryFilePath;
+    }
+
+    private string? GetThumbnailUrl(MediaEntity media, string mediaUrl, string responseType)
+    {
+        if (!string.IsNullOrWhiteSpace(media.ThumbnailStorageKey))
+        {
+            return _objectStorageService.GetReadUrl(media.ThumbnailStorageKey);
+        }
+
+        return responseType is "image" or "gif"
+            ? mediaUrl
+            : null;
+    }
+
+    private static string ResolveResponseType(string contentType, MediaType mediaType)
+    {
+        if (contentType.Equals("image/gif", StringComparison.OrdinalIgnoreCase))
+        {
+            return "gif";
+        }
+
+        return mediaType == MediaType.Video
+            ? "video"
+            : "image";
+    }
+
     private async Task TryDeleteObjectAsync(string? objectKey, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(objectKey))
@@ -168,6 +278,26 @@ public class MediaService : IMediaService
         catch
         {
             // Best-effort cleanup after a failed metadata write.
+        }
+    }
+
+    private static void TryDeleteLocalFile(string? filePath)
+    {
+        if (string.IsNullOrWhiteSpace(filePath))
+        {
+            return;
+        }
+
+        try
+        {
+            if (File.Exists(filePath))
+            {
+                File.Delete(filePath);
+            }
+        }
+        catch
+        {
+            // Best-effort cleanup for temporary files.
         }
     }
 }
