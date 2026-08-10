@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http;
+using Threads.Application.DTOs.Locations;
 
 namespace Threads.Api.Requests;
 
@@ -8,7 +9,9 @@ public class UpdateCurrentUserRequest
 
     public string? Bio { get; set; }
 
-    public string? Location { get; set; }
+    public bool RemoveLocation { get; set; }
+
+    public LocationRequest? Location { get; set; }
 
     public bool RemoveAvatar { get; set; }
 

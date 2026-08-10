@@ -20,6 +20,14 @@ public class User : BaseEntity
 
     public string? Location { get; set; }
 
+    public string? LocationPlaceId { get; set; }
+
+    public string? LocationCountry { get; set; }
+
+    public double? LocationLatitude { get; set; }
+
+    public double? LocationLongitude { get; set; }
+
     public string? AvatarObjectKey { get; set; }
 
     public string? BannerObjectKey { get; set; }

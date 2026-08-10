@@ -97,6 +97,7 @@ public class UsersController : ControllerBase
         {
             DisplayName = request.DisplayName,
             Bio = request.Bio,
+            RemoveLocation = request.RemoveLocation,
             Location = request.Location,
             RemoveAvatar = request.RemoveAvatar,
             RemoveBanner = request.RemoveBanner

@@ -305,9 +305,17 @@ namespace Threads.Infrastracture.Migrations
                     b.Property<double?>("LocationLongitude")
                         .HasColumnType("double precision");
 
+                    b.Property<string>("LocationCountry")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
                     b.Property<string>("LocationName")
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
+
+                    b.Property<string>("LocationPlaceId")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
 
                     b.Property<int>("RepostsCount")
                         .HasColumnType("integer");
@@ -433,6 +441,20 @@ namespace Threads.Infrastracture.Migrations
                     b.Property<string>("Location")
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
+
+                    b.Property<string>("LocationCountry")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<double?>("LocationLatitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("LocationLongitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("LocationPlaceId")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()

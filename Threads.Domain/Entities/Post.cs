@@ -9,6 +9,10 @@ public class Post : BaseEntity
 
     public string? LocationName { get; set; }
 
+    public string? LocationPlaceId { get; set; }
+
+    public string? LocationCountry { get; set; }
+
     public double? LocationLatitude { get; set; }
 
     public double? LocationLongitude { get; set; }

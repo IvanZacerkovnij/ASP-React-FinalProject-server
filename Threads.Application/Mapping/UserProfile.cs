@@ -9,9 +9,11 @@ public class UserProfile : Profile
     public UserProfile()
     {
         CreateMap<User, UserShortResponse>()
+            .ForMember(destination => destination.Location, options => options.Ignore())
             .ForMember(destination => destination.AvatarUrl, options => options.MapFrom(source => source.AvatarObjectKey));
 
         CreateMap<User, UserResponse>()
+            .ForMember(destination => destination.Location, options => options.Ignore())
             .ForMember(destination => destination.AvatarUrl, options => options.MapFrom(source => source.AvatarObjectKey))
             .ForMember(destination => destination.BannerUrl, options => options.MapFrom(source => source.BannerObjectKey))
             .ForMember(destination => destination.FollowersCount, options => options.MapFrom(source => source.FollowerRelations.Count))
@@ -26,6 +28,10 @@ public class UserProfile : Profile
             .ForMember(destination => destination.PasswordHash, options => options.Ignore())
             .ForMember(destination => destination.AvatarObjectKey, options => options.Ignore())
             .ForMember(destination => destination.BannerObjectKey, options => options.Ignore())
+            .ForMember(destination => destination.LocationPlaceId, options => options.Ignore())
+            .ForMember(destination => destination.LocationCountry, options => options.Ignore())
+            .ForMember(destination => destination.LocationLatitude, options => options.Ignore())
+            .ForMember(destination => destination.LocationLongitude, options => options.Ignore())
             .ForMember(destination => destination.IsVerified, options => options.Ignore())
             .ForMember(destination => destination.IsActive, options => options.Ignore())
             .ForMember(destination => destination.Posts, options => options.Ignore())

@@ -1,5 +1,6 @@
 using AutoMapper;
 using Threads.Application.DTOs.Comments;
+using Threads.Application.DTOs.Locations;
 using Threads.Application.DTOs.Users;
 using Threads.Application.Interfaces.Media;
 using Threads.Application.Interfaces.Comments;
@@ -161,11 +162,30 @@ public class CommentService : ICommentService
             Id = response.Id,
             Username = response.Username,
             DisplayName = response.DisplayName,
-            Location = response.Location,
+            Location = MapLocation(user),
             AvatarUrl = string.IsNullOrWhiteSpace(user.AvatarObjectKey)
                 ? null
                 : _objectStorageService.GetReadUrl(user.AvatarObjectKey),
             IsVerified = response.IsVerified
+        };
+    }
+
+    private static LocationResponse? MapLocation(User user)
+    {
+        if (string.IsNullOrWhiteSpace(user.Location))
+        {
+            return null;
+        }
+
+        return new LocationResponse
+        {
+            Id = string.IsNullOrWhiteSpace(user.LocationPlaceId)
+                ? user.Location
+                : user.LocationPlaceId,
+            Name = user.Location,
+            Country = user.LocationCountry ?? string.Empty,
+            Latitude = user.LocationLatitude ?? 0,
+            Longitude = user.LocationLongitude ?? 0
         };
     }
 }

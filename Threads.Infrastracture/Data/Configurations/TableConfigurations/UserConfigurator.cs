@@ -36,6 +36,12 @@ public class UserConfigurator : IEntityTypeConfiguration<User>
         builder.Property(user => user.Location)
             .HasMaxLength(255);
 
+        builder.Property(user => user.LocationPlaceId)
+            .HasMaxLength(1024);
+
+        builder.Property(user => user.LocationCountry)
+            .HasMaxLength(255);
+
         builder.Property(user => user.AvatarObjectKey)
             .HasMaxLength(512);
 

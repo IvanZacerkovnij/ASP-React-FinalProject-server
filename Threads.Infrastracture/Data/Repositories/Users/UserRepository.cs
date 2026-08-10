@@ -28,7 +28,8 @@ public class UserRepository : IUserRepository
             .Where(user =>
                 EF.Functions.ILike(user.Username, $"%{query}%") ||
                 (user.DisplayName != null && EF.Functions.ILike(user.DisplayName, $"%{query}%")) ||
-                (user.Location != null && EF.Functions.ILike(user.Location, $"%{query}%")))
+                (user.Location != null && EF.Functions.ILike(user.Location, $"%{query}%")) ||
+                (user.LocationCountry != null && EF.Functions.ILike(user.LocationCountry, $"%{query}%")))
             .OrderBy(user => user.Username)
             .Take(take)
             .ToListAsync(cancellationToken);

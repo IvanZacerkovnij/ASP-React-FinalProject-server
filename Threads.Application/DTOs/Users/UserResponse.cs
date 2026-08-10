@@ -1,3 +1,5 @@
+using Threads.Application.DTOs.Locations;
+
 namespace Threads.Application.DTOs.Users;
 
 public class UserResponse
@@ -10,7 +12,7 @@ public class UserResponse
 
     public string? Bio { get; init; }
 
-    public string? Location { get; init; }
+    public LocationResponse? Location { get; init; }
 
     public string? AvatarUrl { get; init; }
 

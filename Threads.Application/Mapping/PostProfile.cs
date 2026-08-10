@@ -28,7 +28,9 @@ public class PostProfile : Profile
 
         CreateMap<CreatePostRequest, Post>()
             .ForMember(destination => destination.Content, options => options.Ignore())
+            .ForMember(destination => destination.LocationPlaceId, options => options.Ignore())
             .ForMember(destination => destination.LocationName, options => options.Ignore())
+            .ForMember(destination => destination.LocationCountry, options => options.Ignore())
             .ForMember(destination => destination.LocationLatitude, options => options.Ignore())
             .ForMember(destination => destination.LocationLongitude, options => options.Ignore())
             .ForMember(destination => destination.EmbedUrl, options => options.Ignore())
@@ -46,7 +48,9 @@ public class PostProfile : Profile
 
         CreateMap<UpdatePostRequest, Post>()
             .ForMember(destination => destination.Content, options => options.Ignore())
+            .ForMember(destination => destination.LocationPlaceId, options => options.Ignore())
             .ForMember(destination => destination.LocationName, options => options.Ignore())
+            .ForMember(destination => destination.LocationCountry, options => options.Ignore())
             .ForMember(destination => destination.LocationLatitude, options => options.Ignore())
             .ForMember(destination => destination.LocationLongitude, options => options.Ignore())
             .ForMember(destination => destination.EmbedUrl, options => options.Ignore())

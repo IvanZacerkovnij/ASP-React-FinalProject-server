@@ -18,6 +18,12 @@ public class PostConfigurator : IEntityTypeConfiguration<Post>
         builder.Property(post => post.LocationName)
             .HasMaxLength(255);
 
+        builder.Property(post => post.LocationPlaceId)
+            .HasMaxLength(1024);
+
+        builder.Property(post => post.LocationCountry)
+            .HasMaxLength(255);
+
         builder.Property(post => post.EmbedUrl)
             .HasMaxLength(2048);
 

@@ -1,4 +1,5 @@
 using AutoMapper;
+using Threads.Application.DTOs.Locations;
 using Threads.Application.DTOs.Polls;
 using Threads.Application.DTOs.Posts;
 using Threads.Application.DTOs.Users;
@@ -13,6 +14,8 @@ public class PostService : IPostService
     private const int FeedSize = 10;
     private const int MaxContentLength = 2000;
     private const int MaxLocationNameLength = 255;
+    private const int MaxLocationCountryLength = 255;
+    private const int MaxLocationIdLength = 1024;
     private const int MaxEmbedUrlLength = 2048;
     private const int MaxEmbedTitleLength = 255;
     private const int MaxEmbedDescriptionLength = 1000;
@@ -323,6 +326,8 @@ public class PostService : IPostService
         }
 
         post.LocationName = normalizedLocationName;
+        post.LocationPlaceId = NormalizeOptionalValue(location.Id, MaxLocationIdLength, "Location id");
+        post.LocationCountry = NormalizeOptionalValue(location.Country, MaxLocationCountryLength, "Location country");
         post.LocationLatitude = location.Latitude;
         post.LocationLongitude = location.Longitude;
     }
@@ -330,6 +335,8 @@ public class PostService : IPostService
     private static void ClearLocation(Post post)
     {
         post.LocationName = null;
+        post.LocationPlaceId = null;
+        post.LocationCountry = null;
         post.LocationLatitude = null;
         post.LocationLongitude = null;
     }
@@ -461,7 +468,9 @@ public class PostService : IPostService
                 ? null
                 : new PostLocationResponse
                 {
+                    Id = post.LocationPlaceId,
                     Name = post.LocationName,
+                    Country = post.LocationCountry,
                     Latitude = post.LocationLatitude,
                     Longitude = post.LocationLongitude
                 },
@@ -494,11 +503,30 @@ public class PostService : IPostService
             Id = response.Id,
             Username = response.Username,
             DisplayName = response.DisplayName,
-            Location = response.Location,
+            Location = MapLocation(user),
             AvatarUrl = string.IsNullOrWhiteSpace(user.AvatarObjectKey)
                 ? null
                 : _objectStorageService.GetReadUrl(user.AvatarObjectKey),
             IsVerified = response.IsVerified
+        };
+    }
+
+    private static LocationResponse? MapLocation(User user)
+    {
+        if (string.IsNullOrWhiteSpace(user.Location))
+        {
+            return null;
+        }
+
+        return new LocationResponse
+        {
+            Id = string.IsNullOrWhiteSpace(user.LocationPlaceId)
+                ? user.Location
+                : user.LocationPlaceId,
+            Name = user.Location,
+            Country = user.LocationCountry ?? string.Empty,
+            Latitude = user.LocationLatitude ?? 0,
+            Longitude = user.LocationLongitude ?? 0
         };
     }
 

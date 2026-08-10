@@ -1,4 +1,5 @@
 using AutoMapper;
+using Threads.Application.DTOs.Locations;
 using Threads.Application.DTOs.Users;
 using Threads.Application.Interfaces.Media;
 using Threads.Application.Interfaces.Users;
@@ -19,6 +20,8 @@ public class UserService : IUserService
     private const int MaxDisplayNameLength = 100;
     private const int MaxBioLength = 500;
     private const int MaxLocationLength = 255;
+    private const int MaxLocationCountryLength = 255;
+    private const int MaxLocationIdLength = 1024;
     private readonly IUserRepository _userRepository;
     private readonly IObjectStorageService _objectStorageService;
     private readonly IMapper _mapper;
@@ -111,9 +114,13 @@ public class UserService : IUserService
             user.Bio = NormalizeOptionalText(request.Bio, MaxBioLength, "Bio");
         }
 
-        if (request.Location is not null)
+        if (request.RemoveLocation)
         {
-            user.Location = NormalizeOptionalText(request.Location, MaxLocationLength, "Location");
+            ClearLocation(user);
+        }
+        else if (request.Location is not null)
+        {
+            ApplyLocation(user, request.Location);
         }
 
         if (request.RemoveAvatar)
@@ -241,6 +248,55 @@ public class UserService : IUserService
         return normalizedValue;
     }
 
+    private static void ApplyLocation(User user, LocationRequest location)
+    {
+        if (string.IsNullOrWhiteSpace(location.Name))
+        {
+            throw new InvalidOperationException("Location name is required.");
+        }
+
+        user.Location = NormalizeOptionalText(location.Name, MaxLocationLength, "Location");
+        user.LocationPlaceId = NormalizeOptionalText(location.Id, MaxLocationIdLength, "Location id");
+        user.LocationCountry = NormalizeOptionalText(location.Country, MaxLocationCountryLength, "Location country");
+        user.LocationLatitude = location.Latitude;
+        user.LocationLongitude = location.Longitude;
+    }
+
+    private static void ClearLocation(User user)
+    {
+        user.Location = null;
+        user.LocationPlaceId = null;
+        user.LocationCountry = null;
+        user.LocationLatitude = null;
+        user.LocationLongitude = null;
+    }
+
+    private static LocationResponse? MapLocation(
+        string? id,
+        string? name,
+        string? country,
+        double? latitude,
+        double? longitude)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return null;
+        }
+
+        return new LocationResponse
+        {
+            Id = string.IsNullOrWhiteSpace(id)
+                ? name
+                : id,
+            Name = name,
+            Country = string.IsNullOrWhiteSpace(country)
+                ? string.Empty
+                : country,
+            Latitude = latitude ?? 0,
+            Longitude = longitude ?? 0
+        };
+    }
+
     private static IReadOnlyCollection<string?> GetReplacedObjectKeys(
         string? originalAvatarObjectKey,
         string? originalBannerObjectKey,
@@ -288,7 +344,12 @@ public class UserService : IUserService
             Id = response.Id,
             Username = response.Username,
             DisplayName = response.DisplayName,
-            Location = response.Location,
+            Location = MapLocation(
+                user.LocationPlaceId,
+                user.Location,
+                user.LocationCountry,
+                user.LocationLatitude,
+                user.LocationLongitude),
             AvatarUrl = string.IsNullOrWhiteSpace(user.AvatarObjectKey)
                 ? null
                 : _objectStorageService.GetReadUrl(user.AvatarObjectKey),
@@ -306,7 +367,12 @@ public class UserService : IUserService
             Username = response.Username,
             DisplayName = response.DisplayName,
             Bio = response.Bio,
-            Location = response.Location,
+            Location = MapLocation(
+                user.LocationPlaceId,
+                user.Location,
+                user.LocationCountry,
+                user.LocationLatitude,
+                user.LocationLongitude),
             AvatarUrl = string.IsNullOrWhiteSpace(user.AvatarObjectKey)
                 ? null
                 : _objectStorageService.GetReadUrl(user.AvatarObjectKey),

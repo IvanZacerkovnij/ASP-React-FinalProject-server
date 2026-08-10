@@ -1,6 +1,6 @@
-namespace Threads.Application.DTOs.Posts;
+namespace Threads.Application.DTOs.Locations;
 
-public class PostLocationRequest
+public class LocationRequest
 {
     public string? Id { get; init; }
 
