@@ -80,3 +80,4 @@ namespace Threads.Infrastracture.Migrations
                 table: "Media");
         }
     }
+}
