@@ -27,25 +27,43 @@ public class PostsController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<IReadOnlyCollection<PostResponse>>> GetAll(CancellationToken cancellationToken)
     {
-        var posts = await _postService.GetAllAsync(cancellationToken);
+        var posts = await _postService.GetAllAsync(cancellationToken, GetCurrentUserId());
         return Ok(posts);
     }
 
     [HttpGet("feed")]
     public async Task<ActionResult<IReadOnlyCollection<PostResponse>>> GetFeed(CancellationToken cancellationToken)
     {
-        var posts = await _postService.GetFeedAsync(cancellationToken);
+        var posts = await _postService.GetFeedAsync(cancellationToken, GetCurrentUserId());
         return Ok(posts);
     }
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<PostResponse>> GetById(Guid id, CancellationToken cancellationToken)
     {
-        var post = await _postService.GetByIdAsync(id, cancellationToken);
+        var post = await _postService.GetByIdAsync(id, cancellationToken, GetCurrentUserId());
 
         return post is null
             ? NotFound(new { message = "Post was not found." })
             : Ok(post);
+    }
+
+    [Authorize]
+    [HttpPost("{id:guid}/view")]
+    public async Task<ActionResult<PostViewResponse>> RegisterView(Guid id, CancellationToken cancellationToken)
+    {
+        var currentUserId = GetCurrentUserId();
+
+        if (currentUserId is null)
+        {
+            return Unauthorized(new { message = "Invalid token claims." });
+        }
+
+        var result = await _postService.RecordViewAsync(id, currentUserId.Value, cancellationToken);
+
+        return result is null
+            ? NotFound(new { message = "Post was not found." })
+            : Ok(result);
     }
 
     [Authorize]
@@ -59,7 +77,7 @@ public class PostsController : ControllerBase
             return Unauthorized(new { message = "Invalid token claims." });
         }
 
-        var currentPost = await _postService.GetByIdAsync(id, cancellationToken);
+        var currentPost = await _postService.GetByIdAsync(id, cancellationToken, currentUserId);
 
         if (currentPost is null)
         {
@@ -84,7 +102,7 @@ public class PostsController : ControllerBase
             return Unauthorized(new { message = "Invalid token claims." });
         }
 
-        var currentPost = await _postService.GetByIdAsync(id, cancellationToken);
+        var currentPost = await _postService.GetByIdAsync(id, cancellationToken, currentUserId);
 
         if (currentPost is null)
         {
@@ -165,7 +183,7 @@ public class PostsController : ControllerBase
             return Unauthorized(new { message = "Invalid token claims." });
         }
 
-        var existingPost = await _postService.GetByIdAsync(id, cancellationToken);
+        var existingPost = await _postService.GetByIdAsync(id, cancellationToken, currentUserId);
 
         if (existingPost is null)
         {
@@ -177,11 +195,18 @@ public class PostsController : ControllerBase
             return Forbid();
         }
 
-        var updatedPost = await _postService.UpdateAsync(id, request, cancellationToken);
+        try
+        {
+            var updatedPost = await _postService.UpdateAsync(id, request, cancellationToken);
 
-        return updatedPost is null
-            ? NotFound(new { message = "Post was not found." })
-            : Ok(updatedPost);
+            return updatedPost is null
+                ? NotFound(new { message = "Post was not found." })
+                : Ok(updatedPost);
+        }
+        catch (InvalidOperationException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
     }
 
     [Authorize]
@@ -195,7 +220,7 @@ public class PostsController : ControllerBase
             return Unauthorized(new { message = "Invalid token claims." });
         }
 
-        var existingPost = await _postService.GetByIdAsync(id, cancellationToken);
+        var existingPost = await _postService.GetByIdAsync(id, cancellationToken, currentUserId);
 
         if (existingPost is null)
         {

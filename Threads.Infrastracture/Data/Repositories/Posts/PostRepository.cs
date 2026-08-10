@@ -15,12 +15,8 @@ public class PostRepository : IPostRepository
 
     public async Task<IReadOnlyCollection<Post>> GetAllAsync(CancellationToken cancellationToken = default)
     {
-        return await _dbContext.Posts
-            .AsNoTracking()
-            .Include(post => post.Author)
-            .Include(post => post.Media)
-            .Include(post => post.Comments)
-            .Include(post => post.Likes)
+        return await BuildPostQuery(trackChanges: false)
+            .OrderByDescending(post => post.CreatedAt)
             .ToListAsync(cancellationToken);
     }
 
@@ -38,13 +34,8 @@ public class PostRepository : IPostRepository
             return [];
         }
 
-        var posts = await _dbContext.Posts
-            .AsNoTracking()
+        var posts = await BuildPostQuery(trackChanges: false)
             .Where(post => postIds.Contains(post.Id))
-            .Include(post => post.Author)
-            .Include(post => post.Media)
-            .Include(post => post.Comments)
-            .Include(post => post.Likes)
             .ToListAsync(cancellationToken);
 
         var postOrder = postIds
@@ -58,25 +49,84 @@ public class PostRepository : IPostRepository
 
     public async Task<IReadOnlyCollection<Post>> GetByAuthorIdAsync(Guid authorId, CancellationToken cancellationToken = default)
     {
-        return await _dbContext.Posts
-            .AsNoTracking()
+        return await BuildPostQuery(trackChanges: false)
             .Where(post => post.AuthorId == authorId)
-            .Include(post => post.Author)
-            .Include(post => post.Media)
-            .Include(post => post.Comments)
-            .Include(post => post.Likes)
             .OrderByDescending(post => post.CreatedAt)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyCollection<Post>> SearchAsync(
+        string query,
+        int take = 20,
+        CancellationToken cancellationToken = default)
+    {
+        return await BuildPostQuery(trackChanges: false)
+            .Where(post =>
+                (post.Content != null && EF.Functions.ILike(post.Content, $"%{query}%")) ||
+                (post.LocationName != null && EF.Functions.ILike(post.LocationName, $"%{query}%")) ||
+                (post.EmbedTitle != null && EF.Functions.ILike(post.EmbedTitle, $"%{query}%")) ||
+                (post.Author.Username != null && EF.Functions.ILike(post.Author.Username, $"%{query}%")) ||
+                (post.Author.DisplayName != null && EF.Functions.ILike(post.Author.DisplayName, $"%{query}%")))
+            .OrderByDescending(post => post.CreatedAt)
+            .Take(take)
             .ToListAsync(cancellationToken);
     }
 
     public async Task<Post?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        return await _dbContext.Posts
-            .Include(post => post.Author)
-            .Include(post => post.Media)
-            .Include(post => post.Comments)
-            .Include(post => post.Likes)
+        return await BuildPostQuery(trackChanges: true)
             .FirstOrDefaultAsync(post => post.Id == id, cancellationToken);
+    }
+
+    public async Task<int?> RecordViewAsync(Guid id, Guid viewerId, CancellationToken cancellationToken = default)
+    {
+        var post = await _dbContext.Posts
+            .FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
+
+        if (post is null)
+        {
+            return null;
+        }
+
+        var alreadyViewed = await _dbContext.PostViews
+            .AsNoTracking()
+            .AnyAsync(
+                item => item.PostId == id && item.ViewerId == viewerId,
+                cancellationToken);
+
+        if (alreadyViewed)
+        {
+            return post.ViewsCount;
+        }
+
+        await _dbContext.PostViews.AddAsync(
+            new PostView
+            {
+                PostId = id,
+                ViewerId = viewerId
+            },
+            cancellationToken);
+
+        post.ViewsCount++;
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            var persistedPost = await _dbContext.Posts
+                .AsNoTracking()
+                .FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
+
+            if (persistedPost is not null)
+            {
+                return persistedPost.ViewsCount;
+            }
+
+            throw;
+        }
+
+        return post.ViewsCount;
     }
 
     public async Task AddAsync(Post post, CancellationToken cancellationToken = default)
@@ -95,5 +145,24 @@ public class PostRepository : IPostRepository
     {
         _dbContext.Posts.Remove(post);
         await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private IQueryable<Post> BuildPostQuery(bool trackChanges)
+    {
+        var query = trackChanges
+            ? _dbContext.Posts.AsQueryable()
+            : _dbContext.Posts.AsNoTracking();
+
+        return query
+            .AsSplitQuery()
+            .Include(post => post.Author)
+            .Include(post => post.Media)
+            .Include(post => post.Comments)
+            .Include(post => post.Likes)
+            .Include(post => post.Poll)
+                .ThenInclude(poll => poll!.Options)
+                    .ThenInclude(option => option.Votes)
+            .Include(post => post.Poll)
+                .ThenInclude(poll => poll!.Votes);
     }
 }

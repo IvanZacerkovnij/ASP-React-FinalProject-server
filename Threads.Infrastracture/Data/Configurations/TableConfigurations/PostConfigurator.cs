@@ -15,8 +15,39 @@ public class PostConfigurator : IEntityTypeConfiguration<Post>
         builder.Property(post => post.Content)
             .HasMaxLength(2000);
 
+        builder.Property(post => post.LocationName)
+            .HasMaxLength(255);
+
+        builder.Property(post => post.EmbedUrl)
+            .HasMaxLength(2048);
+
+        builder.Property(post => post.EmbedTitle)
+            .HasMaxLength(255);
+
+        builder.Property(post => post.EmbedDescription)
+            .HasMaxLength(1000);
+
+        builder.Property(post => post.EmbedThumbnailUrl)
+            .HasMaxLength(2048);
+
+        builder.Property(post => post.ViewsCount)
+            .IsRequired();
+
+        builder.Property(post => post.RepostsCount)
+            .IsRequired();
+
         builder.Property(post => post.CreatedAt)
             .IsRequired();
+
+        builder.ToTable(table =>
+            table.HasCheckConstraint(
+                "CK_Posts_ViewsCount",
+                "\"ViewsCount\" >= 0"));
+
+        builder.ToTable(table =>
+            table.HasCheckConstraint(
+                "CK_Posts_RepostsCount",
+                "\"RepostsCount\" >= 0"));
 
         builder.HasIndex(post => post.AuthorId);
 
@@ -33,6 +64,11 @@ public class PostConfigurator : IEntityTypeConfiguration<Post>
         builder.HasMany(post => post.Likes)
             .WithOne(like => like.Post)
             .HasForeignKey(like => like.PostId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasMany(post => post.Views)
+            .WithOne(view => view.Post)
+            .HasForeignKey(view => view.PostId)
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasMany(post => post.Media)

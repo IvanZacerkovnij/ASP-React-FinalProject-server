@@ -18,7 +18,11 @@ public class User : BaseEntity
 
     public string? Bio { get; set; }
 
+    public string? Location { get; set; }
+
     public string? AvatarObjectKey { get; set; }
+
+    public string? BannerObjectKey { get; set; }
 
     public bool IsVerified { get; set; }
 
@@ -32,6 +36,9 @@ public class User : BaseEntity
 
     public ICollection<Like> Likes { get; set; } =
         new List<Like>();
+
+    public ICollection<PostView> PostViews { get; set; } =
+        new List<PostView>();
 
     public ICollection<PollVote> PollVotes { get; set; } =
         new List<PollVote>();

@@ -42,6 +42,11 @@ public class AuthService : IAuthService
         var normalizedEmail = request.Email.Trim();
         var normalizedUsername = request.Username.Trim();
 
+        if (Guid.TryParse(normalizedUsername, out _))
+        {
+            throw new InvalidOperationException("Username must not be a GUID.");
+        }
+
         var existingUserByEmail = await _userRepository.GetByEmailAsync(normalizedEmail, cancellationToken);
         if (existingUserByEmail is not null)
         {

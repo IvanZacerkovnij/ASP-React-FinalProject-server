@@ -10,7 +10,11 @@ public class UserResponse
 
     public string? Bio { get; init; }
 
+    public string? Location { get; init; }
+
     public string? AvatarUrl { get; init; }
+
+    public string? BannerUrl { get; init; }
 
     public int FollowersCount { get; init; }
 

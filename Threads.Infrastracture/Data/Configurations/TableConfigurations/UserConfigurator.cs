@@ -33,7 +33,13 @@ public class UserConfigurator : IEntityTypeConfiguration<User>
         builder.Property(user => user.Bio)
             .HasMaxLength(500);
 
+        builder.Property(user => user.Location)
+            .HasMaxLength(255);
+
         builder.Property(user => user.AvatarObjectKey)
+            .HasMaxLength(512);
+
+        builder.Property(user => user.BannerObjectKey)
             .HasMaxLength(512);
 
         builder.Property(user => user.CreatedAt)
@@ -58,6 +64,11 @@ public class UserConfigurator : IEntityTypeConfiguration<User>
         builder.HasMany(user => user.Likes)
             .WithOne(like => like.User)
             .HasForeignKey(like => like.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasMany(user => user.PostViews)
+            .WithOne(postView => postView.Viewer)
+            .HasForeignKey(postView => postView.ViewerId)
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasMany(user => user.PollVotes)

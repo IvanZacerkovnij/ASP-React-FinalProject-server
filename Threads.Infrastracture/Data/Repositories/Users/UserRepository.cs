@@ -15,20 +15,28 @@ public class UserRepository : IUserRepository
 
     public async Task<IReadOnlyCollection<User>> GetAllAsync(CancellationToken cancellationToken = default)
     {
-        return await _dbContext.Users
-            .AsNoTracking()
-            .Include(user => user.Posts)
-            .Include(user => user.FollowingRelations)
-            .Include(user => user.FollowerRelations)
+        return await BuildUserQuery(trackChanges: false)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyCollection<User>> SearchAsync(
+        string query,
+        int take = 20,
+        CancellationToken cancellationToken = default)
+    {
+        return await BuildUserQuery(trackChanges: false)
+            .Where(user =>
+                EF.Functions.ILike(user.Username, $"%{query}%") ||
+                (user.DisplayName != null && EF.Functions.ILike(user.DisplayName, $"%{query}%")) ||
+                (user.Location != null && EF.Functions.ILike(user.Location, $"%{query}%")))
+            .OrderBy(user => user.Username)
+            .Take(take)
             .ToListAsync(cancellationToken);
     }
 
     public async Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        return await _dbContext.Users
-            .Include(user => user.Posts)
-            .Include(user => user.FollowingRelations)
-            .Include(user => user.FollowerRelations)
+        return await BuildUserQuery(trackChanges: true)
             .FirstOrDefaultAsync(user => user.Id == id, cancellationToken);
     }
 
@@ -40,7 +48,7 @@ public class UserRepository : IUserRepository
 
     public async Task<User?> GetByUsernameAsync(string username, CancellationToken cancellationToken = default)
     {
-        return await _dbContext.Users
+        return await BuildUserQuery(trackChanges: false)
             .FirstOrDefaultAsync(user => user.Username == username, cancellationToken);
     }
 
@@ -60,5 +68,18 @@ public class UserRepository : IUserRepository
     {
         _dbContext.Users.Remove(user);
         await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private IQueryable<User> BuildUserQuery(bool trackChanges)
+    {
+        var query = trackChanges
+            ? _dbContext.Users.AsQueryable()
+            : _dbContext.Users.AsNoTracking();
+
+        return query
+            .AsSplitQuery()
+            .Include(user => user.Posts)
+            .Include(user => user.FollowingRelations)
+            .Include(user => user.FollowerRelations);
     }
 }

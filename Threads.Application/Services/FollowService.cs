@@ -1,6 +1,7 @@
 using AutoMapper;
 using Threads.Application.DTOs.Users;
 using Threads.Application.Interfaces.Follows;
+using Threads.Application.Interfaces.Media;
 using Threads.Application.Interfaces.Users;
 using Threads.Domain.Entities;
 
@@ -10,12 +11,18 @@ public class FollowService : IFollowService
 {
     private readonly IFollowRepository _followRepository;
     private readonly IUserRepository _userRepository;
+    private readonly IObjectStorageService _objectStorageService;
     private readonly IMapper _mapper;
 
-    public FollowService(IFollowRepository followRepository, IUserRepository userRepository, IMapper mapper)
+    public FollowService(
+        IFollowRepository followRepository,
+        IUserRepository userRepository,
+        IObjectStorageService objectStorageService,
+        IMapper mapper)
     {
         _followRepository = followRepository;
         _userRepository = userRepository;
+        _objectStorageService = objectStorageService;
         _mapper = mapper;
     }
 
@@ -77,7 +84,7 @@ public class FollowService : IFollowService
         var followers = await _followRepository.GetFollowersAsync(userId, cancellationToken);
 
         return followers
-            .Select(_mapper.Map<UserShortResponse>)
+            .Select(MapUserShortResponse)
             .ToList();
     }
 
@@ -86,7 +93,24 @@ public class FollowService : IFollowService
         var following = await _followRepository.GetFollowingAsync(userId, cancellationToken);
 
         return following
-            .Select(_mapper.Map<UserShortResponse>)
+            .Select(MapUserShortResponse)
             .ToList();
+    }
+
+    private UserShortResponse MapUserShortResponse(User user)
+    {
+        var response = _mapper.Map<UserShortResponse>(user);
+
+        return new UserShortResponse
+        {
+            Id = response.Id,
+            Username = response.Username,
+            DisplayName = response.DisplayName,
+            Location = response.Location,
+            AvatarUrl = string.IsNullOrWhiteSpace(user.AvatarObjectKey)
+                ? null
+                : _objectStorageService.GetReadUrl(user.AvatarObjectKey),
+            IsVerified = response.IsVerified
+        };
     }
 }

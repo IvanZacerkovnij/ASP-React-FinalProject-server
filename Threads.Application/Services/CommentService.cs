@@ -1,5 +1,7 @@
 using AutoMapper;
 using Threads.Application.DTOs.Comments;
+using Threads.Application.DTOs.Users;
+using Threads.Application.Interfaces.Media;
 using Threads.Application.Interfaces.Comments;
 using Threads.Application.Interfaces.Posts;
 using Threads.Domain.Entities;
@@ -10,15 +12,18 @@ public class CommentService : ICommentService
 {
     private readonly ICommentRepository _commentRepository;
     private readonly IPostRepository _postRepository;
+    private readonly IObjectStorageService _objectStorageService;
     private readonly IMapper _mapper;
 
     public CommentService(
         ICommentRepository commentRepository,
         IPostRepository postRepository,
+        IObjectStorageService objectStorageService,
         IMapper mapper)
     {
         _commentRepository = commentRepository;
         _postRepository = postRepository;
+        _objectStorageService = objectStorageService;
         _mapper = mapper;
     }
 
@@ -29,7 +34,7 @@ public class CommentService : ICommentService
         var comments = await _commentRepository.GetByPostIdAsync(postId, cancellationToken);
 
         return comments
-            .Select(_mapper.Map<CommentResponse>)
+            .Select(MapCommentResponse)
             .ToList();
     }
 
@@ -39,7 +44,7 @@ public class CommentService : ICommentService
 
         return comment is null
             ? null
-            : _mapper.Map<CommentResponse>(comment);
+            : MapCommentResponse(comment);
     }
 
     public async Task<CommentResponse> CreateAsync(
@@ -85,7 +90,7 @@ public class CommentService : ICommentService
 
         var createdComment = await _commentRepository.GetByIdAsync(comment.Id, cancellationToken);
 
-        return _mapper.Map<CommentResponse>(createdComment ?? comment);
+        return MapCommentResponse(createdComment ?? comment);
     }
 
     public async Task<CommentResponse?> UpdateAsync(
@@ -112,7 +117,7 @@ public class CommentService : ICommentService
 
         var updatedComment = await _commentRepository.GetByIdAsync(comment.Id, cancellationToken);
 
-        return _mapper.Map<CommentResponse>(updatedComment ?? comment);
+        return MapCommentResponse(updatedComment ?? comment);
     }
 
     public async Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default)
@@ -127,5 +132,40 @@ public class CommentService : ICommentService
         await _commentRepository.DeleteAsync(comment, cancellationToken);
 
         return true;
+    }
+
+    private CommentResponse MapCommentResponse(Comment comment)
+    {
+        var response = _mapper.Map<CommentResponse>(comment);
+
+        return new CommentResponse
+        {
+            Id = response.Id,
+            PostId = response.PostId,
+            ParentCommentId = response.ParentCommentId,
+            Content = response.Content,
+            Author = MapUserShortResponse(comment.Author),
+            LikesCount = response.LikesCount,
+            IsLikedByCurrentUser = response.IsLikedByCurrentUser,
+            CreatedAt = response.CreatedAt,
+            UpdatedAt = response.UpdatedAt
+        };
+    }
+
+    private UserShortResponse MapUserShortResponse(User user)
+    {
+        var response = _mapper.Map<UserShortResponse>(user);
+
+        return new UserShortResponse
+        {
+            Id = response.Id,
+            Username = response.Username,
+            DisplayName = response.DisplayName,
+            Location = response.Location,
+            AvatarUrl = string.IsNullOrWhiteSpace(user.AvatarObjectKey)
+                ? null
+                : _objectStorageService.GetReadUrl(user.AvatarObjectKey),
+            IsVerified = response.IsVerified
+        };
     }
 }

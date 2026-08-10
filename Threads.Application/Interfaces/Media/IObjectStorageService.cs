@@ -8,5 +8,9 @@ public interface IObjectStorageService
         string contentType,
         CancellationToken cancellationToken = default);
 
+    Task DeleteAsync(
+        string objectKey,
+        CancellationToken cancellationToken = default);
+
     string GetReadUrl(string objectKey);
 }

@@ -7,6 +7,24 @@ public class Post : BaseEntity
 {
     public string? Content { get; set; }
 
+    public string? LocationName { get; set; }
+
+    public double? LocationLatitude { get; set; }
+
+    public double? LocationLongitude { get; set; }
+
+    public string? EmbedUrl { get; set; }
+
+    public string? EmbedTitle { get; set; }
+
+    public string? EmbedDescription { get; set; }
+
+    public string? EmbedThumbnailUrl { get; set; }
+
+    public int ViewsCount { get; set; }
+
+    public int RepostsCount { get; set; }
+
     public Guid AuthorId { get; set; }
 
     public User Author { get; set; } = null!;
@@ -19,6 +37,9 @@ public class Post : BaseEntity
 
     public ICollection<Like> Likes { get; set; } =
         new List<Like>();
+
+    public ICollection<PostView> Views { get; set; } =
+        new List<PostView>();
 
     public Poll? Poll { get; set; }
 }

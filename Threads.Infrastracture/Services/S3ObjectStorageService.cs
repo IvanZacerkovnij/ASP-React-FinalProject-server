@@ -50,6 +50,16 @@ public class S3ObjectStorageService : IObjectStorageService
         await _s3Client.PutObjectAsync(request, cancellationToken);
     }
 
+    public async Task DeleteAsync(string objectKey, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(objectKey))
+        {
+            return;
+        }
+
+        await _s3Client.DeleteObjectAsync(_bucketName, objectKey, cancellationToken);
+    }
+
     public string GetReadUrl(string objectKey)
     {
         var request = new GetPreSignedUrlRequest

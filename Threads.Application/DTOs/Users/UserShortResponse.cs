@@ -8,6 +8,8 @@ public class UserShortResponse
 
     public string? DisplayName { get; init; }
 
+    public string? Location { get; init; }
+
     public string? AvatarUrl { get; init; }
 
     public bool IsVerified { get; init; }
