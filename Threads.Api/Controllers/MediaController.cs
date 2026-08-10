@@ -23,7 +23,7 @@ public class MediaController : ControllerBase
         Guid id,
         CancellationToken cancellationToken)
     {
-        var media = await _mediaService.GetUrlAsync(id, cancellationToken);
+        var media = await _mediaService.GetUrlAsync(id, GetCurrentUserId(), cancellationToken);
 
         return media is null
             ? NotFound(new { message = "Media was not found." })

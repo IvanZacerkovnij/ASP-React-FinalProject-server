@@ -43,14 +43,18 @@ public class UserRepository : IUserRepository
 
     public async Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
+        var normalizedEmail = email.ToLower();
+
         return await _dbContext.Users
-            .FirstOrDefaultAsync(user => user.Email == email, cancellationToken);
+            .FirstOrDefaultAsync(user => user.Email.ToLower() == normalizedEmail, cancellationToken);
     }
 
     public async Task<User?> GetByUsernameAsync(string username, CancellationToken cancellationToken = default)
     {
+        var normalizedUsername = username.ToLower();
+
         return await BuildUserQuery(trackChanges: false)
-            .FirstOrDefaultAsync(user => user.Username == username, cancellationToken);
+            .FirstOrDefaultAsync(user => user.Username.ToLower() == normalizedUsername, cancellationToken);
     }
 
     public async Task AddAsync(User user, CancellationToken cancellationToken = default)

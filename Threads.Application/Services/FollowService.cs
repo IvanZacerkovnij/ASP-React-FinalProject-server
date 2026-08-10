@@ -58,7 +58,14 @@ public class FollowService : IFollowService
             FollowingId = followingId
         };
 
-        await _followRepository.AddAsync(follow, cancellationToken);
+        try
+        {
+            await _followRepository.AddAsync(follow, cancellationToken);
+        }
+        catch (Exception exception) when (IsDuplicateWriteException(exception))
+        {
+            return false;
+        }
 
         return true;
     }
@@ -132,5 +139,10 @@ public class FollowService : IFollowService
             Latitude = user.LocationLatitude ?? 0,
             Longitude = user.LocationLongitude ?? 0
         };
+    }
+
+    private static bool IsDuplicateWriteException(Exception exception)
+    {
+        return exception.GetType().Name == "DbUpdateException";
     }
 }

@@ -80,7 +80,20 @@ public class PollService : IPollService
             UserId = userId
         };
 
-        await _pollRepository.AddVoteAsync(vote, cancellationToken);
+        try
+        {
+            await _pollRepository.AddVoteAsync(vote, cancellationToken);
+        }
+        catch (Exception exception) when (IsDuplicateWriteException(exception))
+        {
+            var persistedPoll = await _pollRepository.GetByPostIdAsync(postId, cancellationToken) ?? poll;
+
+            return new PollVoteResult
+            {
+                Status = PollVoteStatus.AlreadyVoted,
+                Poll = MapPollResponse(persistedPoll, userId)
+            };
+        }
 
         poll.Votes.Add(vote);
         selectedOption.Votes.Add(vote);
@@ -115,5 +128,10 @@ public class PollService : IPollService
                 })
                 .ToList()
         };
+    }
+
+    private static bool IsDuplicateWriteException(Exception exception)
+    {
+        return exception.GetType().Name == "DbUpdateException";
     }
 }

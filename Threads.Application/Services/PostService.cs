@@ -105,6 +105,7 @@ public class PostService : IPostService
         CancellationToken cancellationToken = default)
     {
         ValidatePostCreateRequest(request);
+        var mediaIds = request.MediaIds ?? [];
 
         var post = new Post
         {
@@ -116,7 +117,7 @@ public class PostService : IPostService
         ApplyLocation(post, request.Location);
         ApplyEmbed(post, request.Embed);
 
-        await ApplyMediaAsync(post, authorId, request.MediaIds, cancellationToken);
+        await ApplyMediaAsync(post, authorId, mediaIds, cancellationToken);
 
         await _postRepository.AddAsync(post, cancellationToken);
 
@@ -207,7 +208,14 @@ public class PostService : IPostService
             return false;
         }
 
+        var mediaStorageKeys = post.Media
+            .Select(media => media.StorageKey)
+            .Where(storageKey => !string.IsNullOrWhiteSpace(storageKey))
+            .Distinct()
+            .ToArray();
+
         await _postRepository.DeleteAsync(post, cancellationToken);
+        await TryDeleteObjectsAsync(mediaStorageKeys, cancellationToken);
 
         return true;
     }
@@ -266,7 +274,7 @@ public class PostService : IPostService
     private static void ValidatePostCreateRequest(CreatePostRequest request)
     {
         var hasContent = !string.IsNullOrWhiteSpace(request.Content);
-        var hasMedia = request.MediaIds.Count > 0;
+        var hasMedia = request.MediaIds?.Count > 0;
         var hasPoll = request.Poll is not null;
         var hasEmbed = request.Embed is not null;
 
@@ -398,6 +406,11 @@ public class PostService : IPostService
             return null;
         }
 
+        if (poll.Options is null)
+        {
+            throw new InvalidOperationException("Poll options are required.");
+        }
+
         if (poll.Options.Count < 2)
         {
             throw new InvalidOperationException("Poll must contain at least 2 options.");
@@ -435,6 +448,23 @@ public class PostService : IPostService
                 })
                 .ToList()
         };
+    }
+
+    private async Task TryDeleteObjectsAsync(
+        IEnumerable<string> storageKeys,
+        CancellationToken cancellationToken)
+    {
+        foreach (var storageKey in storageKeys)
+        {
+            try
+            {
+                await _objectStorageService.DeleteAsync(storageKey, cancellationToken);
+            }
+            catch
+            {
+                // Best-effort cleanup after DB delete already succeeded.
+            }
+        }
     }
 
     private PostResponse MapPostResponse(Post post, Guid? currentUserId)

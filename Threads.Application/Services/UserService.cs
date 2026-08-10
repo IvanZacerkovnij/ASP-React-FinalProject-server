@@ -22,13 +22,19 @@ public class UserService : IUserService
     private const int MaxLocationLength = 255;
     private const int MaxLocationCountryLength = 255;
     private const int MaxLocationIdLength = 1024;
+    private readonly IMediaRepository _mediaRepository;
     private readonly IUserRepository _userRepository;
     private readonly IObjectStorageService _objectStorageService;
     private readonly IMapper _mapper;
 
-    public UserService(IUserRepository userRepository, IObjectStorageService objectStorageService, IMapper mapper)
+    public UserService(
+        IUserRepository userRepository,
+        IMediaRepository mediaRepository,
+        IObjectStorageService objectStorageService,
+        IMapper mapper)
     {
         _userRepository = userRepository;
+        _mediaRepository = mediaRepository;
         _objectStorageService = objectStorageService;
         _mapper = mapper;
     }
@@ -185,12 +191,16 @@ public class UserService : IUserService
             return false;
         }
 
+        var uploadedMediaStorageKeys = await _mediaRepository.GetStorageKeysByUploaderIdAsync(id, cancellationToken);
+
         await _userRepository.DeleteAsync(user, cancellationToken);
         await TryDeleteObjectsAsync(
-            [
-                user.AvatarObjectKey,
-                user.BannerObjectKey
-            ],
+            uploadedMediaStorageKeys
+                .Concat(
+                    [
+                        user.AvatarObjectKey,
+                        user.BannerObjectKey
+                    ]),
             cancellationToken);
 
         return true;

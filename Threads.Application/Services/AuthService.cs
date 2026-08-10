@@ -39,8 +39,9 @@ public class AuthService : IAuthService
 
     public async Task<AuthResponse> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default)
     {
-        var normalizedEmail = request.Email.Trim();
-        var normalizedUsername = request.Username.Trim();
+        var normalizedEmail = NormalizeEmail(request.Email);
+        var normalizedUsername = NormalizeUsername(request.Username);
+        var normalizedPassword = NormalizePassword(request.Password, nameof(request.Password));
 
         if (Guid.TryParse(normalizedUsername, out _))
         {
@@ -62,7 +63,7 @@ public class AuthService : IAuthService
         var user = _mapper.Map<User>(request);
         user.Email = normalizedEmail;
         user.Username = normalizedUsername;
-        user.PasswordHash = _passwordHasher.HashPassword(request.Password);
+        user.PasswordHash = _passwordHasher.HashPassword(normalizedPassword);
 
         await _userRepository.AddAsync(user, cancellationToken);
 
@@ -71,14 +72,19 @@ public class AuthService : IAuthService
 
     public async Task<AuthResponse?> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default)
     {
-        var user = await GetUserByEmailOrUsernameAsync(request.EmailOrUsername, cancellationToken);
+        var normalizedEmailOrUsername = NormalizeRequiredValue(
+            request.EmailOrUsername,
+            nameof(request.EmailOrUsername),
+            "Email or username is required.");
+        var normalizedPassword = NormalizePassword(request.Password, nameof(request.Password));
+        var user = await GetUserByEmailOrUsernameAsync(normalizedEmailOrUsername, cancellationToken);
 
         if (user is null || !user.IsActive)
         {
             return null;
         }
 
-        var isPasswordValid = _passwordHasher.VerifyPassword(request.Password, user.PasswordHash);
+        var isPasswordValid = _passwordHasher.VerifyPassword(normalizedPassword, user.PasswordHash);
 
         if (!isPasswordValid)
         {
@@ -92,7 +98,7 @@ public class AuthService : IAuthService
         RefreshTokenRequest request,
         CancellationToken cancellationToken = default)
     {
-        var refreshTokenHash = HashRefreshToken(request.RefreshToken);
+        var refreshTokenHash = HashRefreshToken(NormalizeRefreshToken(request.RefreshToken));
 
         var currentRefreshToken = await _refreshTokenRepository.GetByTokenHashAsync(refreshTokenHash, cancellationToken);
 
@@ -119,7 +125,7 @@ public class AuthService : IAuthService
 
     public async Task<bool> LogoutAsync(LogoutRequest request, CancellationToken cancellationToken = default)
     {
-        var refreshTokenHash = HashRefreshToken(request.RefreshToken);
+        var refreshTokenHash = HashRefreshToken(NormalizeRefreshToken(request.RefreshToken));
 
         var refreshToken = await _refreshTokenRepository.GetByTokenHashAsync(refreshTokenHash, cancellationToken);
 
@@ -169,10 +175,7 @@ public class AuthService : IAuthService
         var normalizedEmail = NormalizeEmail(request.Email);
         var normalizedCode = NormalizePasswordResetCode(request.Code);
 
-        if (string.IsNullOrWhiteSpace(request.NewPassword))
-        {
-            throw new ArgumentException("New password is required.", nameof(request.NewPassword));
-        }
+        var normalizedPassword = NormalizePassword(request.NewPassword, nameof(request.NewPassword));
 
         var user = await _userRepository.GetByEmailAsync(normalizedEmail, cancellationToken);
 
@@ -181,7 +184,7 @@ public class AuthService : IAuthService
             return false;
         }
 
-        user!.PasswordHash = _passwordHasher.HashPassword(request.NewPassword);
+        user!.PasswordHash = _passwordHasher.HashPassword(normalizedPassword);
         user.PasswordResetCodeHash = null;
         user.PasswordResetCodeExpiresAt = null;
         user.UpdatedAt = DateTimeOffset.UtcNow;
@@ -198,10 +201,10 @@ public class AuthService : IAuthService
 
         if (normalizedValue.Contains('@'))
         {
-            return await _userRepository.GetByEmailAsync(normalizedValue, cancellationToken);
+            return await _userRepository.GetByEmailAsync(NormalizeEmail(normalizedValue), cancellationToken);
         }
 
-        return await _userRepository.GetByUsernameAsync(normalizedValue, cancellationToken);
+        return await _userRepository.GetByUsernameAsync(NormalizeUsername(normalizedValue), cancellationToken);
     }
 
     private async Task<AuthResponse> CreateAuthResponseAsync(User user, CancellationToken cancellationToken)
@@ -240,14 +243,36 @@ public class AuthService : IAuthService
 
     private static string NormalizeEmail(string email)
     {
-        if (string.IsNullOrWhiteSpace(email))
-        {
-            throw new ArgumentException("Email is required.", nameof(email));
-        }
-
-        var normalizedEmail = email.Trim();
+        var normalizedEmail = NormalizeRequiredValue(email, nameof(email), "Email is required.")
+            .ToLowerInvariant();
 
         return normalizedEmail;
+    }
+
+    private static string NormalizeUsername(string username)
+    {
+        return NormalizeRequiredValue(username, nameof(username), "Username is required.")
+            .ToLowerInvariant();
+    }
+
+    private static string NormalizePassword(string password, string paramName)
+    {
+        return NormalizeRequiredValue(password, paramName, "Password is required.");
+    }
+
+    private static string NormalizeRefreshToken(string refreshToken)
+    {
+        return NormalizeRequiredValue(refreshToken, nameof(refreshToken), "Refresh token is required.");
+    }
+
+    private static string NormalizeRequiredValue(string? value, string paramName, string errorMessage)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new ArgumentException(errorMessage, paramName);
+        }
+
+        return value.Trim();
     }
 
     private static string NormalizePasswordResetCode(string code)

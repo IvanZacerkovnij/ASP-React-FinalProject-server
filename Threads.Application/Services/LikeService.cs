@@ -40,7 +40,14 @@ public class LikeService : ILikeService
             PostId = postId
         };
 
-        await _likeRepository.AddAsync(like, cancellationToken);
+        try
+        {
+            await _likeRepository.AddAsync(like, cancellationToken);
+        }
+        catch (Exception exception) when (IsDuplicateWriteException(exception))
+        {
+            return false;
+        }
 
         return true;
     }
@@ -60,5 +67,10 @@ public class LikeService : ILikeService
         await _likeRepository.DeleteAsync(existingLike, cancellationToken);
 
         return true;
+    }
+
+    private static bool IsDuplicateWriteException(Exception exception)
+    {
+        return exception.GetType().Name == "DbUpdateException";
     }
 }

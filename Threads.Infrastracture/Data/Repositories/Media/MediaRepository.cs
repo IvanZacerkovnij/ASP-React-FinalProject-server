@@ -34,6 +34,17 @@ public class MediaRepository : IMediaRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyCollection<string>> GetStorageKeysByUploaderIdAsync(
+        Guid uploadedByUserId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Medias
+            .AsNoTracking()
+            .Where(media => media.UploadedByUserId == uploadedByUserId)
+            .Select(media => media.StorageKey)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task AddAsync(Domain.Entities.Media media, CancellationToken cancellationToken = default)
     {
         await _dbContext.Medias.AddAsync(media, cancellationToken);

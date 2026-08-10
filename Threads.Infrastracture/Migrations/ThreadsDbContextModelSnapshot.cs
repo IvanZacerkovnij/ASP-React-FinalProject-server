@@ -299,15 +299,15 @@ namespace Threads.Infrastracture.Migrations
                         .HasMaxLength(2048)
                         .HasColumnType("character varying(2048)");
 
+                    b.Property<string>("LocationCountry")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
                     b.Property<double?>("LocationLatitude")
                         .HasColumnType("double precision");
 
                     b.Property<double?>("LocationLongitude")
                         .HasColumnType("double precision");
-
-                    b.Property<string>("LocationCountry")
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)");
 
                     b.Property<string>("LocationName")
                         .HasMaxLength(255)

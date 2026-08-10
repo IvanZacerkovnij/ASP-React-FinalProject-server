@@ -32,17 +32,28 @@ public class MediaService : IMediaService
 
     public async Task<MediaUrlResponse?> GetUrlAsync(
         Guid mediaId,
+        Guid? currentUserId = null,
         CancellationToken cancellationToken = default)
     {
         var media = await _mediaRepository.GetByIdAsync(mediaId, cancellationToken);
 
-        return media is null
-            ? null
-            : new MediaUrlResponse
-            {
-                Id = media.Id,
-                Url = _objectStorageService.GetReadUrl(media.StorageKey)
-            };
+        if (media is null)
+        {
+            return null;
+        }
+
+        var canAccess = media.PostId.HasValue || currentUserId == media.UploadedByUserId;
+
+        if (!canAccess)
+        {
+            return null;
+        }
+
+        return new MediaUrlResponse
+        {
+            Id = media.Id,
+            Url = _objectStorageService.GetReadUrl(media.StorageKey)
+        };
     }
 
     public async Task<UploadMediaResponse> UploadAsync(
@@ -90,7 +101,15 @@ public class MediaService : IMediaService
 
         await _objectStorageService.UploadAsync(content, media.StorageKey, contentType, cancellationToken);
 
-        await _mediaRepository.AddAsync(media, cancellationToken);
+        try
+        {
+            await _mediaRepository.AddAsync(media, cancellationToken);
+        }
+        catch
+        {
+            await TryDeleteObjectAsync(media.StorageKey, cancellationToken);
+            throw;
+        }
 
         return new UploadMediaResponse
         {
@@ -133,5 +152,22 @@ public class MediaService : IMediaService
             uploadedByUserId.ToString(),
             category,
             $"{mediaId}{extension.ToLowerInvariant()}");
+    }
+
+    private async Task TryDeleteObjectAsync(string? objectKey, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(objectKey))
+        {
+            return;
+        }
+
+        try
+        {
+            await _objectStorageService.DeleteAsync(objectKey, cancellationToken);
+        }
+        catch
+        {
+            // Best-effort cleanup after a failed metadata write.
+        }
     }
 }

@@ -12,5 +12,9 @@ public interface IMediaRepository
         IReadOnlyCollection<Guid> ids,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyCollection<string>> GetStorageKeysByUploaderIdAsync(
+        Guid uploadedByUserId,
+        CancellationToken cancellationToken = default);
+
     Task AddAsync(MediaEntity media, CancellationToken cancellationToken = default);
 }
