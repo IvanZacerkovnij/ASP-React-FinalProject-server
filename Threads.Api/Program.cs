@@ -5,6 +5,7 @@ using Threads.Application.Interfaces.Comments;
 using Threads.Application.Interfaces.Follows;
 using Threads.Application.Interfaces.Gifs;
 using Threads.Application.Interfaces.Media;
+using Threads.Application.Interfaces.Locations;
 using Threads.Application.Interfaces.Polls;
 using Threads.Application.Interfaces.Posts;
 using Threads.Application.Interfaces.Security;
@@ -56,6 +57,10 @@ public class Program
         builder.Services.AddHttpClient<IGifSearchService, GiphyGifSearchService>(client =>
         {
             client.BaseAddress = new Uri("https://api.giphy.com/");
+        });
+        builder.Services.AddHttpClient<ILocationSearchService, GeoapifyLocationSearchService>(client =>
+        {
+            client.BaseAddress = new Uri("https://api.geoapify.com/");
         });
         builder.Services.AddScoped<ILikeService, LikeService>();
         builder.Services.AddScoped<IMediaService, MediaService>();

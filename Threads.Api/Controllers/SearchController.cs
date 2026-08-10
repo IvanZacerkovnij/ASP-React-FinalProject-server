@@ -2,9 +2,11 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Threads.Application.DTOs.Gifs;
+using Threads.Application.DTOs.Locations;
 using Threads.Application.DTOs.Posts;
 using Threads.Application.DTOs.Users;
 using Threads.Application.Interfaces.Gifs;
+using Threads.Application.Interfaces.Locations;
 using Threads.Application.Interfaces.Posts;
 using Threads.Application.Interfaces.Users;
 
@@ -17,15 +19,18 @@ public class SearchController : ControllerBase
     private readonly IUserService _userService;
     private readonly IPostService _postService;
     private readonly IGifSearchService _gifSearchService;
+    private readonly ILocationSearchService _locationSearchService;
 
     public SearchController(
         IUserService userService,
         IPostService postService,
-        IGifSearchService gifSearchService)
+        IGifSearchService gifSearchService,
+        ILocationSearchService locationSearchService)
     {
         _userService = userService;
         _postService = postService;
         _gifSearchService = gifSearchService;
+        _locationSearchService = locationSearchService;
     }
 
     [HttpGet("users")]
@@ -55,6 +60,30 @@ public class SearchController : ControllerBase
         {
             var gifs = await _gifSearchService.SearchAsync(q ?? string.Empty, cancellationToken);
             return Ok(gifs);
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+        catch (InvalidOperationException exception)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = exception.Message });
+        }
+        catch (HttpRequestException exception)
+        {
+            return StatusCode(StatusCodes.Status502BadGateway, new { message = exception.Message });
+        }
+    }
+
+    [HttpGet("locations")]
+    public async Task<ActionResult<IReadOnlyCollection<LocationResponse>>> SearchLocations(
+        [FromQuery] string? q,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var locations = await _locationSearchService.SearchAsync(q ?? string.Empty, cancellationToken);
+            return Ok(locations);
         }
         catch (ArgumentException exception)
         {
