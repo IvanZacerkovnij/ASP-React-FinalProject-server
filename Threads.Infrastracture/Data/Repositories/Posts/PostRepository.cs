@@ -221,6 +221,7 @@ public class PostRepository : IPostRepository
             .Include(post => post.Media)
             .Include(post => post.Comments)
             .Include(post => post.Likes)
+            .Include(post => post.Bookmarks)
             .Include(post => post.Reposts)
             .Include(post => post.Poll)
                 .ThenInclude(poll => poll!.Options)

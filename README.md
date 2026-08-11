@@ -202,6 +202,8 @@ http://127.0.0.1:7000
 
 ### Posts і Comments
 
+Bookmark endpoints added: `2026-08-11`
+
 | Method | Route | Призначення |
 |---|---|---|
 | `GET` | `/api/posts` | Усі пости |
@@ -215,6 +217,8 @@ http://127.0.0.1:7000
 | `DELETE` | `/api/posts/{id}/like` | Прибрати лайк |
 | `POST` | `/api/posts/{id}/repost` | Репост |
 | `DELETE` | `/api/posts/{id}/repost` | Скасувати репост |
+| `POST` | `/api/posts/{id}/bookmark` | Додати пост у bookmarks |
+| `DELETE` | `/api/posts/{id}/bookmark` | Прибрати пост з bookmarks |
 | `POST` | `/api/posts/{id}/poll/vote` | Проголосувати в poll |
 | `POST` | `/api/posts` | Створити пост |
 | `PUT` | `/api/posts/{id}` | Оновити пост |

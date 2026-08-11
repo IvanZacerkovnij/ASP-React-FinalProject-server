@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Threads.Application.DTOs.Polls;
 using Threads.Application.DTOs.Posts;
+using Threads.Application.Interfaces.Bookmarks;
 using Threads.Application.Interfaces.Likes;
 using Threads.Application.Interfaces.Polls;
 using Threads.Application.Interfaces.Posts;
@@ -20,19 +21,22 @@ public class PostsController : ControllerBase
     private readonly IRepostService _repostService;
     private readonly IPollService _pollService;
     private readonly IUserService _userService;
+    private readonly IBookmarkService _bookmarkService;
 
     public PostsController(
         IPostService postService,
         ILikeService likeService,
         IRepostService repostService,
         IPollService pollService,
-        IUserService userService)
+        IUserService userService,
+        IBookmarkService bookmarkService)
     {
         _postService = postService;
         _likeService = likeService;
         _repostService = repostService;
         _pollService = pollService;
         _userService = userService;
+        _bookmarkService = bookmarkService;
     }
 
     [HttpGet]
@@ -257,6 +261,78 @@ public class PostsController : ControllerBase
     }
 
     [Authorize]
+    [HttpPost("{id:guid}/bookmark")]
+    public async Task<ActionResult<PostBookmarkStateResponse>> BookmarkPost(Guid id,
+        CancellationToken cancellationToken)
+    {
+        var currentUserId = GetCurrentUserId();
+        
+        if (currentUserId is null)
+        {
+            return Unauthorized(new { message = "Invalid token claims." });
+        }
+        
+        var currentPost = await _postService.GetByIdAsync(id, cancellationToken, currentUserId);
+
+        if (currentPost is null)
+        {
+            return NotFound(new { message = "Post was not found." });
+        }
+        
+        var wasAdded = await _bookmarkService.AddBookmarkAsync(currentUserId.Value, id, cancellationToken);
+        if (!wasAdded)
+        {
+            var postAfterFailedBookmark = await _postService.GetByIdAsync(id, cancellationToken, currentUserId.Value);
+
+            return postAfterFailedBookmark is null
+                ? NotFound(new { message = "Post was not found." })
+                : Conflict(new { message = "You have already bookmarked this post." });
+        }
+        
+        var updatedPost = await _postService.GetByIdAsync(id, cancellationToken, currentUserId);
+        
+        return updatedPost is null 
+            ? NotFound(new { message = "Post was not found." }):
+            Ok(MapBookmarkStateResponse(updatedPost));
+    }
+    
+    [Authorize]
+    [HttpDelete("{id:guid}/bookmark")]
+    public async Task<ActionResult<PostBookmarkStateResponse>> UnBookmarkPost(Guid id,
+        CancellationToken cancellationToken)
+    {
+        var currentUserId = GetCurrentUserId();
+        
+        if (currentUserId is null)
+        {
+            return Unauthorized(new { message = "Invalid token claims." });
+        }
+        
+        var currentPost = await _postService.GetByIdAsync(id, cancellationToken, currentUserId);
+
+        if (currentPost is null)
+        {
+            return NotFound(new { message = "Post was not found." });
+        }
+        
+        var wasRemoved = await _bookmarkService.RemoveBookmarkAsync(currentUserId.Value, id, cancellationToken);
+        if (!wasRemoved)
+        {
+            var postAfterFailedBookmark = await _postService.GetByIdAsync(id, cancellationToken, currentUserId.Value);
+
+            return postAfterFailedBookmark is null
+                ? NotFound(new { message = "Post was not found." })
+                : NotFound(new { message = "Bookmark was not found." });
+        }
+        
+        var updatedPost = await _postService.GetByIdAsync(id, cancellationToken, currentUserId);
+        
+        return updatedPost is null 
+            ? NotFound(new { message = "Post was not found." }):
+            Ok(MapBookmarkStateResponse(updatedPost));
+    }
+
+    [Authorize]
     [HttpPost("{id:guid}/poll/vote")]
     public async Task<ActionResult<PollResponse>> VotePoll(
         Guid id,
@@ -401,6 +477,15 @@ public class PostsController : ControllerBase
         {
             RepostedByMe = post.IsRepostedByCurrentUser,
             RepostsCount = post.RepostsCount
+        };
+    }
+
+    private static PostBookmarkStateResponse MapBookmarkStateResponse(PostResponse post)
+    {
+        return new PostBookmarkStateResponse()
+        {
+            BookmarkedByMe = post.IsBookmarkedByCurrentUser,
+            BookmarksCount = post.BookmarksCount
         };
     }
 }

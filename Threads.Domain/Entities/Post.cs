@@ -44,6 +44,9 @@ public class Post : BaseEntity
 
     public ICollection<Repost> Reposts { get; set; } =
         new List<Repost>();
+    
+    public ICollection<Bookmark> Bookmarks { get; set; } =
+        new List<Bookmark>();
 
     public ICollection<PostView> Views { get; set; } =
         new List<PostView>();

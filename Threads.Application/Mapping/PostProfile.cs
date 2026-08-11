@@ -17,9 +17,11 @@ public class PostProfile : Profile
             .ForMember(destination => destination.LikesCount, options => options.MapFrom(source => source.Likes.Count))
             .ForMember(destination => destination.CommentsCount, options => options.MapFrom(source => source.Comments.Count))
             .ForMember(destination => destination.RepostsCount, options => options.MapFrom(source => source.RepostsCount))
+            .ForMember(destination => destination.BookmarksCount, options => options.MapFrom(source => source.Bookmarks.Count))
             .ForMember(destination => destination.ViewsCount, options => options.MapFrom(source => source.ViewsCount))
             .ForMember(destination => destination.IsLikedByCurrentUser, options => options.Ignore())
             .ForMember(destination => destination.IsRepostedByCurrentUser, options => options.Ignore())
+            .ForMember(destination => destination.IsBookmarkedByCurrentUser, options => options.Ignore())
             .ForMember(destination => destination.CreatedAt, options => options.MapFrom(source => source.CreatedAt.UtcDateTime))
             .ForMember(destination => destination.UpdatedAt, options => options.MapFrom(source =>
                 source.UpdatedAt.HasValue ? source.UpdatedAt.Value.UtcDateTime : (DateTime?)null));
@@ -43,6 +45,7 @@ public class PostProfile : Profile
             .ForMember(destination => destination.Comments, options => options.Ignore())
             .ForMember(destination => destination.Likes, options => options.Ignore())
             .ForMember(destination => destination.Reposts, options => options.Ignore())
+            .ForMember(destination => destination.Bookmarks, options => options.Ignore())
             .ForMember(destination => destination.Poll, options => options.Ignore());
 
         CreateMap<UpdatePostRequest, Post>()
@@ -64,6 +67,7 @@ public class PostProfile : Profile
             .ForMember(destination => destination.Comments, options => options.Ignore())
             .ForMember(destination => destination.Likes, options => options.Ignore())
             .ForMember(destination => destination.Reposts, options => options.Ignore())
+            .ForMember(destination => destination.Bookmarks, options => options.Ignore())
             .ForMember(destination => destination.Poll, options => options.Ignore());
     }
 }

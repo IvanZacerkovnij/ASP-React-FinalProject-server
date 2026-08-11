@@ -11,6 +11,7 @@ public class ThreadsDbContext : DbContext
     public DbSet<Follow> Follows { get; set; }
     public DbSet<Like> Likes { get; set; }
     public DbSet<Repost> Reposts { get; set; }
+    public DbSet<Bookmark> Bookmarks { get; set; }
     public DbSet<Media> Medias { get; set; }
     public DbSet<Poll> Polls { get; set; }
     public DbSet<PollOption> PollOptions { get; set; }

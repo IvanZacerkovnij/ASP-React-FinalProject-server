@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Features;
 using Resend;
 using Threads.Application.Interfaces.Auth;
+using Threads.Application.Interfaces.Bookmarks;
 using Threads.Application.Interfaces.Comments;
 using Threads.Application.Interfaces.Follows;
 using Threads.Application.Interfaces.Gifs;
@@ -17,6 +18,7 @@ using Threads.Application.Mapping;
 using Threads.Application.Services;
 using Threads.Infrastracture.Data;
 using Threads.Infrastracture.Data.Configurations;
+using Threads.Infrastracture.Data.Repositories.Bookmarks;
 using Threads.Infrastracture.Data.Repositories.Comments;
 using Threads.Infrastracture.Data.Repositories.Follows;
 using Threads.Infrastracture.Data.Repositories.Likes;
@@ -49,6 +51,7 @@ public class Program
         builder.Services.AddScoped<IFollowRepository, FollowRepository>();
         builder.Services.AddScoped<ILikeRepository, LikeRepository>();
         builder.Services.AddScoped<IRepostRepository, RepostRepository>();
+        builder.Services.AddScoped<IBookmarkRepository, BookmarkRepository>();
         builder.Services.AddScoped<IMediaRepository, MediaRepository>();
         builder.Services.AddScoped<IMediaProcessingService, FfmpegMediaProcessingService>();
         builder.Services.AddScoped<IObjectStorageService, S3ObjectStorageService>();
@@ -71,6 +74,7 @@ public class Program
         });
         builder.Services.AddScoped<ILikeService, LikeService>();
         builder.Services.AddScoped<IRepostService, RepostService>();
+        builder.Services.AddScoped<IBookmarkService, BookmarkService>();
         builder.Services.AddScoped<IMediaService, MediaService>();
         builder.Services.AddScoped<IAuthService, AuthService>();
 

@@ -11,7 +11,6 @@
       <Folder Include="DTOs\Comments\" />
       <Folder Include="DTOs\Media\" />
       <Folder Include="DTOs\Polls\" />
-      <Folder Include="DTOs\Posts\" />
       <Folder Include="DTOs\Users\" />
       <Folder Include="Interfaces\Auth\" />
       <Folder Include="Interfaces\Comments\" />
@@ -23,7 +22,6 @@
       <Folder Include="Interfaces\Security\" />
       <Folder Include="Interfaces\Users\" />
       <Folder Include="Mapping\" />
-      <Folder Include="Services\" />
     </ItemGroup>
 
     <ItemGroup>

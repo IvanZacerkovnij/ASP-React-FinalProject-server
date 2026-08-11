@@ -546,10 +546,10 @@ public class PostService : IPostService
             CommentsCount = response.CommentsCount,
             RepostsCount = response.RepostsCount,
             ViewsCount = response.ViewsCount,
-            IsLikedByCurrentUser = currentUserId.HasValue &&
-                post.Likes.Any(like => like.UserId == currentUserId.Value),
-            IsRepostedByCurrentUser = currentUserId.HasValue &&
-                post.Reposts.Any(repost => repost.UserId == currentUserId.Value),
+            BookmarksCount = response.BookmarksCount,
+            IsLikedByCurrentUser = currentUserId.HasValue && post.Likes.Any(like => like.UserId == currentUserId.Value),
+            IsRepostedByCurrentUser = currentUserId.HasValue && post.Reposts.Any(repost => repost.UserId == currentUserId.Value),
+            IsBookmarkedByCurrentUser = currentUserId.HasValue && post.Bookmarks.Any(bookmark => bookmark.UserId == currentUserId.Value),
             CreatedAt = response.CreatedAt,
             UpdatedAt = response.UpdatedAt
         };
