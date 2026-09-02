@@ -120,6 +120,20 @@ public class UserService : IUserService
             user.Bio = NormalizeOptionalText(request.Bio, MaxBioLength, "Bio");
         }
 
+        if (request.DateOfBirth > DateOnly.FromDateTime(DateTime.UtcNow))
+        {
+            throw new InvalidOperationException("Date of birth cannot be in the future.");
+        }
+
+        if (request.RemoveDateOfBirth)
+        {
+            user.DateOfBirth = null;
+        }
+        else if (request.DateOfBirth.HasValue)
+        {
+            user.DateOfBirth = request.DateOfBirth;
+        }
+
         if (request.RemoveLocation)
         {
             ClearLocation(user);
@@ -377,6 +391,7 @@ public class UserService : IUserService
             Username = response.Username,
             DisplayName = response.DisplayName,
             Bio = response.Bio,
+            DateOfBirth = response.DateOfBirth,
             Location = MapLocation(
                 user.LocationPlaceId,
                 user.Location,

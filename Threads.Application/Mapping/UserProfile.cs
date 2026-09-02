@@ -23,11 +23,16 @@ public class UserProfile : Profile
             .ForMember(destination => destination.CreatedAt, options => options.MapFrom(source => source.CreatedAt.UtcDateTime));
 
         CreateMap<UpdateUserRequest, User>()
+            .ForMember(destination => destination.Id, options => options.Ignore())
             .ForMember(destination => destination.Username, options => options.Ignore())
             .ForMember(destination => destination.Email, options => options.Ignore())
             .ForMember(destination => destination.PasswordHash, options => options.Ignore())
+            .ForMember(destination => destination.PasswordResetCodeHash, options => options.Ignore())
+            .ForMember(destination => destination.PasswordResetCodeExpiresAt, options => options.Ignore())
+            .ForMember(destination => destination.PendingPasswordHash, options => options.Ignore())
             .ForMember(destination => destination.AvatarObjectKey, options => options.Ignore())
             .ForMember(destination => destination.BannerObjectKey, options => options.Ignore())
+            .ForMember(destination => destination.Location, options => options.Ignore())
             .ForMember(destination => destination.LocationPlaceId, options => options.Ignore())
             .ForMember(destination => destination.LocationCountry, options => options.Ignore())
             .ForMember(destination => destination.LocationLatitude, options => options.Ignore())
@@ -38,9 +43,14 @@ public class UserProfile : Profile
             .ForMember(destination => destination.Comments, options => options.Ignore())
             .ForMember(destination => destination.Likes, options => options.Ignore())
             .ForMember(destination => destination.Reposts, options => options.Ignore())
+            .ForMember(destination => destination.Bookmarks, options => options.Ignore())
+            .ForMember(destination => destination.PostViews, options => options.Ignore())
+            .ForMember(destination => destination.PollVotes, options => options.Ignore())
             .ForMember(destination => destination.FollowingRelations, options => options.Ignore())
             .ForMember(destination => destination.FollowerRelations, options => options.Ignore())
             .ForMember(destination => destination.RefreshTokens, options => options.Ignore())
-            .ForMember(destination => destination.UploadedMedia, options => options.Ignore());
+            .ForMember(destination => destination.UploadedMedia, options => options.Ignore())
+            .ForMember(destination => destination.CreatedAt, options => options.Ignore())
+            .ForMember(destination => destination.UpdatedAt, options => options.Ignore());
     }
 }

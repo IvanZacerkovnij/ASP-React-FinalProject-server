@@ -12,6 +12,8 @@ public class UserResponse
 
     public string? Bio { get; init; }
 
+    public DateOnly? DateOfBirth { get; init; }
+
     public LocationResponse? Location { get; init; }
 
     public string? AvatarUrl { get; init; }

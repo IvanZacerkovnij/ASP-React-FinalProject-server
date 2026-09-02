@@ -9,6 +9,10 @@ public class UpdateCurrentUserRequest
 
     public string? Bio { get; set; }
 
+    public DateOnly? DateOfBirth { get; set; }
+
+    public bool RemoveDateOfBirth { get; set; }
+
     public bool RemoveLocation { get; set; }
 
     public LocationRequest? Location { get; set; }

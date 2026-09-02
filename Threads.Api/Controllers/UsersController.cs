@@ -133,6 +133,8 @@ public class UsersController : ControllerBase
         {
             DisplayName = request.DisplayName,
             Bio = request.Bio,
+            DateOfBirth = request.DateOfBirth,
+            RemoveDateOfBirth = request.RemoveDateOfBirth,
             RemoveLocation = request.RemoveLocation,
             Location = request.Location,
             RemoveAvatar = request.RemoveAvatar,

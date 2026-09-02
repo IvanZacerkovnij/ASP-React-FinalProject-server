@@ -1,3 +1,4 @@
+using System;
 using Threads.Application.DTOs.Auth;
 
 namespace Threads.Application.Interfaces.Auth;

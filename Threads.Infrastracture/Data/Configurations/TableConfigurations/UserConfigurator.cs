@@ -36,6 +36,9 @@ public class UserConfigurator : IEntityTypeConfiguration<User>
         builder.Property(user => user.Bio)
             .HasMaxLength(500);
 
+        builder.Property(user => user.DateOfBirth)
+            .HasColumnType("date");
+
         builder.Property(user => user.Location)
             .HasMaxLength(255);
 

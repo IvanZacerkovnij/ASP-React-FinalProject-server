@@ -43,6 +43,11 @@ public class AuthService : IAuthService
         var normalizedUsername = NormalizeUsername(request.Username);
         var normalizedPassword = NormalizePassword(request.Password, nameof(request.Password));
 
+        if (request.DateOfBirth > DateOnly.FromDateTime(DateTime.UtcNow))
+        {
+            throw new InvalidOperationException("Date of birth cannot be in the future.");
+        }
+
         if (Guid.TryParse(normalizedUsername, out _))
         {
             throw new InvalidOperationException("Username must not be a GUID.");
@@ -334,7 +339,7 @@ public class AuthService : IAuthService
             .ToLowerInvariant();
     }
 
-    private static string NormalizePassword(string password, string paramName)
+    private static string NormalizePassword(string? password, string paramName)
     {
         return NormalizeRequiredValue(password, paramName, "Password is required.");
     }

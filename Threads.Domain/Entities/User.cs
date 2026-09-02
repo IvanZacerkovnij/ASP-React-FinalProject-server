@@ -20,6 +20,8 @@ public class User : BaseEntity
 
     public string? Bio { get; set; }
 
+    public DateOnly? DateOfBirth { get; set; }
+
     public string? Location { get; set; }
 
     public string? LocationPlaceId { get; set; }
