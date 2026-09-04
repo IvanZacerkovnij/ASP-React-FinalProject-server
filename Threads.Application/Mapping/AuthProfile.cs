@@ -11,7 +11,7 @@ public class AuthProfile : Profile
         CreateMap<RegisterRequest, User>()
             .ForMember(destination => destination.Id, options => options.Ignore())
             .ForMember(destination => destination.PasswordHash, options => options.Ignore())
-            .ForMember(destination => destination.PasswordResetCodeHash, options => options.Ignore())
+            .ForMember(destination => destination.PasswordResetCode, options => options.Ignore())
             .ForMember(destination => destination.PasswordResetCodeExpiresAt, options => options.Ignore())
             .ForMember(destination => destination.PendingPasswordHash, options => options.Ignore())
             .ForMember(destination => destination.Bio, options => options.Ignore())

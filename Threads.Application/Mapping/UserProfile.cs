@@ -27,7 +27,7 @@ public class UserProfile : Profile
             .ForMember(destination => destination.Username, options => options.Ignore())
             .ForMember(destination => destination.Email, options => options.Ignore())
             .ForMember(destination => destination.PasswordHash, options => options.Ignore())
-            .ForMember(destination => destination.PasswordResetCodeHash, options => options.Ignore())
+            .ForMember(destination => destination.PasswordResetCode, options => options.Ignore())
             .ForMember(destination => destination.PasswordResetCodeExpiresAt, options => options.Ignore())
             .ForMember(destination => destination.PendingPasswordHash, options => options.Ignore())
             .ForMember(destination => destination.AvatarObjectKey, options => options.Ignore())

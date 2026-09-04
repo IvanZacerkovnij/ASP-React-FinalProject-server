@@ -23,6 +23,7 @@ using Threads.Infrastracture.Data.Repositories.Comments;
 using Threads.Infrastracture.Data.Repositories.Follows;
 using Threads.Infrastracture.Data.Repositories.Likes;
 using Threads.Infrastracture.Data.Repositories.Media;
+using Threads.Infrastracture.Data.Repositories.PendingRegistrations;
 using Threads.Infrastracture.Data.Repositories.Polls;
 using Threads.Infrastracture.Data.Repositories.Posts;
 using Threads.Infrastracture.Data.Repositories.Reposts;
@@ -57,7 +58,8 @@ public class Program
         builder.Services.AddScoped<IObjectStorageService, S3ObjectStorageService>();
         builder.Services.AddScoped<IPollRepository, PollRepository>();
         builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
-        builder.Services.AddScoped<IPasswordResetEmailService, ResendPasswordResetEmailService>();
+        builder.Services.AddScoped<IPendingRegistrationRepository, PendingRegistrationRepository>();
+        builder.Services.AddScoped<IAuthEmailService, AuthEmailService>();
 
         builder.Services.AddScoped<IUserService, UserService>();
         builder.Services.AddScoped<IPostService, PostService>();

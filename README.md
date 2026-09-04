@@ -171,10 +171,12 @@ http://127.0.0.1:7000
 
 | Method | Route | Призначення |
 |---|---|---|
-| `POST` | `/api/auth/register` | Реєстрація |
+| `POST` | `/api/auth/register` | Створення pending registration і надсилання verification code |
 | `POST` | `/api/auth/login` | Логін |
 | `POST` | `/api/auth/refresh` | Оновлення access token |
 | `POST` | `/api/auth/logout` | Відкликання refresh token |
+| `POST` | `/api/auth/verify-email` | Підтвердження email і фінальне створення користувача |
+| `POST` | `/api/auth/resend-verification-code` | Повторне надсилання verification code |
 | `POST` | `/api/auth/forgot-password` | Надсилання reset code |
 | `POST` | `/api/auth/verify-reset-code` | Перевірка reset code |
 | `POST` | `/api/auth/reset-password` | Скидання пароля |

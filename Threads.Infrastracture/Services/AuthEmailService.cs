@@ -4,15 +4,34 @@ using Threads.Application.Interfaces.Auth;
 
 namespace Threads.Infrastracture.Services;
 
-public class ResendPasswordResetEmailService : IPasswordResetEmailService
+public class AuthEmailService : IAuthEmailService
 {
     private readonly IResend _resend;
     private readonly IConfiguration _configuration;
 
-    public ResendPasswordResetEmailService(IResend resend, IConfiguration configuration)
+    public AuthEmailService(IResend resend, IConfiguration configuration)
     {
         _resend = resend;
         _configuration = configuration;
+    }
+
+    public async Task SendEmailVerificationCodeAsync(
+        string email,
+        string code,
+        CancellationToken cancellationToken = default)
+    {
+        var message = CreateMessage(
+            email,
+            "Verify your email",
+            $"""
+             <div>
+                 <p>Your email verification code is <strong>{code}</strong>.</p>
+                 <p>This code expires in 15 minutes.</p>
+             </div>
+             """,
+            $"Your email verification code is {code}. This code expires in 15 minutes.");
+
+        await _resend.EmailSendAsync(message, cancellationToken);
     }
 
     public async Task SendPasswordResetCodeAsync(

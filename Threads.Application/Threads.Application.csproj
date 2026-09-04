@@ -7,7 +7,6 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <Folder Include="DTOs\Auth\" />
       <Folder Include="DTOs\Comments\" />
       <Folder Include="DTOs\Media\" />
       <Folder Include="DTOs\Polls\" />

@@ -6,5 +6,4 @@ public sealed class RegisterRequest
     public required string Password { get; init; }
     public required string Email { get; init; }
     public string? DisplayName { get; init; }
-    public DateOnly? DateOfBirth { get; init; }
 }

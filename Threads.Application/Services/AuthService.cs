@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using System.Text;
-using AutoMapper;
 using Threads.Application.DTOs.Auth;
 using Threads.Application.Interfaces.Auth;
 using Threads.Application.Interfaces.Security;
@@ -13,85 +12,65 @@ public class AuthService : IAuthService
 {
     private const int RefreshTokenLifetimeDays = 7;
     private const int PasswordResetCodeLifetimeMinutes = 15;
+    private const int EmailVerificationCodeLifetimeMinutes = 15;
 
     private readonly IUserRepository _userRepository;
+    private readonly IPendingRegistrationRepository _pendingRegistrationRepository;
     private readonly IRefreshTokenRepository _refreshTokenRepository;
-    private readonly IPasswordResetEmailService _passwordResetEmailService;
+    private readonly IAuthEmailService _authEmailService;
     private readonly IPasswordHasher _passwordHasher;
     private readonly ITokenService _tokenService;
-    private readonly IMapper _mapper;
 
     public AuthService(
         IUserRepository userRepository,
+        IPendingRegistrationRepository pendingRegistrationRepository,
         IRefreshTokenRepository refreshTokenRepository,
-        IPasswordResetEmailService passwordResetEmailService,
+        IAuthEmailService authEmailService,
         IPasswordHasher passwordHasher,
-        ITokenService tokenService,
-        IMapper mapper)
+        ITokenService tokenService)
     {
         _userRepository = userRepository;
+        _pendingRegistrationRepository = pendingRegistrationRepository;
         _refreshTokenRepository = refreshTokenRepository;
-        _passwordResetEmailService = passwordResetEmailService;
+        _authEmailService = authEmailService;
         _passwordHasher = passwordHasher;
         _tokenService = tokenService;
-        _mapper = mapper;
     }
 
-    public async Task<AuthResponse> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default)
+    public async Task RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default)
     {
-        var normalizedEmail = NormalizeEmail(request.Email);
-        var normalizedUsername = NormalizeUsername(request.Username);
-        var normalizedPassword = NormalizePassword(request.Password, nameof(request.Password));
+        var registration = NormalizeRegistrationRequest(request);
+        await EnsureUserDoesNotExistAsync(registration.Email, registration.Username, cancellationToken);
 
-        if (request.DateOfBirth > DateOnly.FromDateTime(DateTime.UtcNow))
-        {
-            throw new InvalidOperationException("Date of birth cannot be in the future.");
-        }
+        var (pendingRegistration, isNew) = await ResolvePendingRegistrationAsync(
+            registration.Email,
+            registration.Username,
+            cancellationToken);
+        var code = GenerateCode();
 
-        if (Guid.TryParse(normalizedUsername, out _))
-        {
-            throw new InvalidOperationException("Username must not be a GUID.");
-        }
-
-        var existingUserByEmail = await _userRepository.GetByEmailAsync(normalizedEmail, cancellationToken);
-        if (existingUserByEmail is not null)
-        {
-            throw new InvalidOperationException("User with this email already exists.");
-        }
-
-        var existingUserByUsername = await _userRepository.GetByUsernameAsync(normalizedUsername, cancellationToken);
-        if (existingUserByUsername is not null)
-        {
-            throw new InvalidOperationException("User with this username already exists.");
-        }
-
-        var user = _mapper.Map<User>(request);
-        user.Email = normalizedEmail;
-        user.Username = normalizedUsername;
-        user.PasswordHash = _passwordHasher.HashPassword(normalizedPassword);
-
-        await _userRepository.AddAsync(user, cancellationToken);
-
-        return await CreateAuthResponseAsync(user, cancellationToken);
+        ApplyRegistrationData(pendingRegistration, registration, code);
+        await SavePendingRegistrationAsync(pendingRegistration, isNew, cancellationToken);
+        await _authEmailService.SendEmailVerificationCodeAsync(
+            pendingRegistration.Email,
+            code,
+            cancellationToken);
     }
 
     public async Task<AuthResponse?> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default)
     {
-        var normalizedEmailOrUsername = NormalizeRequiredValue(
+        var normalizedIdentity = NormalizeRequiredValue(
             request.EmailOrUsername,
             nameof(request.EmailOrUsername),
             "Email or username is required.");
         var normalizedPassword = NormalizePassword(request.Password, nameof(request.Password));
-        var user = await GetUserByEmailOrUsernameAsync(normalizedEmailOrUsername, cancellationToken);
+        var user = await GetUserByEmailOrUsernameAsync(normalizedIdentity, cancellationToken);
 
-        if (user is null || !user.IsActive)
+        if (!CanUserLogin(user))
         {
             return null;
         }
 
-        var isPasswordValid = _passwordHasher.VerifyPassword(normalizedPassword, user.PasswordHash);
-
-        if (!isPasswordValid)
+        if (!_passwordHasher.VerifyPassword(normalizedPassword, user!.PasswordHash))
         {
             return null;
         }
@@ -103,65 +82,76 @@ public class AuthService : IAuthService
         RefreshTokenRequest request,
         CancellationToken cancellationToken = default)
     {
-        var refreshTokenHash = HashRefreshToken(NormalizeRefreshToken(request.RefreshToken));
+        var currentRefreshToken = await GetActiveRefreshTokenAsync(request.RefreshToken, cancellationToken);
 
-        var currentRefreshToken = await _refreshTokenRepository.GetByTokenHashAsync(refreshTokenHash, cancellationToken);
-
-        if (currentRefreshToken is null || !currentRefreshToken.IsActive || !currentRefreshToken.User.IsActive)
+        if (currentRefreshToken is null)
         {
             return null;
         }
 
-        currentRefreshToken.RevokedAt = DateTimeOffset.UtcNow;
-        await _refreshTokenRepository.UpdateAsync(currentRefreshToken, cancellationToken);
-
-        var newRefreshToken = _tokenService.GenerateRefreshToken();
-        var refreshTokenEntity = new RefreshToken
-        {
-            TokenHash = HashRefreshToken(newRefreshToken),
-            ExpiresAt = DateTimeOffset.UtcNow.AddDays(RefreshTokenLifetimeDays),
-            UserId = currentRefreshToken.UserId
-        };
-
-        await _refreshTokenRepository.AddAsync(refreshTokenEntity, cancellationToken);
+        await RevokeRefreshTokenAsync(currentRefreshToken, cancellationToken);
+        var newRefreshToken = await IssueRefreshTokenAsync(currentRefreshToken.UserId, cancellationToken);
 
         return CreateAuthResponse(currentRefreshToken.User, newRefreshToken);
     }
 
     public async Task<bool> LogoutAsync(LogoutRequest request, CancellationToken cancellationToken = default)
     {
-        var refreshTokenHash = HashRefreshToken(NormalizeRefreshToken(request.RefreshToken));
-
-        var refreshToken = await _refreshTokenRepository.GetByTokenHashAsync(refreshTokenHash, cancellationToken);
+        var refreshToken = await GetStoredRefreshTokenAsync(request.RefreshToken, cancellationToken);
 
         if (refreshToken is null || !refreshToken.IsActive)
         {
             return false;
         }
 
-        refreshToken.RevokedAt = DateTimeOffset.UtcNow;
-        await _refreshTokenRepository.UpdateAsync(refreshToken, cancellationToken);
+        await RevokeRefreshTokenAsync(refreshToken, cancellationToken);
 
+        return true;
+    }
+
+    public async Task<AuthResponse?> VerifyEmailAsync(
+        VerifyEmailRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedEmail = NormalizeEmail(request.Email);
+        var pendingRegistration = await GetVerifiedPendingRegistrationAsync(
+            normalizedEmail,
+            request.Code,
+            cancellationToken);
+
+        if (pendingRegistration is null)
+        {
+            return null;
+        }
+
+        return await CompleteEmailVerificationAsync(pendingRegistration, cancellationToken);
+    }
+
+    public async Task<bool> ResendVerificationCodeAsync(
+        ResendVerificationCodeRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var pendingRegistration = await GetActivePendingRegistrationByEmailAsync(NormalizeEmail(request.Email), cancellationToken);
+
+        if (pendingRegistration is null)
+        {
+            return false;
+        }
+
+        await RefreshEmailVerificationCodeAsync(pendingRegistration, cancellationToken);
         return true;
     }
 
     public async Task ForgotPasswordAsync(ForgotPasswordRequest request, CancellationToken cancellationToken = default)
     {
-        var normalizedEmail = NormalizeEmail(request.Email);
-        var user = await _userRepository.GetByEmailAsync(normalizedEmail, cancellationToken);
+        var user = await GetActiveUserByEmailAsync(request.Email, cancellationToken);
 
-        if (user is null || !user.IsActive)
+        if (user is null)
         {
             return;
         }
 
-        var code = GeneratePasswordResetCode();
-        user.PendingPasswordHash = null;
-        SetPasswordResetCode(user, code);
-        user.UpdatedAt = DateTimeOffset.UtcNow;
-
-        await _userRepository.UpdateAsync(user, cancellationToken);
-        await _passwordResetEmailService.SendPasswordResetCodeAsync(user.Email, code, cancellationToken);
+        await SendPasswordResetCodeAsync(user, cancellationToken);
     }
 
     public async Task<bool> VerifyResetCodeAsync(
@@ -178,25 +168,15 @@ public class AuthService : IAuthService
         CancellationToken cancellationToken = default)
     {
         var normalizedEmail = NormalizeEmail(request.Email);
-        var normalizedCode = NormalizePasswordResetCode(request.Code);
-
         var normalizedPassword = NormalizePassword(request.NewPassword, nameof(request.NewPassword));
-
         var user = await _userRepository.GetByEmailAsync(normalizedEmail, cancellationToken);
 
-        if (!IsPasswordResetCodeValid(user, normalizedCode))
+        if (!IsPasswordResetCodeValid(user, request.Code))
         {
             return false;
         }
 
-        user!.PasswordHash = _passwordHasher.HashPassword(normalizedPassword);
-        ClearPasswordResetCode(user);
-        user.PendingPasswordHash = null;
-        user.UpdatedAt = DateTimeOffset.UtcNow;
-
-        await _userRepository.UpdateAsync(user, cancellationToken);
-        await _refreshTokenRepository.RevokeAllByUserIdAsync(user.Id, DateTimeOffset.UtcNow, cancellationToken);
-
+        await ApplyPasswordChangeAsync(user!, _passwordHasher.HashPassword(normalizedPassword), cancellationToken);
         return true;
     }
 
@@ -210,73 +190,204 @@ public class AuthService : IAuthService
 
         if (user is null || !user.IsActive)
         {
-            return new ChangePasswordResult
-            {
-                Status = ChangePasswordStatus.UserNotFound
-            };
+            return CreateChangePasswordResult(ChangePasswordStatus.UserNotFound);
         }
 
         if (!_passwordHasher.VerifyPassword(normalizedCurrentPassword, user.PasswordHash))
         {
-            return new ChangePasswordResult
-            {
-                Status = ChangePasswordStatus.InvalidCurrentPassword
-            };
+            return CreateChangePasswordResult(ChangePasswordStatus.InvalidCurrentPassword);
         }
 
         if (!string.IsNullOrWhiteSpace(request.Code))
         {
-            var normalizedCode = NormalizePasswordResetCode(request.Code);
-
-            if (string.IsNullOrWhiteSpace(user.PendingPasswordHash))
-            {
-                return new ChangePasswordResult
-                {
-                    Status = ChangePasswordStatus.NoPendingPasswordChange
-                };
-            }
-
-            if (!IsPasswordResetCodeValid(user, normalizedCode))
-            {
-                return new ChangePasswordResult
-                {
-                    Status = ChangePasswordStatus.InvalidConfirmationCode
-                };
-            }
-
-            user.PasswordHash = user.PendingPasswordHash;
-            user.PendingPasswordHash = null;
-            ClearPasswordResetCode(user);
-            user.UpdatedAt = DateTimeOffset.UtcNow;
-
-            await _userRepository.UpdateAsync(user, cancellationToken);
-            await _refreshTokenRepository.RevokeAllByUserIdAsync(user.Id, DateTimeOffset.UtcNow, cancellationToken);
-
-            return new ChangePasswordResult
-            {
-                Status = ChangePasswordStatus.PasswordChanged
-            };
+            return await ConfirmPasswordChangeAsync(user, request.Code, cancellationToken);
         }
 
-        var normalizedNewPassword = NormalizePassword(request.NewPassword, nameof(request.NewPassword));
+        return await StartPasswordChangeAsync(user, request.NewPassword, cancellationToken);
+    }
+
+    private async Task<(PendingRegistration PendingRegistration, bool IsNew)> ResolvePendingRegistrationAsync(
+        string normalizedEmail,
+        string normalizedUsername,
+        CancellationToken cancellationToken)
+    {
+        var pendingRegistrationByEmail = await GetActivePendingRegistrationByEmailAsync(
+            normalizedEmail,
+            cancellationToken);
+        var pendingRegistrationByUsername = await GetActivePendingRegistrationByUsernameAsync(
+            normalizedUsername,
+            cancellationToken);
+
+        if (pendingRegistrationByEmail is not null &&
+            pendingRegistrationByUsername is not null &&
+            pendingRegistrationByEmail.Id != pendingRegistrationByUsername.Id)
+        {
+            throw new InvalidOperationException("Email or username is already used in another pending registration.");
+        }
+
+        var pendingRegistration = pendingRegistrationByEmail
+            ?? pendingRegistrationByUsername
+            ?? new PendingRegistration();
+        var isNew = pendingRegistrationByEmail is null && pendingRegistrationByUsername is null;
+
+        return (pendingRegistration, isNew);
+    }
+
+    private static RegistrationData NormalizeRegistrationRequest(RegisterRequest request)
+    {
+        var normalizedEmail = NormalizeEmail(request.Email);
+        var normalizedUsername = NormalizeUsername(request.Username);
+        var normalizedPassword = NormalizePassword(request.Password, nameof(request.Password));
+
+        if (Guid.TryParse(normalizedUsername, out _))
+        {
+            throw new InvalidOperationException("Username must not be a GUID.");
+        }
+
+        return new RegistrationData(
+            normalizedEmail,
+            normalizedUsername,
+            normalizedPassword,
+            NormalizeOptionalValue(request.DisplayName));
+    }
+
+    private void ApplyRegistrationData(
+        PendingRegistration pendingRegistration,
+        RegistrationData registration,
+        string code)
+    {
+        pendingRegistration.Email = registration.Email;
+        pendingRegistration.Username = registration.Username;
+        pendingRegistration.PasswordHash = _passwordHasher.HashPassword(registration.Password);
+        pendingRegistration.DisplayName = registration.DisplayName;
+        SetEmailVerificationCode(pendingRegistration, code);
+        pendingRegistration.UpdatedAt = DateTimeOffset.UtcNow;
+    }
+
+    private async Task SavePendingRegistrationAsync(
+        PendingRegistration pendingRegistration,
+        bool isNew,
+        CancellationToken cancellationToken)
+    {
+        if (isNew)
+        {
+            await _pendingRegistrationRepository.AddAsync(pendingRegistration, cancellationToken);
+            return;
+        }
+
+        await _pendingRegistrationRepository.UpdateAsync(pendingRegistration, cancellationToken);
+    }
+
+    private async Task<AuthResponse> CompleteEmailVerificationAsync(
+        PendingRegistration pendingRegistration,
+        CancellationToken cancellationToken)
+    {
+        await EnsureUserDoesNotExistAsync(
+            pendingRegistration.Email,
+            pendingRegistration.Username,
+            cancellationToken);
+
+        var user = CreateVerifiedUser(pendingRegistration);
+        await _userRepository.AddAsync(user, cancellationToken);
+        await _pendingRegistrationRepository.DeleteAsync(pendingRegistration, cancellationToken);
+
+        return await CreateAuthResponseAsync(user, cancellationToken);
+    }
+
+    private static User CreateVerifiedUser(PendingRegistration pendingRegistration)
+    {
+        return new User
+        {
+            Email = pendingRegistration.Email,
+            Username = pendingRegistration.Username,
+            PasswordHash = pendingRegistration.PasswordHash,
+            DisplayName = pendingRegistration.DisplayName,
+            IsVerified = true,
+            IsActive = true
+        };
+    }
+
+    private async Task RefreshEmailVerificationCodeAsync(
+        PendingRegistration pendingRegistration,
+        CancellationToken cancellationToken)
+    {
+        var code = GenerateCode();
+        SetEmailVerificationCode(pendingRegistration, code);
+        pendingRegistration.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await _pendingRegistrationRepository.UpdateAsync(pendingRegistration, cancellationToken);
+        await _authEmailService.SendEmailVerificationCodeAsync(
+            pendingRegistration.Email,
+            code,
+            cancellationToken);
+    }
+
+    private async Task SendPasswordResetCodeAsync(User user, CancellationToken cancellationToken)
+    {
+        var code = GenerateCode();
+        user.PendingPasswordHash = null;
+        SetPasswordResetCode(user, code);
+        user.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await _userRepository.UpdateAsync(user, cancellationToken);
+        await _authEmailService.SendPasswordResetCodeAsync(user.Email, code, cancellationToken);
+    }
+
+    private async Task<ChangePasswordResult> ConfirmPasswordChangeAsync(
+        User user,
+        string code,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(user.PendingPasswordHash))
+        {
+            return CreateChangePasswordResult(ChangePasswordStatus.NoPendingPasswordChange);
+        }
+
+        if (!IsPasswordResetCodeValid(user, code))
+        {
+            return CreateChangePasswordResult(ChangePasswordStatus.InvalidConfirmationCode);
+        }
+
+        await ApplyPasswordChangeAsync(user, user.PendingPasswordHash, cancellationToken);
+
+        return CreateChangePasswordResult(ChangePasswordStatus.PasswordChanged);
+    }
+
+    private async Task<ChangePasswordResult> StartPasswordChangeAsync(
+        User user,
+        string? newPassword,
+        CancellationToken cancellationToken)
+    {
+        var normalizedNewPassword = NormalizePassword(newPassword, nameof(ChangePasswordRequest.NewPassword));
 
         if (_passwordHasher.VerifyPassword(normalizedNewPassword, user.PasswordHash))
         {
             throw new InvalidOperationException("New password must be different from the current password.");
         }
 
-        var code = GeneratePasswordResetCode();
+        var code = GenerateCode();
         user.PendingPasswordHash = _passwordHasher.HashPassword(normalizedNewPassword);
         SetPasswordResetCode(user, code);
         user.UpdatedAt = DateTimeOffset.UtcNow;
 
         await _userRepository.UpdateAsync(user, cancellationToken);
-        await _passwordResetEmailService.SendPasswordChangeCodeAsync(user.Email, code, cancellationToken);
+        await _authEmailService.SendPasswordChangeCodeAsync(user.Email, code, cancellationToken);
 
-        return new ChangePasswordResult
-        {
-            Status = ChangePasswordStatus.ConfirmationCodeSent
-        };
+        return CreateChangePasswordResult(ChangePasswordStatus.ConfirmationCodeSent);
+    }
+
+    private async Task ApplyPasswordChangeAsync(
+        User user,
+        string newPasswordHash,
+        CancellationToken cancellationToken)
+    {
+        user.PasswordHash = newPasswordHash;
+        user.PendingPasswordHash = null;
+        ClearPasswordResetCode(user);
+        user.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await _userRepository.UpdateAsync(user, cancellationToken);
+        await _refreshTokenRepository.RevokeAllByUserIdAsync(user.Id, DateTimeOffset.UtcNow, cancellationToken);
     }
 
     private async Task<User?> GetUserByEmailOrUsernameAsync(string emailOrUsername, CancellationToken cancellationToken)
@@ -291,19 +402,95 @@ public class AuthService : IAuthService
         return await _userRepository.GetByUsernameAsync(NormalizeUsername(normalizedValue), cancellationToken);
     }
 
+    private async Task<User?> GetActiveUserByEmailAsync(string email, CancellationToken cancellationToken)
+    {
+        var user = await _userRepository.GetByEmailAsync(NormalizeEmail(email), cancellationToken);
+
+        return user is { IsActive: true }
+            ? user
+            : null;
+    }
+
+    private static bool CanUserLogin(User? user)
+    {
+        return user is { IsActive: true, IsVerified: true };
+    }
+
+    private static ChangePasswordResult CreateChangePasswordResult(ChangePasswordStatus status)
+    {
+        return new ChangePasswordResult
+        {
+            Status = status
+        };
+    }
+
+    private async Task EnsureUserDoesNotExistAsync(
+        string normalizedEmail,
+        string normalizedUsername,
+        CancellationToken cancellationToken)
+    {
+        var existingUserByEmail = await _userRepository.GetByEmailAsync(normalizedEmail, cancellationToken);
+        if (existingUserByEmail is not null)
+        {
+            throw new InvalidOperationException("User with this email already exists.");
+        }
+
+        var existingUserByUsername = await _userRepository.GetByUsernameAsync(normalizedUsername, cancellationToken);
+        if (existingUserByUsername is not null)
+        {
+            throw new InvalidOperationException("User with this username already exists.");
+        }
+    }
+
+    private async Task<PendingRegistration?> GetActivePendingRegistrationByEmailAsync(
+        string email,
+        CancellationToken cancellationToken)
+    {
+        var pendingRegistration = await _pendingRegistrationRepository.GetByEmailAsync(email, cancellationToken);
+        return await RemovePendingRegistrationIfExpiredAsync(pendingRegistration, cancellationToken);
+    }
+
+    private async Task<PendingRegistration?> GetActivePendingRegistrationByUsernameAsync(
+        string username,
+        CancellationToken cancellationToken)
+    {
+        var pendingRegistration = await _pendingRegistrationRepository.GetByUsernameAsync(username, cancellationToken);
+        return await RemovePendingRegistrationIfExpiredAsync(pendingRegistration, cancellationToken);
+    }
+
+    private async Task<PendingRegistration?> RemovePendingRegistrationIfExpiredAsync(
+        PendingRegistration? pendingRegistration,
+        CancellationToken cancellationToken)
+    {
+        if (pendingRegistration is null)
+        {
+            return null;
+        }
+
+        if (pendingRegistration.VerificationCodeExpiresAt > DateTimeOffset.UtcNow)
+        {
+            return pendingRegistration;
+        }
+
+        await _pendingRegistrationRepository.DeleteAsync(pendingRegistration, cancellationToken);
+        return null;
+    }
+
+    private async Task<PendingRegistration?> GetVerifiedPendingRegistrationAsync(
+        string normalizedEmail,
+        string code,
+        CancellationToken cancellationToken)
+    {
+        var pendingRegistration = await GetActivePendingRegistrationByEmailAsync(normalizedEmail, cancellationToken);
+
+        return IsEmailVerificationCodeValid(pendingRegistration, code)
+            ? pendingRegistration
+            : null;
+    }
+
     private async Task<AuthResponse> CreateAuthResponseAsync(User user, CancellationToken cancellationToken)
     {
-        var refreshToken = _tokenService.GenerateRefreshToken();
-
-        var refreshTokenEntity = new RefreshToken
-        {
-            TokenHash = HashRefreshToken(refreshToken),
-            ExpiresAt = DateTimeOffset.UtcNow.AddDays(RefreshTokenLifetimeDays),
-            UserId = user.Id
-        };
-
-        await _refreshTokenRepository.AddAsync(refreshTokenEntity, cancellationToken);
-
+        var refreshToken = await IssueRefreshTokenAsync(user.Id, cancellationToken);
         return CreateAuthResponse(user, refreshToken);
     }
 
@@ -361,58 +548,133 @@ public class AuthService : IAuthService
 
     private static string NormalizePasswordResetCode(string code)
     {
-        if (string.IsNullOrWhiteSpace(code))
-        {
-            throw new ArgumentException("Reset code is required.", nameof(code));
-        }
-
-        var normalizedCode = code.Trim();
-
-        if (normalizedCode.Length != 6 || normalizedCode.Any(character => !char.IsDigit(character)))
-        {
-            throw new ArgumentException("Reset code must contain exactly 6 digits.", nameof(code));
-        }
-
-        return normalizedCode;
+        return NormalizeSixDigitCode(code, "Reset code");
     }
 
-    private static string GeneratePasswordResetCode()
+    private static string NormalizeEmailVerificationCode(string code)
+    {
+        return NormalizeSixDigitCode(code, "Verification code");
+    }
+
+    private static string? NormalizeOptionalValue(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value)
+            ? null
+            : value.Trim();
+    }
+
+    private static string GenerateCode()
     {
         return RandomNumberGenerator
             .GetInt32(0, 1_000_000)
             .ToString("D6");
     }
 
+    private static string NormalizeSixDigitCode(string code, string codeName)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            throw new ArgumentException($"{codeName} is required.", nameof(code));
+        }
+
+        var normalizedCode = code.Trim();
+
+        if (normalizedCode.Length != 6 || normalizedCode.Any(character => !char.IsDigit(character)))
+        {
+            throw new ArgumentException($"{codeName} must contain exactly 6 digits.", nameof(code));
+        }
+
+        return normalizedCode;
+    }
+
     private static void SetPasswordResetCode(User user, string code)
     {
-        user.PasswordResetCodeHash = HashPasswordResetCode(code);
+        user.PasswordResetCode = NormalizePasswordResetCode(code);
         user.PasswordResetCodeExpiresAt = DateTimeOffset.UtcNow.AddMinutes(PasswordResetCodeLifetimeMinutes);
     }
 
     private static void ClearPasswordResetCode(User user)
     {
-        user.PasswordResetCodeHash = null;
+        user.PasswordResetCode = null;
         user.PasswordResetCodeExpiresAt = null;
     }
 
-    private static string HashPasswordResetCode(string code)
+    private static void SetEmailVerificationCode(PendingRegistration pendingRegistration, string code)
     {
-        var normalizedCode = NormalizePasswordResetCode(code);
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(normalizedCode));
-        return Convert.ToBase64String(bytes);
+        pendingRegistration.VerificationCode = NormalizeEmailVerificationCode(code);
+        pendingRegistration.VerificationCodeExpiresAt = DateTimeOffset.UtcNow.AddMinutes(
+            EmailVerificationCodeLifetimeMinutes);
     }
 
     private static bool IsPasswordResetCodeValid(User? user, string code)
     {
         if (user is null ||
             !user.IsActive ||
-            string.IsNullOrWhiteSpace(user.PasswordResetCodeHash) ||
+            string.IsNullOrWhiteSpace(user.PasswordResetCode) ||
             user.PasswordResetCodeExpiresAt is null ||
             user.PasswordResetCodeExpiresAt <= DateTimeOffset.UtcNow)
         {
             return false;
         }
 
-        return user.PasswordResetCodeHash == HashPasswordResetCode(code);
+        return user.PasswordResetCode == NormalizePasswordResetCode(code);
     }
+
+    private static bool IsEmailVerificationCodeValid(PendingRegistration? pendingRegistration, string code)
+    {
+        if (pendingRegistration is null || pendingRegistration.VerificationCodeExpiresAt <= DateTimeOffset.UtcNow)
+        {
+            return false;
+        }
+
+        return pendingRegistration.VerificationCode == NormalizeEmailVerificationCode(code);
+    }
+
+    private async Task<RefreshToken?> GetStoredRefreshTokenAsync(
+        string refreshToken,
+        CancellationToken cancellationToken)
+    {
+        var refreshTokenHash = HashRefreshToken(NormalizeRefreshToken(refreshToken));
+        return await _refreshTokenRepository.GetByTokenHashAsync(refreshTokenHash, cancellationToken);
+    }
+
+    private async Task<RefreshToken?> GetActiveRefreshTokenAsync(
+        string refreshToken,
+        CancellationToken cancellationToken)
+    {
+        var storedRefreshToken = await GetStoredRefreshTokenAsync(refreshToken, cancellationToken);
+
+        if (storedRefreshToken is null || !storedRefreshToken.IsActive || !storedRefreshToken.User.IsActive)
+        {
+            return null;
+        }
+
+        return storedRefreshToken;
+    }
+
+    private async Task<string> IssueRefreshTokenAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var refreshToken = _tokenService.GenerateRefreshToken();
+        var refreshTokenEntity = new RefreshToken
+        {
+            TokenHash = HashRefreshToken(refreshToken),
+            ExpiresAt = DateTimeOffset.UtcNow.AddDays(RefreshTokenLifetimeDays),
+            UserId = userId
+        };
+
+        await _refreshTokenRepository.AddAsync(refreshTokenEntity, cancellationToken);
+        return refreshToken;
+    }
+
+    private async Task RevokeRefreshTokenAsync(RefreshToken refreshToken, CancellationToken cancellationToken)
+    {
+        refreshToken.RevokedAt = DateTimeOffset.UtcNow;
+        await _refreshTokenRepository.UpdateAsync(refreshToken, cancellationToken);
+    }
+
+    private sealed record RegistrationData(
+        string Email,
+        string Username,
+        string Password,
+        string? DisplayName);
 }

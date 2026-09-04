@@ -22,14 +22,18 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("register")]
-    public async Task<ActionResult<AuthResponse>> Register(
+    public async Task<IActionResult> Register(
         RegisterRequest request,
         CancellationToken cancellationToken)
     {
         try
         {
-            var response = await _authService.RegisterAsync(request, cancellationToken);
-            return Ok(response);
+            await _authService.RegisterAsync(request, cancellationToken);
+            return Ok(new { message = "Verification code has been sent to your email." });
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(new { message = exception.Message });
         }
         catch (InvalidOperationException exception)
         {
@@ -122,6 +126,52 @@ public class AuthController : ControllerBase
                 : BadRequest(new { message = "Reset code is invalid or expired." });
         }
         catch (ArgumentException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+    }
+
+    [HttpPost("verify-email")]
+    public async Task<ActionResult<AuthResponse>> VerifyEmail(
+        VerifyEmailRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var response = await _authService.VerifyEmailAsync(request, cancellationToken);
+
+            return response is null
+                ? BadRequest(new { message = "Verification code is invalid or expired." })
+                : Ok(response);
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+        catch (InvalidOperationException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+    }
+    
+    [HttpPost("resend-verification-code")]
+    public async Task<IActionResult> ResendVerifyEmail(
+        ResendVerificationCodeRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var wasSent = await _authService.ResendVerificationCodeAsync(request, cancellationToken);
+
+            return wasSent
+                ? Ok(new { message = "Verification code has been sent to your email." })
+                : NotFound(new { message = "Pending registration was not found or expired." });
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+        catch (InvalidOperationException exception)
         {
             return BadRequest(new { message = exception.Message });
         }
