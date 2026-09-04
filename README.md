@@ -19,8 +19,8 @@ Backend для соціального застосунку у стилі Threads
 - реєстрація, логін, logout, `me`, скидання і зміна пароля
 - профілі користувачів з `avatar`, `banner`, `bio`, `location`
 - пости з текстом, embed, локацією, медіа та опитуваннями
-- лайки, репости, перегляди постів
-- коментарі з підтримкою вкладеності через `parent comment`
+- лайки, репости, bookmarks і перегляди для постів та коментарів
+- коментарі з підтримкою вкладеності через `parent comment` і user-interactions
 - підписки: followers / following
 - пошук користувачів і постів
 - пошук GIF через `Giphy`
@@ -204,7 +204,7 @@ http://127.0.0.1:7000
 
 ### Posts і Comments
 
-Bookmark endpoints added: `2026-08-11`
+Comments interactions and unified target entities updated: `2026-09-04`
 
 | Method | Route | Призначення |
 |---|---|---|
@@ -229,6 +229,13 @@ Bookmark endpoints added: `2026-08-11`
 | `POST` | `/api/comments` | Створити коментар |
 | `PUT` | `/api/comments/{id}` | Оновити коментар |
 | `DELETE` | `/api/comments/{id}` | Видалити коментар |
+| `POST` | `/api/comments/{id}/view` | Зареєструвати перегляд коментаря |
+| `POST` | `/api/comments/{id}/like` | Поставити лайк коментарю |
+| `DELETE` | `/api/comments/{id}/like` | Прибрати лайк з коментаря |
+| `POST` | `/api/comments/{id}/repost` | Репост коментаря |
+| `DELETE` | `/api/comments/{id}/repost` | Скасувати репост коментаря |
+| `POST` | `/api/comments/{id}/bookmark` | Додати коментар у bookmarks |
+| `DELETE` | `/api/comments/{id}/bookmark` | Прибрати коментар з bookmarks |
 
 ### Search і Media
 
@@ -261,3 +268,4 @@ Bookmark endpoints added: `2026-08-11`
 
 - Swagger у поточному проєкті не підключений.
 - README описує фактичні контролери й конфігурацію, які є в коді зараз.
+- Для `Like`, `Bookmark`, `Repost` і `View` тепер використовується єдина сутність на `post` або `comment` target.
