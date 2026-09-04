@@ -12,6 +12,8 @@ public interface ICommentRepository
         Guid id,
         CancellationToken cancellationToken = default);
 
+    void AttachView(View view);
+    Task SaveChangesAsync(CancellationToken cancellationToken = default);
     Task AddAsync(Comment comment, CancellationToken cancellationToken = default);
     Task UpdateAsync(Comment comment, CancellationToken cancellationToken = default);
     Task DeleteAsync(Comment comment, CancellationToken cancellationToken = default);

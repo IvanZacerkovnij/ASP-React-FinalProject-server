@@ -20,4 +20,16 @@ public class Comment : BaseEntity
 
     public ICollection<Comment> Replies { get; set; } =
         new List<Comment>();
+
+    public ICollection<Like> Likes { get; set; } =
+        new List<Like>();
+
+    public ICollection<Bookmark> Bookmarks { get; set; } =
+        new List<Bookmark>();
+
+    public ICollection<Repost> Reposts { get; set; } =
+        new List<Repost>();
+
+    public ICollection<View> Views { get; set; } =
+        new List<View>();
 }

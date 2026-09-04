@@ -20,7 +20,18 @@ public class LikeRepository : ILikeRepository
     {
         return await _dbContext.Likes
             .FirstOrDefaultAsync(
-                like => like.UserId == userId && like.PostId == postId,
+                like => like.UserId == userId && like.PostId == postId && like.CommentId == null,
+                cancellationToken);
+    }
+
+    public async Task<Like?> GetByUserAndCommentAsync(
+        Guid userId,
+        Guid commentId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Likes
+            .FirstOrDefaultAsync(
+                like => like.UserId == userId && like.CommentId == commentId && like.PostId == null,
                 cancellationToken);
     }
 

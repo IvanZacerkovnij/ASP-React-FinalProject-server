@@ -36,7 +36,8 @@ public class RepostService : IRepostService
         var repost = new Repost
         {
             UserId = userId,
-            PostId = postId
+            PostId = postId,
+            CommentId = null
         };
 
         try

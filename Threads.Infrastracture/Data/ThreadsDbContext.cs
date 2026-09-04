@@ -16,7 +16,7 @@ public class ThreadsDbContext : DbContext
     public DbSet<Poll> Polls { get; set; }
     public DbSet<PollOption> PollOptions { get; set; }
     public DbSet<PollVote> PollVotes { get; set; }
-    public DbSet<PostView> PostViews { get; set; }
+    public DbSet<View> Views { get; set; }
     public DbSet<RefreshToken> RefreshTokens { get; set; }
     public DbSet<PendingRegistration> PendingRegistrations { get; set; }
 

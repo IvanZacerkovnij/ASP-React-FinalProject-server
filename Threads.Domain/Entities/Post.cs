@@ -48,8 +48,8 @@ public class Post : BaseEntity
     public ICollection<Bookmark> Bookmarks { get; set; } =
         new List<Bookmark>();
 
-    public ICollection<PostView> Views { get; set; } =
-        new List<PostView>();
+    public ICollection<View> Views { get; set; } =
+        new List<View>();
 
     public Poll? Poll { get; set; }
 }

@@ -9,6 +9,11 @@ public interface ILikeRepository
         Guid postId,
         CancellationToken cancellationToken = default);
 
+    Task<Like?> GetByUserAndCommentAsync(
+        Guid userId,
+        Guid commentId,
+        CancellationToken cancellationToken = default);
+
     Task AddAsync(Like like, CancellationToken cancellationToken = default);
     Task DeleteAsync(Like like, CancellationToken cancellationToken = default);
 }

@@ -29,7 +29,7 @@ public class AuthProfile : Profile
             .ForMember(destination => destination.Likes, options => options.Ignore())
             .ForMember(destination => destination.Reposts, options => options.Ignore())
             .ForMember(destination => destination.Bookmarks, options => options.Ignore())
-            .ForMember(destination => destination.PostViews, options => options.Ignore())
+            .ForMember(destination => destination.Views, options => options.Ignore())
             .ForMember(destination => destination.PollVotes, options => options.Ignore())
             .ForMember(destination => destination.FollowingRelations, options => options.Ignore())
             .ForMember(destination => destination.FollowerRelations, options => options.Ignore())

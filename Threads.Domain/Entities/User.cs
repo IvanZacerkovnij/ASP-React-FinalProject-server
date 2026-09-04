@@ -55,8 +55,8 @@ public class User : BaseEntity
     public ICollection<Bookmark> Bookmarks { get; set; } =
         new List<Bookmark>();
 
-    public ICollection<PostView> PostViews { get; set; } =
-        new List<PostView>();
+    public ICollection<View> Views { get; set; } =
+        new List<View>();
 
     public ICollection<PollVote> PollVotes { get; set; } =
         new List<PollVote>();

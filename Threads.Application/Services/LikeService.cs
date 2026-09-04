@@ -37,7 +37,8 @@ public class LikeService : ILikeService
         var like = new Like
         {
             UserId = userId,
-            PostId = postId
+            PostId = postId,
+            CommentId = null
         };
 
         try

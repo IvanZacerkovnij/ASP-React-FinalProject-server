@@ -70,16 +70,25 @@ public class PostConfigurator : IEntityTypeConfiguration<Post>
         builder.HasMany(post => post.Likes)
             .WithOne(like => like.Post)
             .HasForeignKey(like => like.PostId)
+            .IsRequired(false)
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasMany(post => post.Reposts)
             .WithOne(repost => repost.Post)
             .HasForeignKey(repost => repost.PostId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasMany(post => post.Bookmarks)
+            .WithOne(bookmark => bookmark.Post)
+            .HasForeignKey(bookmark => bookmark.PostId)
+            .IsRequired(false)
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasMany(post => post.Views)
             .WithOne(view => view.Post)
             .HasForeignKey(view => view.PostId)
+            .IsRequired(false)
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasMany(post => post.Media)

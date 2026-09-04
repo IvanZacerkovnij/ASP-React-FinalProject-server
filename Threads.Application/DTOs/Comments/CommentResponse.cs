@@ -18,6 +18,16 @@ public class CommentResponse
 
     public bool IsLikedByCurrentUser { get; init; }
 
+    public int RepliesCount { get; init; }
+
+    public bool IsBookmarkedByCurrentUser { get; init; }
+
+    public int RepostsCount { get; init; }
+
+    public bool IsRepostedByCurrentUser { get; init; }
+
+    public int ViewsCount { get; init; }
+
     public DateTime CreatedAt { get; init; }
 
     public DateTime? UpdatedAt { get; init; }

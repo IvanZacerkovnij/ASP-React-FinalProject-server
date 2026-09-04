@@ -22,7 +22,10 @@ public class CommentsController : ControllerBase
         Guid postId,
         CancellationToken cancellationToken)
     {
-        var comments = await _commentService.GetByPostIdAsync(postId, cancellationToken);
+        var comments = await _commentService.GetByPostIdAsync(
+            postId,
+            cancellationToken,
+            GetCurrentUserId());
         return Ok(comments);
     }
 
@@ -78,7 +81,11 @@ public class CommentsController : ControllerBase
 
         try
         {
-            var updatedComment = await _commentService.UpdateAsync(id, request, cancellationToken);
+            var updatedComment = await _commentService.UpdateAsync(
+                id,
+                request,
+                cancellationToken,
+                currentUserId.Value);
             return Ok(updatedComment);
         }
         catch (InvalidOperationException exception)
@@ -115,6 +122,132 @@ public class CommentsController : ControllerBase
         return wasDeleted
             ? NoContent()
             : NotFound(new { message = "Comment was not found." });
+    }
+
+    [Authorize]
+    [HttpPost("{id:guid}/like")]
+    public async Task<ActionResult<CommentResponse>> LikeComment(Guid id, CancellationToken cancellationToken)
+    {
+        var currentUserId = GetCurrentUserId();
+
+        if (currentUserId is null)
+        {
+            return Unauthorized(new { message = "Invalid token claims." });
+        }
+
+        var updatedComment = await _commentService.LikeAsync(id, currentUserId.Value, cancellationToken);
+
+        return updatedComment is null
+            ? NotFound(new { message = "Comment was not found." })
+            : Ok(updatedComment);
+    }
+
+    [Authorize]
+    [HttpPost("{id:guid}/view")]
+    public async Task<ActionResult<CommentResponse>> ViewComment(Guid id, CancellationToken cancellationToken)
+    {
+        var currentUserId = GetCurrentUserId();
+
+        if (currentUserId is null)
+        {
+            return Unauthorized(new { message = "Invalid token claims." });
+        }
+
+        var updatedComment = await _commentService.ViewAsync(id, currentUserId.Value, cancellationToken);
+
+        return updatedComment is null
+            ? NotFound(new { message = "Comment was not found." })
+            : Ok(updatedComment);
+    }
+
+    [Authorize]
+    [HttpDelete("{id:guid}/like")]
+    public async Task<ActionResult<CommentResponse>> UnlikeComment(Guid id, CancellationToken cancellationToken)
+    {
+        var currentUserId = GetCurrentUserId();
+
+        if (currentUserId is null)
+        {
+            return Unauthorized(new { message = "Invalid token claims." });
+        }
+
+        var updatedComment = await _commentService.UnlikeAsync(id, currentUserId.Value, cancellationToken);
+
+        return updatedComment is null
+            ? NotFound(new { message = "Comment was not found." })
+            : Ok(updatedComment);
+    }
+
+    [Authorize]
+    [HttpPost("{id:guid}/bookmark")]
+    public async Task<ActionResult<CommentResponse>> BookmarkComment(Guid id, CancellationToken cancellationToken)
+    {
+        var currentUserId = GetCurrentUserId();
+
+        if (currentUserId is null)
+        {
+            return Unauthorized(new { message = "Invalid token claims." });
+        }
+
+        var updatedComment = await _commentService.BookmarkAsync(id, currentUserId.Value, cancellationToken);
+
+        return updatedComment is null
+            ? NotFound(new { message = "Comment was not found." })
+            : Ok(updatedComment);
+    }
+
+    [Authorize]
+    [HttpDelete("{id:guid}/bookmark")]
+    public async Task<ActionResult<CommentResponse>> UnbookmarkComment(Guid id, CancellationToken cancellationToken)
+    {
+        var currentUserId = GetCurrentUserId();
+
+        if (currentUserId is null)
+        {
+            return Unauthorized(new { message = "Invalid token claims." });
+        }
+
+        var updatedComment = await _commentService.UnbookmarkAsync(id, currentUserId.Value, cancellationToken);
+
+        return updatedComment is null
+            ? NotFound(new { message = "Comment was not found." })
+            : Ok(updatedComment);
+    }
+
+    [Authorize]
+    [HttpPost("{id:guid}/repost")]
+    public async Task<ActionResult<CommentResponse>> RepostComment(Guid id, CancellationToken cancellationToken)
+    {
+        var currentUserId = GetCurrentUserId();
+
+        if (currentUserId is null)
+        {
+            return Unauthorized(new { message = "Invalid token claims." });
+        }
+
+        var updatedComment = await _commentService.RepostAsync(id, currentUserId.Value, cancellationToken);
+
+        return updatedComment is null
+            ? NotFound(new { message = "Comment was not found." })
+            : Ok(updatedComment);
+    }
+
+    [Authorize]
+    [HttpDelete("{id:guid}/repost")]
+    public async Task<ActionResult<CommentResponse>> UnrepostComment(Guid id, CancellationToken cancellationToken)
+    {
+        var currentUserId = GetCurrentUserId();
+
+        if (currentUserId is null)
+        {
+            return Unauthorized(new { message = "Invalid token claims." });
+        }
+
+        var updatedComment = await _commentService.UnrepostAsync(id, currentUserId.Value, cancellationToken);
+
+        return updatedComment is null
+            ? NotFound(new { message = "Comment was not found." })
+            : Ok(updatedComment);
     }
 
     private Guid? GetCurrentUserId()

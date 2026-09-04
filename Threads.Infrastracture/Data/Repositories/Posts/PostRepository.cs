@@ -61,9 +61,9 @@ public class PostRepository : IPostRepository
     {
         var likedPostIds = await _dbContext.Likes
             .AsNoTracking()
-            .Where(like => like.UserId == userId)
+            .Where(like => like.UserId == userId && like.PostId.HasValue && like.CommentId == null)
             .OrderByDescending(like => like.CreatedAt)
-            .Select(like => like.PostId)
+            .Select(like => like.PostId!.Value)
             .ToListAsync(cancellationToken);
 
         if (likedPostIds.Count == 0)
@@ -90,9 +90,9 @@ public class PostRepository : IPostRepository
     {
         var repostedPostIds = await _dbContext.Reposts
             .AsNoTracking()
-            .Where(repost => repost.UserId == userId)
+            .Where(repost => repost.UserId == userId && repost.PostId.HasValue && repost.CommentId == null)
             .OrderByDescending(repost => repost.CreatedAt)
-            .Select(repost => repost.PostId)
+            .Select(repost => repost.PostId!.Value)
             .ToListAsync(cancellationToken);
 
         repostedPostIds = repostedPostIds
@@ -150,10 +150,10 @@ public class PostRepository : IPostRepository
             return null;
         }
 
-        var alreadyViewed = await _dbContext.PostViews
+        var alreadyViewed = await _dbContext.Views
             .AsNoTracking()
             .AnyAsync(
-                item => item.PostId == id && item.ViewerId == viewerId,
+                item => item.PostId == id && item.ViewerId == viewerId && item.CommentId == null,
                 cancellationToken);
 
         if (alreadyViewed)
@@ -161,10 +161,11 @@ public class PostRepository : IPostRepository
             return post.ViewsCount;
         }
 
-        await _dbContext.PostViews.AddAsync(
-            new PostView
+        await _dbContext.Views.AddAsync(
+            new View
             {
                 PostId = id,
+                CommentId = null,
                 ViewerId = viewerId
             },
             cancellationToken);

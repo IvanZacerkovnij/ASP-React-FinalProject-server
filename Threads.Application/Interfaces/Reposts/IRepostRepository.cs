@@ -9,6 +9,11 @@ public interface IRepostRepository
         Guid postId,
         CancellationToken cancellationToken = default);
 
+    Task<Repost?> GetByUserAndCommentAsync(
+        Guid userId,
+        Guid commentId,
+        CancellationToken cancellationToken = default);
+
     Task AddAsync(Repost repost, CancellationToken cancellationToken = default);
     Task DeleteAsync(Repost repost, CancellationToken cancellationToken = default);
 }

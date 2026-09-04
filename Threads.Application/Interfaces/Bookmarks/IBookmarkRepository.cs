@@ -7,6 +7,10 @@ public interface IBookmarkRepository
     Task<Bookmark?> GetByUserAndPostId(Guid userId,
         Guid postId,
         CancellationToken cancellationToken = default);
+
+    Task<Bookmark?> GetByUserAndCommentId(Guid userId,
+        Guid commentId,
+        CancellationToken cancellationToken = default);
     
     Task AddAsync(Bookmark bookmark, CancellationToken cancellationToken = default);
     Task DeleteAsync(Bookmark bookmark, CancellationToken cancellationToken = default);

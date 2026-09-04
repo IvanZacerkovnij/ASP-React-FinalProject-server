@@ -41,6 +41,7 @@ public class BookmarkService: IBookmarkService
         {
             UserId = userId,
             PostId = postId,
+            CommentId = null
         };
 
         try

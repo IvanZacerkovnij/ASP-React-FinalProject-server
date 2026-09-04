@@ -20,7 +20,18 @@ public class RepostRepository : IRepostRepository
     {
         return await _dbContext.Reposts
             .FirstOrDefaultAsync(
-                repost => repost.UserId == userId && repost.PostId == postId,
+                repost => repost.UserId == userId && repost.PostId == postId && repost.CommentId == null,
+                cancellationToken);
+    }
+
+    public async Task<Repost?> GetByUserAndCommentAsync(
+        Guid userId,
+        Guid commentId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Reposts
+            .FirstOrDefaultAsync(
+                repost => repost.UserId == userId && repost.CommentId == commentId && repost.PostId == null,
                 cancellationToken);
     }
 

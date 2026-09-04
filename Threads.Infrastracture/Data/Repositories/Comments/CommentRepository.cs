@@ -21,6 +21,10 @@ public class CommentRepository : ICommentRepository
             .AsNoTracking()
             .Include(comment => comment.Author)
             .Include(comment => comment.Replies)
+            .Include(comment => comment.Likes)
+            .Include(comment => comment.Bookmarks)
+            .Include(comment => comment.Reposts)
+            .Include(comment => comment.Views)
             .Where(comment => comment.PostId == postId)
             .OrderBy(comment => comment.CreatedAt)
             .ToListAsync(cancellationToken);
@@ -31,6 +35,10 @@ public class CommentRepository : ICommentRepository
         return await _dbContext.Comments
             .Include(comment => comment.Author)
             .Include(comment => comment.Replies)
+            .Include(comment => comment.Likes)
+            .Include(comment => comment.Bookmarks)
+            .Include(comment => comment.Reposts)
+            .Include(comment => comment.Views)
             .FirstOrDefaultAsync(comment => comment.Id == id, cancellationToken);
     }
 
@@ -38,6 +46,16 @@ public class CommentRepository : ICommentRepository
     {
         await _dbContext.Comments.AddAsync(comment, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public void AttachView(View view)
+    {
+        _dbContext.Views.Add(view);
+    }
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        return _dbContext.SaveChangesAsync(cancellationToken);
     }
 
     public async Task UpdateAsync(Comment comment, CancellationToken cancellationToken = default)

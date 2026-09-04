@@ -15,7 +15,14 @@ public class BookmarkRepository : IBookmarkRepository
     public Task<Bookmark?> GetByUserAndPostId(Guid userId, Guid postId, CancellationToken cancellationToken = default)
     {
         return _dbContext.Bookmarks.FirstOrDefaultAsync(
-            bookmark => bookmark.UserId == userId && bookmark.PostId == postId,
+            bookmark => bookmark.UserId == userId && bookmark.PostId == postId && bookmark.CommentId == null,
+            cancellationToken);
+    }
+
+    public Task<Bookmark?> GetByUserAndCommentId(Guid userId, Guid commentId, CancellationToken cancellationToken = default)
+    {
+        return _dbContext.Bookmarks.FirstOrDefaultAsync(
+            bookmark => bookmark.UserId == userId && bookmark.CommentId == commentId && bookmark.PostId == null,
             cancellationToken);
     }
 
