@@ -11,6 +11,7 @@ Backend для соціального застосунку у стилі Threads
 - [Технології](#технології)
 - [Запуск через Docker](#запуск-через-docker)
 - [Конфігурація](#конфігурація)
+- [Рольова авторизація](#рольова-авторизація)
 - [Огляд API](#огляд-api)
 - [Кешування](#кешування)
 - [Обробка медіа](#обробка-медіа)
@@ -186,6 +187,18 @@ dotnet ef database update \
   --project Threads.Infrastracture \
   --startup-project Threads.Api
 ```
+
+## Рольова авторизація
+
+Додано: `2026-09-07`
+
+- користувач має роль `User` або `Moderator`; нові користувачі за замовчуванням отримують `User`
+- роль зберігається в `Users.Role` як ціле число
+- роль додається до access token через `ClaimTypes.Role`
+- JWT Bearer використовує `ClaimTypes.Role` для перевірки ролі користувача
+- policy `Moderation` дозволяє доступ користувачам із роллю `Moderator`
+- майбутні moderation endpoints захищатимуться атрибутом `[Authorize(Policy = AuthorizationPolicies.Moderation)]`
+- moderation endpoints у поточній версії API ще не реалізовані
 
 ## Огляд API
 
