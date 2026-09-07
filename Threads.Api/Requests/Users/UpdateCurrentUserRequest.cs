@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using Threads.Application.DTOs.Locations;
 
-namespace Threads.Api.Requests;
+namespace Threads.Api.Requests.Users;
 
 public class UpdateCurrentUserRequest
 {

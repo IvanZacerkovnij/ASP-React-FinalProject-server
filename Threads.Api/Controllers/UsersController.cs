@@ -1,7 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Threads.Api.Requests;
+using Threads.Api.Requests.Users;
 using Threads.Application.DTOs.Posts;
 using Threads.Application.DTOs.Users;
 using Threads.Application.Interfaces.Posts;

@@ -1,7 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Threads.Api.Requests;
+using Threads.Api.Requests.Media;
 using Threads.Application.DTOs.Media;
 using Threads.Application.Exceptions;
 using Threads.Application.Interfaces.Media;
