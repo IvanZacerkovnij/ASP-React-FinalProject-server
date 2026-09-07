@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Threads.Domain.Entities;
+using Threads.Domain.Enums;
 
 namespace Threads.Infrastracture.Data.Configurations.TableConfigurations;
 
@@ -23,6 +24,11 @@ public class UserConfigurator : IEntityTypeConfiguration<User>
         builder.Property(user => user.PasswordHash)
             .IsRequired()
             .HasMaxLength(512);
+        
+        builder.Property(u => u.Role)
+            .IsRequired()
+            .HasConversion<int>()
+            .HasDefaultValue(UserRole.User);
 
         builder.Property(user => user.PasswordResetCode)
             .HasMaxLength(6);

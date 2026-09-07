@@ -86,7 +86,7 @@ public class Program
         builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options => JwtBearerConfigurator.Configure(options, builder.Configuration));
 
-        builder.Services.AddAuthorization();
+        builder.Services.AddAuthorization(AuthorizationConfigurator.Configure);
         builder.Services.AddControllers();
         
         builder.Services.AddCors(options => CORSConfigurator.Configure(options, builder.Configuration));

@@ -12,7 +12,7 @@ using Threads.Infrastracture.Data;
 namespace Threads.Infrastracture.Migrations
 {
     [DbContext(typeof(ThreadsDbContext))]
-    [Migration("20260904163959_Initial")]
+    [Migration("20260907162500_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -613,6 +613,11 @@ namespace Threads.Infrastracture.Migrations
                     b.Property<string>("PendingPasswordHash")
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)");
+
+                    b.Property<int>("Role")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
 
                     b.Property<DateTimeOffset?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");

@@ -1,4 +1,5 @@
 using Threads.Domain.Common;
+using Threads.Domain.Enums;
 
 namespace Threads.Domain.Entities;
 
@@ -37,8 +38,10 @@ public class User : BaseEntity
     public string? BannerObjectKey { get; set; }
 
     public bool IsVerified { get; set; }
-
+    
     public bool IsActive { get; set; } = true;
+    
+    public UserRole Role { get; set; } = UserRole.User;
 
     public ICollection<Post> Posts { get; set; } =
         new List<Post>();

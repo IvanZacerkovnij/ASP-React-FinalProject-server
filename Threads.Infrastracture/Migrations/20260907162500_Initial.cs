@@ -53,6 +53,7 @@ namespace Threads.Infrastracture.Migrations
                     BannerObjectKey = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
                     IsVerified = table.Column<bool>(type: "boolean", nullable: false),
                     IsActive = table.Column<bool>(type: "boolean", nullable: false),
+                    Role = table.Column<int>(type: "integer", nullable: false, defaultValue: 0),
                     CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
                 },
