@@ -2,6 +2,8 @@
 
 Backend для соціального застосунку у стилі Threads, побудований на `ASP.NET Core Web API` з `PostgreSQL`, `EF Core`, `JWT`, `AWS S3` і обробкою медіа через `ffmpeg`.
 
+> Останнє оновлення документації: `2026-09-07`
+
 ## Зміст
 
 - [Що вміє API](#що-вміє-api)
@@ -10,6 +12,7 @@ Backend для соціального застосунку у стилі Threads
 - [Запуск через Docker](#запуск-через-docker)
 - [Конфігурація](#конфігурація)
 - [Огляд API](#огляд-api)
+- [Кешування](#кешування)
 - [Обробка медіа](#обробка-медіа)
 - [Розгортання](#розгортання)
 
@@ -25,6 +28,7 @@ Backend для соціального застосунку у стилі Threads
 - пошук користувачів і постів
 - пошук GIF через `Giphy`
 - пошук локацій через `Geoapify`
+- дворівневе кешування пошуку через `HybridCache` і `Redis`
 - завантаження зображень і відео в `AWS S3`
 - стиснення відео та генерація thumbnail перед upload
 
@@ -36,6 +40,7 @@ BackEndForFinalProject
 ├── Threads.Application       # DTOs, interfaces, business services
 ├── Threads.Domain            # domain entities
 ├── Threads.Infrastracture    # EF Core, repositories, integrations, security
+│   └── Migrations            # EF Core migrations і model snapshot
 ├── deploy/nginx              # nginx config for reverse proxy
 ├── Dockerfile
 └── docker-compose.yml
@@ -55,6 +60,8 @@ BackEndForFinalProject
 - `ASP.NET Core Web API`
 - `Entity Framework Core`
 - `PostgreSQL`
+- `Redis 7`
+- `.NET HybridCache` (L1 memory + L2 Redis)
 - `Npgsql`
 - `JWT Bearer Authentication`
 - `AWS S3`
@@ -69,7 +76,7 @@ BackEndForFinalProject
 
 Основний сценарій запуску цього проєкту: через Docker.
 
-> `docker-compose.yml` у репозиторії підіймає тільки API-контейнер. PostgreSQL потрібно мати окремо: локально, в іншому compose-стеку або як зовнішню БД.
+> `docker-compose.yml` підіймає API та Redis. PostgreSQL потрібно мати окремо: локально, в іншому compose-стеку або як зовнішню БД.
 
 ### 1. Підготуй `.env`
 
@@ -105,6 +112,8 @@ GIPHY_RATING=pg-13
 
 GEOAPIFY_API_KEY=your-geoapify-key
 
+REDIS_PASSWORD=your-strong-redis-password
+
 Cors__AllowedOrigins__0=http://localhost:8000
 Cors__AllowedOrigins__1=http://127.0.0.1:8000
 ```
@@ -123,6 +132,8 @@ http://127.0.0.1:7000
 
 `docker-compose.yml` мапить контейнерний порт `8080` на локальний `7000`.
 
+API стартує після успішного healthcheck Redis. Для Redis автоматично формується connection string `redis:6379` із паролем із `REDIS_PASSWORD`.
+
 ## Конфігурація
 
 ### Обов'язково для старту API
@@ -131,6 +142,9 @@ http://127.0.0.1:7000
 - `Jwt__Issuer`
 - `Jwt__Audience`
 - `Jwt__Key`
+- `Redis__ConnectionString` при запуску без `docker compose`
+
+При запуску через `docker compose` замість ручного `Redis__ConnectionString` достатньо задати `REDIS_PASSWORD` у `.env`.
 
 ### Обов'язково для медіа
 
@@ -162,6 +176,16 @@ http://127.0.0.1:7000
 - `MediaProcessing__VideoCompression__AudioBitrateKbps=128`
 - `MediaProcessing__VideoCompression__MaxWidth=1280`
 - `GIPHY_RATING=pg-13`
+
+### База даних
+
+У репозиторії є початкова EF Core migration від `2026-09-04`. Застосувати її можна командою:
+
+```bash
+dotnet ef database update \
+  --project Threads.Infrastracture \
+  --startup-project Threads.Api
+```
 
 ## Огляд API
 
@@ -248,6 +272,16 @@ Comments interactions and unified target entities updated: `2026-09-04`
 | `GET` | `/api/media/{id}` | Отримати presigned URL медіа |
 | `POST` | `/api/media/upload` | Завантажити файл |
 
+## Кешування
+
+Оновлено: `2026-09-07`
+
+- пошук GIF і локацій використовує `HybridCache`
+- L1-кеш зберігається в пам'яті API-контейнера протягом `5 хвилин`
+- L2-кеш зберігається в Redis протягом `30 хвилин`
+- ключі Redis мають префікс `threads:`
+- загальні значення за замовчуванням для інших HybridCache entries: L1 — `1 хвилина`, L2 — `5 хвилин`
+
 ## Обробка медіа
 
 - зображення проходять валідацію і завантажуються в S3 без перекодування
@@ -262,6 +296,8 @@ Comments interactions and unified target entities updated: `2026-09-04`
 - Docker image вже містить `ffmpeg`
 - API слухає `8080` всередині контейнера
 - `docker-compose.yml` публікує його на `127.0.0.1:7000`
+- Redis працює в окремому контейнері `threads-redis`, захищений паролем і має healthcheck
+- API залежить від успішного Redis healthcheck
 - конфіг `deploy/nginx/threads.conf` проксіює трафік на `127.0.0.1:7000`
 
 ## Примітки
@@ -269,3 +305,4 @@ Comments interactions and unified target entities updated: `2026-09-04`
 - Swagger у поточному проєкті не підключений.
 - README описує фактичні контролери й конфігурацію, які є в коді зараз.
 - Для `Like`, `Bookmark`, `Repost` і `View` тепер використовується єдина сутність на `post` або `comment` target.
+- Останні зміни від `2026-09-07`: додано Redis, L1/L2-кешування Giphy та Geoapify, Redis healthcheck і початкову EF Core migration.
