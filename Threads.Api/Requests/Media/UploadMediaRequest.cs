@@ -1,5 +1,3 @@
-using Microsoft.AspNetCore.Http;
-
 namespace Threads.Api.Requests.Media;
 
 public class UploadMediaRequest
