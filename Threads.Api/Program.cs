@@ -91,6 +91,8 @@ public class Program
         
         builder.Services.AddCors(options => CORSConfigurator.Configure(options, builder.Configuration));
         builder.Services.AddResend(options => ResendConfigurator.Configure(options, builder.Configuration));
+        builder.Services.AddStackExchangeRedisCache(options => RedisConfigurator.Configure(options, builder.Configuration));
+        builder.Services.AddHybridCache(HybridCacheConfigurator.Configure);
 
         var app = builder.Build();
 

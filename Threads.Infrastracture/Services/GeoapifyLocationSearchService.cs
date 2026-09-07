@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Configuration;
 using Threads.Application.DTOs.Locations;
 using Threads.Application.Interfaces.Locations;
@@ -13,11 +14,16 @@ public class GeoapifyLocationSearchService : ILocationSearchService
 
     private readonly HttpClient _httpClient;
     private readonly IConfiguration _configuration;
+    private readonly HybridCache _cache;
 
-    public GeoapifyLocationSearchService(HttpClient httpClient, IConfiguration configuration)
+    public GeoapifyLocationSearchService(
+        HttpClient httpClient,
+        IConfiguration configuration,
+        HybridCache cache)
     {
         _httpClient = httpClient;
         _configuration = configuration;
+        _cache = cache;
     }
 
     public async Task<IReadOnlyCollection<LocationResponse>> SearchAsync(
@@ -38,41 +44,49 @@ public class GeoapifyLocationSearchService : ILocationSearchService
                 nameof(query));
         }
 
-        var apiKey = _configuration["GEOAPIFY_API_KEY"];
+        var cacheKey = $"geoapify:search:{normalizedQuery.ToLowerInvariant()}";
 
-        if (string.IsNullOrWhiteSpace(apiKey))
-        {
-            throw new InvalidOperationException("GEOAPIFY_API_KEY is not configured.");
-        }
+        return await _cache.GetOrCreateAsync(
+            cacheKey,
+            async token =>
+            {
+                var apiKey = _configuration["GEOAPIFY_API_KEY"];
 
-        var requestUri =
-            $"v1/geocode/autocomplete?text={Uri.EscapeDataString(normalizedQuery)}" +
-            $"&format=json" +
-            $"&limit={DefaultLimit}" +
-            $"&apiKey={Uri.EscapeDataString(apiKey)}";
+                if (string.IsNullOrWhiteSpace(apiKey))
+                {
+                    throw new InvalidOperationException("GEOAPIFY_API_KEY is not configured.");
+                }
 
-        using var response = await _httpClient.GetAsync(requestUri, cancellationToken);
+                var requestUri =
+                    $"v1/geocode/autocomplete?text={Uri.EscapeDataString(normalizedQuery)}" +
+                    $"&format=json" +
+                    $"&limit={DefaultLimit}" +
+                    $"&apiKey={Uri.EscapeDataString(apiKey)}";
 
-        if (!response.IsSuccessStatusCode)
-        {
-            throw new HttpRequestException(
-                $"Geoapify returned status code {(int)response.StatusCode}.",
-                null,
-                response.StatusCode);
-        }
+                using var response = await _httpClient.GetAsync(requestUri, token);
 
-        var payload = await response.Content.ReadFromJsonAsync<GeoapifyAutocompleteResponse>(
+                if (!response.IsSuccessStatusCode)
+                {
+                    throw new HttpRequestException(
+                        $"Geoapify returned status code {(int)response.StatusCode}.",
+                        null,
+                        response.StatusCode);
+                }
+
+                var payload = await response.Content.ReadFromJsonAsync<GeoapifyAutocompleteResponse>(
+                    cancellationToken: token);
+
+                return payload?.Results?
+                    .Where(item => item.Latitude.HasValue && item.Longitude.HasValue)
+                    .Select(MapLocationResponse)
+                    .ToList() ?? [];
+            },
+            new HybridCacheEntryOptions
+            {
+                Expiration = TimeSpan.FromMinutes(30),
+                LocalCacheExpiration = TimeSpan.FromMinutes(5)
+            },
             cancellationToken: cancellationToken);
-
-        if (payload?.Results is null || payload.Results.Count == 0)
-        {
-            return [];
-        }
-
-        return payload.Results
-            .Where(item => item.Latitude.HasValue && item.Longitude.HasValue)
-            .Select(MapLocationResponse)
-            .ToList();
     }
 
     private static LocationResponse MapLocationResponse(GeoapifyLocationItem item)

@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Configuration;
 using Threads.Application.DTOs.Gifs;
 using Threads.Application.Interfaces.Gifs;
@@ -14,11 +15,16 @@ public class GiphyGifSearchService : IGifSearchService
 
     private readonly HttpClient _httpClient;
     private readonly IConfiguration _configuration;
+    private readonly HybridCache _cache;
 
-    public GiphyGifSearchService(HttpClient httpClient, IConfiguration configuration)
+    public GiphyGifSearchService(
+        HttpClient httpClient,
+        IConfiguration configuration,
+        HybridCache cache)
     {
         _httpClient = httpClient;
         _configuration = configuration;
+        _cache = cache;
     }
 
     public async Task<IReadOnlyCollection<GifResponse>> SearchAsync(
@@ -39,43 +45,53 @@ public class GiphyGifSearchService : IGifSearchService
                 nameof(query));
         }
 
-        var apiKey = _configuration["GIPHY_API_KEY"];
-
-        if (string.IsNullOrWhiteSpace(apiKey))
-        {
-            throw new InvalidOperationException("GIPHY_API_KEY is not configured.");
-        }
-
         var rating = _configuration["GIPHY_RATING"];
-        var requestUri =
-            $"v1/gifs/search?api_key={Uri.EscapeDataString(apiKey)}" +
-            $"&q={Uri.EscapeDataString(normalizedQuery)}" +
-            $"&limit={DefaultLimit}" +
-            $"&rating={Uri.EscapeDataString(string.IsNullOrWhiteSpace(rating) ? DefaultRating : rating)}";
+        var effectiveRating = string.IsNullOrWhiteSpace(rating) ? DefaultRating : rating;
+        var cacheKey = $"giphy:search:{effectiveRating}:{normalizedQuery.ToLowerInvariant()}";
 
-        using var response = await _httpClient.GetAsync(requestUri, cancellationToken);
+        return await _cache.GetOrCreateAsync(
+            cacheKey,
+            async token =>
+            {
+                var apiKey = _configuration["GIPHY_API_KEY"];
 
-        if (!response.IsSuccessStatusCode)
-        {
-            throw new HttpRequestException(
-                $"GIPHY returned status code {(int)response.StatusCode}.",
-                null,
-                response.StatusCode);
-        }
+                if (string.IsNullOrWhiteSpace(apiKey))
+                {
+                    throw new InvalidOperationException("GIPHY_API_KEY is not configured.");
+                }
 
-        var payload = await response.Content.ReadFromJsonAsync<GiphySearchResponse>(cancellationToken: cancellationToken);
+                var requestUri =
+                    $"v1/gifs/search?api_key={Uri.EscapeDataString(apiKey)}" +
+                    $"&q={Uri.EscapeDataString(normalizedQuery)}" +
+                    $"&limit={DefaultLimit}" +
+                    $"&rating={Uri.EscapeDataString(effectiveRating)}";
 
-        if (payload?.Data is null || payload.Data.Count == 0)
-        {
-            return [];
-        }
+                using var response = await _httpClient.GetAsync(requestUri, token);
 
-        return payload.Data
-            .Where(item =>
-                !string.IsNullOrWhiteSpace(item.Id) &&
-                !string.IsNullOrWhiteSpace(item.Images?.Original?.Url))
-            .Select(MapGifResponse)
-            .ToList();
+                if (!response.IsSuccessStatusCode)
+                {
+                    throw new HttpRequestException(
+                        $"GIPHY returned status code {(int)response.StatusCode}.",
+                        null,
+                        response.StatusCode);
+                }
+
+                var payload = await response.Content.ReadFromJsonAsync<GiphySearchResponse>(
+                    cancellationToken: token);
+
+                return payload?.Data?
+                    .Where(item =>
+                        !string.IsNullOrWhiteSpace(item.Id) &&
+                        !string.IsNullOrWhiteSpace(item.Images?.Original?.Url))
+                    .Select(MapGifResponse)
+                    .ToList() ?? [];
+            },
+            new HybridCacheEntryOptions
+            {
+                Expiration = TimeSpan.FromMinutes(30),
+                LocalCacheExpiration = TimeSpan.FromMinutes(5)
+            },
+            cancellationToken: cancellationToken);
     }
 
     private static GifResponse MapGifResponse(GiphyGifItem item)

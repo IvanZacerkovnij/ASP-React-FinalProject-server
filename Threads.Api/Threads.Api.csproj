@@ -9,13 +9,11 @@
 
     <ItemGroup>
       <Folder Include="Controllers\" />
-      <Folder Include="Requests\" />
     </ItemGroup>
 
     <ItemGroup>
       <Compile Update="Controllers\FollowsController.cs" />
       <Compile Update="Controllers\MediaController.cs" />
-      <Compile Update="Requests\UploadMediaRequest.cs" />
     </ItemGroup>
 
     <ItemGroup>
@@ -25,6 +23,7 @@
         <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       </PackageReference>
       <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.10" />
+      <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.11" />
     </ItemGroup>
 
     <ItemGroup>
