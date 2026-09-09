@@ -95,7 +95,7 @@ public class FollowService : IFollowService
 
     private async Task InvalidateProfileCacheAsync(Guid followerId, Guid followingId)
     {
-        await UserProfileCache.TryRemoveAsync(
+        await CacheInvalidation.TryRemoveAsync(
             _cache,
             UserProfileCache.GetProfileKey(followerId),
             UserProfileCache.GetProfileKey(followingId));

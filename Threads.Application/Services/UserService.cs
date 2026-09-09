@@ -79,7 +79,7 @@ public class UserService : IUserService
 
         if (publicProfile is null)
         {
-            await UserProfileCache.TryRemoveAsync(_cache, cacheKey);
+            await CacheInvalidation.TryRemoveAsync(_cache, cacheKey);
             return null;
         }
 
@@ -112,7 +112,7 @@ public class UserService : IUserService
 
         if (!userId.HasValue)
         {
-            await UserProfileCache.TryRemoveAsync(_cache, cacheKey);
+            await CacheInvalidation.TryRemoveAsync(_cache, cacheKey);
             return null;
         }
 
@@ -120,7 +120,7 @@ public class UserService : IUserService
 
         if (user is null)
         {
-            await UserProfileCache.TryRemoveAsync(_cache, cacheKey);
+            await CacheInvalidation.TryRemoveAsync(_cache, cacheKey);
         }
 
         return user;
@@ -228,7 +228,7 @@ public class UserService : IUserService
                 user.BannerObjectKey),
             cancellationToken);
 
-        await UserProfileCache.TryRemoveAsync(_cache, UserProfileCache.GetProfileKey(id));
+        await CacheInvalidation.TryRemoveAsync(_cache, UserProfileCache.GetProfileKey(id));
 
         return MapUserResponse(user, id);
     }
@@ -250,10 +250,11 @@ public class UserService : IUserService
             .Distinct()
             .Select(UserProfileCache.GetProfileKey)
             .Append(UserProfileCache.GetUsernameKey(user.Username.ToLowerInvariant()))
+            .Concat(user.Posts.Select(post => PostCache.GetKey(post.Id)))
             .ToArray();
 
         await _userRepository.DeleteAsync(user, cancellationToken);
-        await UserProfileCache.TryRemoveAsync(
+        await CacheInvalidation.TryRemoveAsync(
             _cache,
             affectedProfileCacheKeys);
         await TryDeleteObjectsAsync(

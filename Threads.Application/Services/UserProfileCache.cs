@@ -4,8 +4,6 @@ namespace Threads.Application.Services;
 
 internal static class UserProfileCache
 {
-    private static readonly TimeSpan InvalidationTimeout = TimeSpan.FromSeconds(2);
-
     public static HybridCacheEntryOptions ProfileEntryOptions { get; } = new()
     {
         Expiration = TimeSpan.FromMinutes(5),
@@ -28,24 +26,4 @@ internal static class UserProfileCache
         return $"users:username:v1:{normalizedUsername}";
     }
 
-    public static async Task<bool> TryRemoveAsync(
-        HybridCache cache,
-        params string[] cacheKeys)
-    {
-        using var timeout = new CancellationTokenSource(InvalidationTimeout);
-
-        try
-        {
-            var removals = cacheKeys
-                .Distinct(StringComparer.Ordinal)
-                .Select(cacheKey => cache.RemoveAsync(cacheKey, timeout.Token).AsTask());
-
-            await Task.WhenAll(removals);
-            return true;
-        }
-        catch
-        {
-            return false;
-        }
-    }
 }

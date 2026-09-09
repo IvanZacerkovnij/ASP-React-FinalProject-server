@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Threads.Application.DTOs.Posts;
 using Threads.Application.Interfaces.Posts;
 using Threads.Domain.Entities;
 
@@ -167,6 +168,115 @@ public class PostRepository : IPostRepository
     {
         return await BuildPostQuery(trackChanges: true)
             .FirstOrDefaultAsync(post => post.Id == id, cancellationToken);
+    }
+
+    public async Task<PostReadModel?> GetReadModelByIdAsync(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Posts
+            .AsNoTracking()
+            .Where(post => post.Id == id)
+            .Select(post => new PostReadModel
+            {
+                Id = post.Id,
+                Content = post.Content,
+                AuthorId = post.AuthorId,
+                Media = post.Media
+                    .OrderBy(media => media.SortOrder)
+                    .Select(media => new PostMediaReadModel
+                    {
+                        Id = media.Id,
+                        StorageKey = media.StorageKey,
+                        ThumbnailStorageKey = media.ThumbnailStorageKey,
+                        FileName = media.FileName,
+                        ContentType = media.ContentType,
+                        Type = media.Type,
+                        SizeInBytes = media.SizeInBytes,
+                        Width = media.Width,
+                        Height = media.Height,
+                        DurationSeconds = media.DurationSeconds,
+                        SortOrder = media.SortOrder
+                    })
+                    .ToList(),
+                Poll = post.Poll == null
+                    ? null
+                    : new PostPollReadModel
+                    {
+                        Id = post.Poll.Id,
+                        EndsAt = post.Poll.EndsAt,
+                        Options = post.Poll.Options
+                            .OrderBy(option => option.Position)
+                            .Select(option => new PostPollOptionReadModel
+                            {
+                                Id = option.Id,
+                                Text = option.Text,
+                                Position = option.Position
+                            })
+                            .ToList()
+                    },
+                LocationPlaceId = post.LocationPlaceId,
+                LocationName = post.LocationName,
+                LocationCountry = post.LocationCountry,
+                LocationLatitude = post.LocationLatitude,
+                LocationLongitude = post.LocationLongitude,
+                EmbedUrl = post.EmbedUrl,
+                EmbedTitle = post.EmbedTitle,
+                EmbedDescription = post.EmbedDescription,
+                EmbedThumbnailUrl = post.EmbedThumbnailUrl,
+                CreatedAt = post.CreatedAt,
+                UpdatedAt = post.UpdatedAt
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<PostStateReadModel?> GetStateByIdAsync(
+        Guid id,
+        Guid? currentUserId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var hasCurrentUser = currentUserId.HasValue;
+        var effectiveCurrentUserId = currentUserId ?? Guid.Empty;
+
+        return await _dbContext.Posts
+            .AsNoTracking()
+            .Where(post => post.Id == id)
+            .Select(post => new PostStateReadModel
+            {
+                UpdatedAt = post.UpdatedAt,
+                LikesCount = post.Likes.Count,
+                CommentsCount = post.Comments.Count,
+                RepostsCount = post.Reposts.Count,
+                BookmarksCount = post.Bookmarks.Count,
+                ViewsCount = post.ViewsCount,
+                IsLikedByCurrentUser = hasCurrentUser &&
+                    post.Likes.Any(like => like.UserId == effectiveCurrentUserId),
+                IsRepostedByCurrentUser = hasCurrentUser &&
+                    post.Reposts.Any(repost => repost.UserId == effectiveCurrentUserId),
+                IsBookmarkedByCurrentUser = hasCurrentUser &&
+                    post.Bookmarks.Any(bookmark => bookmark.UserId == effectiveCurrentUserId),
+                Poll = post.Poll == null
+                    ? null
+                    : new PostPollStateReadModel
+                    {
+                        TotalVotes = post.Poll.Votes.Count,
+                        SelectedOptionId = hasCurrentUser
+                            ? post.Poll.Votes
+                                .Where(vote => vote.UserId == effectiveCurrentUserId)
+                                .Select(vote => (Guid?)vote.PollOptionId)
+                                .FirstOrDefault()
+                            : null,
+                        Options = post.Poll.Options
+                            .OrderBy(option => option.Position)
+                            .Select(option => new PostPollOptionStateReadModel
+                            {
+                                Id = option.Id,
+                                VotesCount = option.Votes.Count
+                            })
+                            .ToList()
+                    }
+            })
+            .FirstOrDefaultAsync(cancellationToken);
     }
 
     public async Task<int?> RecordViewAsync(Guid id, Guid viewerId, CancellationToken cancellationToken = default)

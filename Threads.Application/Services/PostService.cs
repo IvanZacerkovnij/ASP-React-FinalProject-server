@@ -6,6 +6,7 @@ using Threads.Application.DTOs.Posts;
 using Threads.Application.DTOs.Users;
 using Threads.Application.Interfaces.Media;
 using Threads.Application.Interfaces.Posts;
+using Threads.Application.Interfaces.Users;
 using Threads.Domain.Entities;
 
 namespace Threads.Application.Services;
@@ -22,6 +23,7 @@ public class PostService : IPostService
     private const int MaxEmbedDescriptionLength = 1000;
     private readonly IPostRepository _postRepository;
     private readonly IMediaRepository _mediaRepository;
+    private readonly IUserService _userService;
     private readonly IObjectStorageService _objectStorageService;
     private readonly IMapper _mapper;
     private readonly HybridCache _cache;
@@ -29,12 +31,14 @@ public class PostService : IPostService
     public PostService(
         IPostRepository postRepository,
         IMediaRepository mediaRepository,
+        IUserService userService,
         IObjectStorageService objectStorageService,
         IMapper mapper,
         HybridCache cache)
     {
         _postRepository = postRepository;
         _mediaRepository = mediaRepository;
+        _userService = userService;
         _objectStorageService = objectStorageService;
         _mapper = mapper;
         _cache = cache;
@@ -141,11 +145,53 @@ public class PostService : IPostService
         CancellationToken cancellationToken = default,
         Guid? currentUserId = null)
     {
-        var post = await _postRepository.GetByIdAsync(id, cancellationToken);
+        var cacheKey = PostCache.GetKey(id);
+        var post = await _cache.GetOrCreateAsync<PostReadModel?>(
+            cacheKey,
+            async token => await _postRepository.GetReadModelByIdAsync(id, token),
+            PostCache.EntryOptions,
+            cancellationToken: cancellationToken);
 
-        return post is null
-            ? null
-            : MapPostResponse(post, currentUserId);
+        if (post is null)
+        {
+            await CacheInvalidation.TryRemoveAsync(_cache, cacheKey);
+            return null;
+        }
+
+        var state = await _postRepository.GetStateByIdAsync(
+            id,
+            currentUserId,
+            cancellationToken);
+
+        if (state is null)
+        {
+            await CacheInvalidation.TryRemoveAsync(_cache, cacheKey);
+            return null;
+        }
+
+        if (post.UpdatedAt != state.UpdatedAt)
+        {
+            var refreshedPost = await _postRepository.GetReadModelByIdAsync(id, cancellationToken);
+
+            if (refreshedPost is null)
+            {
+                await CacheInvalidation.TryRemoveAsync(_cache, cacheKey);
+                return null;
+            }
+
+            post = refreshedPost;
+            await PostCache.TrySetAsync(_cache, cacheKey, post);
+        }
+
+        var author = await _userService.GetByIdAsync(post.AuthorId, cancellationToken);
+
+        if (author is null)
+        {
+            await CacheInvalidation.TryRemoveAsync(_cache, cacheKey);
+            return null;
+        }
+
+        return MapPostResponse(post, state, author);
     }
 
     public async Task<PostResponse> CreateAsync(
@@ -169,7 +215,7 @@ public class PostService : IPostService
         await ApplyMediaAsync(post, authorId, mediaIds, cancellationToken);
 
         await _postRepository.AddAsync(post, cancellationToken);
-        await UserProfileCache.TryRemoveAsync(_cache, UserProfileCache.GetProfileKey(authorId));
+        await CacheInvalidation.TryRemoveAsync(_cache, UserProfileCache.GetProfileKey(authorId));
 
         var createdPost = await _postRepository.GetByIdAsync(post.Id, cancellationToken);
 
@@ -227,6 +273,7 @@ public class PostService : IPostService
         post.UpdatedAt = DateTimeOffset.UtcNow;
 
         await _postRepository.UpdateAsync(post, cancellationToken);
+        await CacheInvalidation.TryRemoveAsync(_cache, PostCache.GetKey(post.Id));
 
         var updatedPost = await _postRepository.GetByIdAsync(post.Id, cancellationToken);
 
@@ -270,7 +317,10 @@ public class PostService : IPostService
             .ToArray();
 
         await _postRepository.DeleteAsync(post, cancellationToken);
-        await UserProfileCache.TryRemoveAsync(_cache, UserProfileCache.GetProfileKey(post.AuthorId));
+        await CacheInvalidation.TryRemoveAsync(
+            _cache,
+            PostCache.GetKey(post.Id),
+            UserProfileCache.GetProfileKey(post.AuthorId));
         await TryDeleteObjectsAsync(mediaStorageKeys, cancellationToken);
 
         return true;
@@ -586,6 +636,114 @@ public class PostService : IPostService
         };
     }
 
+    private PostResponse MapPostResponse(
+        PostReadModel post,
+        PostStateReadModel state,
+        UserResponse author)
+    {
+        return new PostResponse
+        {
+            Id = post.Id,
+            Content = post.Content ?? string.Empty,
+            Author = MapUserShortResponse(author),
+            Media = post.Media
+                .OrderBy(media => media.SortOrder)
+                .Select(media => new PostMediaResponse
+                {
+                    Id = media.Id,
+                    Type = ResolveMediaResponseType(media.ContentType, media.Type),
+                    Url = _objectStorageService.GetReadUrl(media.StorageKey),
+                    ThumbnailUrl = ResolveMediaThumbnailUrl(media),
+                    Width = media.Width,
+                    Height = media.Height,
+                    Duration = media.DurationSeconds,
+                    MimeType = media.ContentType,
+                    FileName = media.FileName,
+                    SizeInBytes = media.SizeInBytes,
+                    SortOrder = media.SortOrder
+                })
+                .ToList(),
+            Poll = MapPollResponse(post, state),
+            Location = string.IsNullOrWhiteSpace(post.LocationName)
+                ? null
+                : new PostLocationResponse
+                {
+                    Id = post.LocationPlaceId,
+                    Name = post.LocationName,
+                    Country = post.LocationCountry,
+                    Latitude = post.LocationLatitude,
+                    Longitude = post.LocationLongitude
+                },
+            Embed = string.IsNullOrWhiteSpace(post.EmbedUrl)
+                ? null
+                : new PostEmbedResponse
+                {
+                    Url = post.EmbedUrl,
+                    Title = post.EmbedTitle,
+                    Description = post.EmbedDescription,
+                    ThumbnailUrl = post.EmbedThumbnailUrl
+                },
+            LikesCount = state.LikesCount,
+            CommentsCount = state.CommentsCount,
+            RepostsCount = state.RepostsCount,
+            BookmarksCount = state.BookmarksCount,
+            ViewsCount = state.ViewsCount,
+            IsLikedByCurrentUser = state.IsLikedByCurrentUser,
+            IsRepostedByCurrentUser = state.IsRepostedByCurrentUser,
+            IsBookmarkedByCurrentUser = state.IsBookmarkedByCurrentUser,
+            ActionAt = null,
+            CreatedAt = post.CreatedAt.UtcDateTime,
+            UpdatedAt = post.UpdatedAt?.UtcDateTime
+        };
+    }
+
+    private static UserShortResponse MapUserShortResponse(UserResponse user)
+    {
+        return new UserShortResponse
+        {
+            Id = user.Id,
+            Username = user.Username,
+            DisplayName = user.DisplayName,
+            Location = user.Location,
+            AvatarUrl = user.AvatarUrl,
+            IsVerified = user.IsVerified
+        };
+    }
+
+    private static PollResponse? MapPollResponse(PostReadModel post, PostStateReadModel state)
+    {
+        if (post.Poll is null)
+        {
+            return null;
+        }
+
+        var pollState = state.Poll;
+        var optionStates = pollState?.Options.ToDictionary(option => option.Id)
+            ?? new Dictionary<Guid, PostPollOptionStateReadModel>();
+
+        return new PollResponse
+        {
+            Id = post.Poll.Id,
+            PostId = post.Id,
+            EndsAt = post.Poll.EndsAt?.UtcDateTime,
+            TotalVotes = pollState?.TotalVotes ?? 0,
+            HasVotedByCurrentUser = pollState?.SelectedOptionId.HasValue == true,
+            SelectedOptionId = pollState?.SelectedOptionId,
+            Options = post.Poll.Options
+                .OrderBy(option => option.Position)
+                .Select(option => new PollOptionResponse
+                {
+                    Id = option.Id,
+                    Text = option.Text,
+                    Position = option.Position,
+                    VotesCount = optionStates.TryGetValue(option.Id, out var optionState)
+                        ? optionState.VotesCount
+                        : 0
+                })
+                .ToList()
+        };
+    }
+
     private UserShortResponse MapUserShortResponse(User user)
     {
         var response = _mapper.Map<UserShortResponse>(user);
@@ -667,6 +825,20 @@ public class PostService : IPostService
     }
 
     private string? ResolveMediaThumbnailUrl(Media media)
+    {
+        if (!string.IsNullOrWhiteSpace(media.ThumbnailStorageKey))
+        {
+            return _objectStorageService.GetReadUrl(media.ThumbnailStorageKey);
+        }
+
+        var responseType = ResolveMediaResponseType(media.ContentType, media.Type);
+
+        return responseType is "image" or "gif"
+            ? _objectStorageService.GetReadUrl(media.StorageKey)
+            : null;
+    }
+
+    private string? ResolveMediaThumbnailUrl(PostMediaReadModel media)
     {
         if (!string.IsNullOrWhiteSpace(media.ThumbnailStorageKey))
         {
