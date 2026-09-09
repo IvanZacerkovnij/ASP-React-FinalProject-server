@@ -2,7 +2,7 @@
 
 Backend для соціального застосунку у стилі Threads, побудований на `ASP.NET Core Web API` з `PostgreSQL`, `EF Core`, `JWT`, `AWS S3` і обробкою медіа через `ffmpeg`.
 
-> Останнє оновлення документації: `2026-09-07`
+> Останнє оновлення документації: `2026-09-09 14:17 EEST`
 
 ## Зміст
 
@@ -204,89 +204,102 @@ dotnet ef database update \
 
 Базовий префікс: `api/`
 
+У колонці `Auth` значення `Так` означає, що endpoint вимагає Bearer access token. Публічні endpoint-и можуть використовувати переданий token для формування персоналізованих полів відповіді.
+
 ### Auth
 
-| Method | Route | Призначення |
-|---|---|---|
-| `POST` | `/api/auth/register` | Створення pending registration і надсилання verification code |
-| `POST` | `/api/auth/login` | Логін |
-| `POST` | `/api/auth/refresh` | Оновлення access token |
-| `POST` | `/api/auth/logout` | Відкликання refresh token |
-| `POST` | `/api/auth/verify-email` | Підтвердження email і фінальне створення користувача |
-| `POST` | `/api/auth/resend-verification-code` | Повторне надсилання verification code |
-| `POST` | `/api/auth/forgot-password` | Надсилання reset code |
-| `POST` | `/api/auth/verify-reset-code` | Перевірка reset code |
-| `POST` | `/api/auth/reset-password` | Скидання пароля |
-| `POST` | `/api/auth/change-password` | Зміна пароля з email confirmation |
-| `GET` | `/api/auth/me` | Поточний користувач |
+| Method | Route | Auth | Призначення |
+|---|---|---|---|
+| `POST` | `/api/auth/register` | Ні | Створити pending registration і надіслати verification code |
+| `POST` | `/api/auth/login` | Ні | Увійти й отримати access та refresh tokens |
+| `POST` | `/api/auth/refresh` | Ні | Оновити пару tokens за refresh token |
+| `POST` | `/api/auth/logout` | Ні | Відкликати refresh token |
+| `POST` | `/api/auth/forgot-password` | Ні | Надіслати password reset code |
+| `POST` | `/api/auth/verify-reset-code` | Ні | Перевірити password reset code |
+| `POST` | `/api/auth/reset-password` | Ні | Скинути пароль за підтвердженим code |
+| `POST` | `/api/auth/verify-email` | Ні | Підтвердити email і створити користувача |
+| `POST` | `/api/auth/resend-verification-code` | Ні | Повторно надіслати email verification code |
+| `POST` | `/api/auth/change-password` | Так | Змінити пароль з email confirmation |
 
-### Users і Follows
+### Users
 
-Оновлено `2026-09-09 11:58 EEST`: endpoint `GET /api/users/by-username/{username}` видалено, оскільки він повністю дублював логіку `GET /api/users/{username}`.
+Оновлено `2026-09-09 14:17 EEST`: профільні колекції доступні за username, а операції з поточним профілем згруповані під `/api/users/me`.
 
-Оновлено `2026-09-09 12:22 EEST`: endpoint `GET /api/users/{id}/posts` видалено, оскільки отримання постів автора вже виконує `GET /api/posts/user/{username}`.
+| Method | Route | Auth | Призначення |
+|---|---|---|---|
+| `GET` | `/api/users` | Ні | Отримати список користувачів |
+| `GET` | `/api/users/by-id/{id}` | Ні | Отримати профіль за `Guid` |
+| `GET` | `/api/users/by-username/{username}` | Ні | Отримати профіль за username |
+| `GET` | `/api/users/{username}/posts` | Ні | Отримати пости користувача |
+| `GET` | `/api/users/{username}/likes` | Ні | Отримати лайкнуті користувачем пости |
+| `GET` | `/api/users/{username}/reposts` | Ні | Отримати репости користувача |
+| `GET` | `/api/users/me` | Так | Отримати профіль поточного користувача |
+| `PUT` | `/api/users/me` | Так | Оновити профіль, avatar і banner через `multipart/form-data` |
+| `DELETE` | `/api/users/me` | Так | Видалити акаунт поточного користувача |
 
-| Method | Route | Призначення |
-|---|---|---|
-| `GET` | `/api/users` | Список користувачів |
-| `GET` | `/api/users/{id}` | Користувач за `Guid` |
-| `GET` | `/api/users/{username}` | Користувач за username |
-| `GET` | `/api/users/{username}/likes` | Лайкнуті пости користувача |
-| `GET` | `/api/users/{username}/reposts` | Репости користувача |
-| `PUT` | `/api/users/me` | Оновлення профілю, avatar, banner |
-| `DELETE` | `/api/users/me` | Видалення акаунта |
-| `POST` | `/api/follows/{userId}` | Підписатися |
-| `DELETE` | `/api/follows/{userId}` | Відписатися |
-| `GET` | `/api/follows/{userId}/followers` | Followers |
-| `GET` | `/api/follows/{userId}/following` | Following |
-| `DELETE` | `/api/follows/{userId}/followers/{followId}` | Видалити follower |
+### Posts
 
-### Posts і Comments
+| Method | Route | Auth | Призначення |
+|---|---|---|---|
+| `GET` | `/api/posts/feed` | Ні | Отримати публічну стрічку постів |
+| `GET` | `/api/posts` | Так | Отримати власні пости поточного користувача |
+| `GET` | `/api/posts/liked` | Так | Отримати лайкнуті пости поточного користувача |
+| `GET` | `/api/posts/bookmarked` | Так | Отримати збережені пости поточного користувача |
+| `GET` | `/api/posts/reposted` | Так | Отримати репости поточного користувача |
+| `GET` | `/api/posts/{id}` | Ні | Отримати пост за `Guid` |
+| `POST` | `/api/posts/{id}/view` | Так | Зареєструвати перегляд поста |
+| `POST` | `/api/posts/{id}/like` | Так | Поставити лайк посту |
+| `DELETE` | `/api/posts/{id}/like` | Так | Прибрати лайк із поста |
+| `POST` | `/api/posts/{id}/repost` | Так | Зробити repost поста |
+| `DELETE` | `/api/posts/{id}/repost` | Так | Скасувати repost поста |
+| `POST` | `/api/posts/{id}/bookmark` | Так | Додати пост у bookmarks |
+| `DELETE` | `/api/posts/{id}/bookmark` | Так | Прибрати пост із bookmarks |
+| `POST` | `/api/posts/{id}/poll/vote` | Так | Проголосувати в poll поста |
+| `POST` | `/api/posts` | Так | Створити пост |
+| `PUT` | `/api/posts/{id}` | Так | Оновити власний пост |
+| `DELETE` | `/api/posts/{id}` | Так | Видалити власний пост |
 
-Comments interactions and unified target entities updated: `2026-09-04`
+### Comments
 
-| Method | Route                         | Призначення |
-|---|-------------------------------|---|
-| `GET` | `/api/posts`                  | Усі пости |
-| `GET` | `/api/posts/feed`             | Стрічка |
-| `GET` | `/api/posts/liked`            | Лайкнуті пости поточного юзера |
-| `GET` | `/api/posts/bookmarks`        | Збережені пости поточного юзера |
-| `GET` | `/api/posts/reposted`         | Репости поточного юзера |
-| `GET` | `/api/posts/user/{username}`  | Пости автора |
-| `GET` | `/api/posts/{id}`             | Пост за `Guid` |
-| `POST` | `/api/posts/{id}/view`        | Зареєструвати перегляд |
-| `POST` | `/api/posts/{id}/like`        | Поставити лайк |
-| `DELETE` | `/api/posts/{id}/like`        | Прибрати лайк |
-| `POST` | `/api/posts/{id}/repost`      | Репост |
-| `DELETE` | `/api/posts/{id}/repost`      | Скасувати репост |
-| `POST` | `/api/posts/{id}/bookmark`    | Додати пост у bookmarks |
-| `DELETE` | `/api/posts/{id}/bookmark`    | Прибрати пост з bookmarks |
-| `POST` | `/api/posts/{id}/poll/vote`   | Проголосувати в poll |
-| `POST` | `/api/posts`                  | Створити пост |
-| `PUT` | `/api/posts/{id}`             | Оновити пост |
-| `DELETE` | `/api/posts/{id}`             | Видалити пост |
-| `GET` | `/api/comments/post/{postId}` | Коментарі поста |
-| `POST` | `/api/comments`               | Створити коментар |
-| `PUT` | `/api/comments/{id}`          | Оновити коментар |
-| `DELETE` | `/api/comments/{id}`          | Видалити коментар |
-| `POST` | `/api/comments/{id}/view`     | Зареєструвати перегляд коментаря |
-| `POST` | `/api/comments/{id}/like`     | Поставити лайк коментарю |
-| `DELETE` | `/api/comments/{id}/like`     | Прибрати лайк з коментаря |
-| `POST` | `/api/comments/{id}/repost`   | Репост коментаря |
-| `DELETE` | `/api/comments/{id}/repost`   | Скасувати репост коментаря |
-| `POST` | `/api/comments/{id}/bookmark` | Додати коментар у bookmarks |
-| `DELETE` | `/api/comments/{id}/bookmark` | Прибрати коментар з bookmarks |
+| Method | Route | Auth | Призначення |
+|---|---|---|---|
+| `GET` | `/api/comments/post/{postId}` | Ні | Отримати коментарі поста |
+| `POST` | `/api/comments` | Так | Створити коментар або відповідь |
+| `PUT` | `/api/comments/{id}` | Так | Оновити власний коментар |
+| `DELETE` | `/api/comments/{id}` | Так | Видалити власний коментар |
+| `POST` | `/api/comments/{id}/view` | Так | Зареєструвати перегляд коментаря |
+| `POST` | `/api/comments/{id}/like` | Так | Поставити лайк коментарю |
+| `DELETE` | `/api/comments/{id}/like` | Так | Прибрати лайк із коментаря |
+| `POST` | `/api/comments/{id}/repost` | Так | Зробити repost коментаря |
+| `DELETE` | `/api/comments/{id}/repost` | Так | Скасувати repost коментаря |
+| `POST` | `/api/comments/{id}/bookmark` | Так | Додати коментар у bookmarks |
+| `DELETE` | `/api/comments/{id}/bookmark` | Так | Прибрати коментар із bookmarks |
 
-### Search і Media
+### Follows
 
-| Method | Route | Призначення |
-|---|---|---|
-| `GET` | `/api/search/users?q=...` | Пошук користувачів |
-| `GET` | `/api/search/posts?q=...` | Пошук постів |
-| `GET` | `/api/search/gifs?q=...` | Пошук GIF |
-| `GET` | `/api/search/locations?q=...` | Пошук локацій |
-| `GET` | `/api/media/{id}` | Отримати presigned URL медіа |
-| `POST` | `/api/media/upload` | Завантажити файл |
+| Method | Route | Auth | Призначення |
+|---|---|---|---|
+| `POST` | `/api/follows/{userId}` | Так | Підписатися на користувача |
+| `DELETE` | `/api/follows/{userId}` | Так | Відписатися від користувача |
+| `GET` | `/api/follows/{userId}/followers` | Ні | Отримати followers користувача |
+| `GET` | `/api/follows/{userId}/following` | Ні | Отримати користувачів, на яких оформлена підписка |
+| `DELETE` | `/api/follows/{userId}/followers/{followId}` | Так | Видалити follower зі свого профілю |
+
+### Search
+
+| Method | Route | Auth | Призначення |
+|---|---|---|---|
+| `GET` | `/api/search/users?q=...` | Ні | Знайти користувачів |
+| `GET` | `/api/search/posts?q=...` | Ні | Знайти пости |
+| `GET` | `/api/search/gifs?q=...` | Ні | Знайти GIF через Giphy |
+| `GET` | `/api/search/locations?q=...` | Ні | Знайти локації через Geoapify |
+
+### Media
+
+| Method | Route | Auth | Призначення |
+|---|---|---|---|
+| `GET` | `/api/media/{id}` | Умовно | Отримати presigned URL прикріпленого медіа; неприкріплене доступне лише uploader-у |
+| `POST` | `/api/media/upload` | Так | Завантажити файл через `multipart/form-data` |
 
 ## Кешування
 
