@@ -297,6 +297,7 @@ dotnet ef database update \
 | Method | Route | Auth | Призначення |
 |---|---|---|---|
 | `GET` | `/api/comments/post/{postId}` | Ні | Отримати коментарі поста |
+| `GET` | `/api/comments/{id}` | Ні | Отримати коментар за `Guid` |
 | `POST` | `/api/comments` | Так | Створити коментар або відповідь |
 | `PUT` | `/api/comments/{id}` | Так | Оновити власний коментар |
 | `DELETE` | `/api/comments/{id}` | Так | Видалити власний коментар |

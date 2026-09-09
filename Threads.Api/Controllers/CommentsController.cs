@@ -45,12 +45,26 @@ public class CommentsController : ControllerBase
         try
         {
             var comment = await _commentService.CreateAsync(currentUserId.Value, request, cancellationToken);
-            return CreatedAtAction(nameof(GetByPostId), new { postId = comment.PostId }, comment);
+            return CreatedAtAction(nameof(GetById), new { id = comment.Id }, comment);
         }
         catch (InvalidOperationException exception)
         {
             return BadRequest(new { message = exception.Message });
         }
+    }
+
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<CommentResponse>> GetById(Guid id, CancellationToken cancellationToken)
+    {
+        var comment = await _commentService.GetByIdAsync(
+            id,
+            cancellationToken,
+            GetCurrentUserId());
+        if (comment is null)
+        {
+            return NotFound(new { message = "Comment was not found." });
+        }
+        return Ok(comment);
     }
 
     [Authorize]
