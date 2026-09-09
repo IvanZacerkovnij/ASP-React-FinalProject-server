@@ -48,24 +48,6 @@ public class UsersController : ControllerBase
             : Ok(user);
     }
 
-    [HttpGet("{id:guid}/posts")]
-    public async Task<ActionResult<IReadOnlyCollection<PostResponse>>> GetPostsByUser(
-        Guid id,
-        CancellationToken cancellationToken)
-    {
-        var user = await _userService.GetByIdAsync(id, cancellationToken);
-
-        if (user is null)
-        {
-            return NotFound(new { message = "User was not found." });
-        }
-
-        var currentUserId = GetCurrentUserId();
-        var posts = await _postService.GetByAuthorIdAsync(id, cancellationToken, currentUserId);
-
-        return Ok(posts);
-    }
-
     [HttpGet("{username}/likes")]
     public async Task<ActionResult<IReadOnlyCollection<PostResponse>>> GetLikedPostsByUsername(
         string username,
