@@ -8,6 +8,8 @@ public class UserResponse
 
     public required string Username { get; init; }
 
+    public string? Email { get; init; }
+
     public string? DisplayName { get; init; }
 
     public string? Bio { get; init; }

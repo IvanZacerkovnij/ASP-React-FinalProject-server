@@ -86,6 +86,17 @@ public class UserService : IUserService
         return await AddCurrentUserStateAsync(publicProfile, currentUserId, cancellationToken);
     }
 
+    public async Task<UserResponse?> GetMeAsync(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await _userRepository.GetByIdAsync(id, cancellationToken);
+
+        return user is null
+            ? null
+            : MapUserResponse(user, id);
+    }
+
     public async Task<UserResponse?> GetByUsernameAsync(
         string username,
         CancellationToken cancellationToken = default,
@@ -288,6 +299,7 @@ public class UserService : IUserService
         {
             Id = publicProfile.Id,
             Username = publicProfile.Username,
+            Email = null,
             DisplayName = publicProfile.DisplayName,
             Bio = publicProfile.Bio,
             DateOfBirth = publicProfile.DateOfBirth,
@@ -459,6 +471,7 @@ public class UserService : IUserService
         {
             Id = response.Id,
             Username = response.Username,
+            Email = response.Email,
             DisplayName = response.DisplayName,
             Location = MapLocation(
                 user.LocationPlaceId,

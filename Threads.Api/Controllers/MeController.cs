@@ -47,7 +47,7 @@ public class MeController : ControllerBase
             return Unauthorized(new { message = "Invalid token claims." });
         }
 
-        var user = await _userService.GetByIdAsync(userId.Value, cancellationToken);
+        var user = await _userService.GetMeAsync(userId.Value, cancellationToken);
 
         if (user is null)
         {

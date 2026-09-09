@@ -280,6 +280,8 @@ dotnet ef database update \
 | `GET` | `/api/me/reposts` | Так | Отримати репости постів і коментарів поточного користувача |
 | `POST` | `/api/me/change-password` | Так | Змінити пароль із підтвердженням через email code |
 
+`UserResponse` використовується і для публічного профілю, і для `/api/me`. Поле `email` є nullable: у відповідях `/api/users/...` воно завжди дорівнює `null`, а `GET /api/me` і успішний `PUT /api/me` повертають email поточного користувача. Приватний профіль завантажується окремо від кешованого публічного профілю, щоб email не потрапляв у public profile cache.
+
 #### Формат interaction collections
 
 Публічні profile collections `/api/users/{username}/likes` і `/api/users/{username}/reposts`, а також `/api/me/likes`, `/api/me/bookmarks` і `/api/me/reposts` повертають один об'єкт із двома типізованими колекціями:
