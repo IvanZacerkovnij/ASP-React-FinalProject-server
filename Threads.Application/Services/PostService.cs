@@ -78,7 +78,10 @@ public class PostService : IPostService
         var posts = await _postRepository.GetLikedByUserIdAsync(userId, cancellationToken);
 
         return posts
-            .Select(post => MapPostResponse(post, currentUserId))
+            .Select(post => MapPostResponse(
+                post,
+                currentUserId,
+                post.Likes.FirstOrDefault(like => like.UserId == userId)?.CreatedAt))
             .ToList();
     }
 
@@ -90,7 +93,10 @@ public class PostService : IPostService
         var posts = await _postRepository.GetBookmarkedByUserIdAsync(userId, cancellationToken);
 
         return posts
-            .Select(post => MapPostResponse(post, currentUserId))
+            .Select(post => MapPostResponse(
+                post,
+                currentUserId,
+                post.Bookmarks.FirstOrDefault(bookmark => bookmark.UserId == userId)?.CreatedAt))
             .ToList();
     }
 
@@ -102,7 +108,10 @@ public class PostService : IPostService
         var posts = await _postRepository.GetRepostedByUserIdAsync(userId, cancellationToken);
 
         return posts
-            .Select(post => MapPostResponse(post, currentUserId))
+            .Select(post => MapPostResponse(
+                post,
+                currentUserId,
+                post.Reposts.FirstOrDefault(repost => repost.UserId == userId)?.CreatedAt))
             .ToList();
     }
 
@@ -508,7 +517,10 @@ public class PostService : IPostService
         }
     }
 
-    private PostResponse MapPostResponse(Post post, Guid? currentUserId)
+    private PostResponse MapPostResponse(
+        Post post,
+        Guid? currentUserId,
+        DateTimeOffset? actionAt = null)
     {
         var response = _mapper.Map<PostResponse>(post);
 
@@ -562,6 +574,7 @@ public class PostService : IPostService
             IsLikedByCurrentUser = currentUserId.HasValue && post.Likes.Any(like => like.UserId == currentUserId.Value),
             IsRepostedByCurrentUser = currentUserId.HasValue && post.Reposts.Any(repost => repost.UserId == currentUserId.Value),
             IsBookmarkedByCurrentUser = currentUserId.HasValue && post.Bookmarks.Any(bookmark => bookmark.UserId == currentUserId.Value),
+            ActionAt = actionAt,
             CreatedAt = response.CreatedAt,
             UpdatedAt = response.UpdatedAt
         };

@@ -22,6 +22,7 @@ public class PostProfile : Profile
             .ForMember(destination => destination.IsLikedByCurrentUser, options => options.Ignore())
             .ForMember(destination => destination.IsRepostedByCurrentUser, options => options.Ignore())
             .ForMember(destination => destination.IsBookmarkedByCurrentUser, options => options.Ignore())
+            .ForMember(destination => destination.ActionAt, options => options.Ignore())
             .ForMember(destination => destination.CreatedAt, options => options.MapFrom(source => source.CreatedAt.UtcDateTime))
             .ForMember(destination => destination.UpdatedAt, options => options.MapFrom(source =>
                 source.UpdatedAt.HasValue ? source.UpdatedAt.Value.UtcDateTime : (DateTime?)null));

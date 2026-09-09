@@ -16,6 +16,7 @@ public class CommentProfile : Profile
             .ForMember(destination => destination.RepostsCount, options => options.MapFrom(source => source.Reposts.Count))
             .ForMember(destination => destination.IsRepostedByCurrentUser, options => options.Ignore())
             .ForMember(destination => destination.ViewsCount, options => options.MapFrom(source => source.Views.Count))
+            .ForMember(destination => destination.ActionAt, options => options.Ignore())
             .ForMember(destination => destination.CreatedAt, options => options.MapFrom(source => source.CreatedAt.UtcDateTime))
             .ForMember(destination => destination.UpdatedAt, options => options.MapFrom(source =>
                 source.UpdatedAt.HasValue ? source.UpdatedAt.Value.UtcDateTime : (DateTime?)null));

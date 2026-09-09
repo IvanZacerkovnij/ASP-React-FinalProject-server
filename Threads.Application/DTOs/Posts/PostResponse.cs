@@ -35,6 +35,8 @@ public class PostResponse
     
     public bool IsBookmarkedByCurrentUser { get; init; }
 
+    public DateTimeOffset? ActionAt { get; init; }
+
     public DateTime CreatedAt { get; init; }
 
     public DateTime? UpdatedAt { get; init; }

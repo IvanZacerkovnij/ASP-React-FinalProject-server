@@ -261,8 +261,8 @@ dotnet ef database update \
 | `GET` | `/api/users/by-id/{id}` | Ні | Отримати профіль за `Guid` |
 | `GET` | `/api/users/by-username/{username}` | Ні | Отримати профіль за username |
 | `GET` | `/api/users/{username}/posts` | Ні | Отримати пости користувача |
-| `GET` | `/api/users/{username}/likes` | Ні | Отримати лайкнуті користувачем пости |
-| `GET` | `/api/users/{username}/reposts` | Ні | Отримати репости користувача |
+| `GET` | `/api/users/{username}/likes` | Ні | Отримати лайкнуті користувачем пости та коментарі |
+| `GET` | `/api/users/{username}/reposts` | Ні | Отримати reposts постів і коментарів користувача |
 
 ### Me
 
@@ -281,22 +281,35 @@ dotnet ef database update \
 
 #### Формат interaction collections
 
-`GET /api/me/likes`, `GET /api/me/bookmarks` і `GET /api/me/reposts` повертають один об'єкт із двома типізованими колекціями:
+Публічні profile collections `/api/users/{username}/likes` і `/api/users/{username}/reposts`, а також `/api/me/likes`, `/api/me/bookmarks` і `/api/me/reposts` повертають один об'єкт із двома типізованими колекціями:
 
 ```json
 {
-  "posts": [],
-  "comments": []
+  "posts": [
+    {
+      "id": "00000000-0000-0000-0000-000000000000",
+      "actionAt": "2026-09-09T12:00:00+00:00"
+    }
+  ],
+  "comments": [
+    {
+      "id": "00000000-0000-0000-0000-000000000000",
+      "actionAt": "2026-09-09T11:30:00+00:00"
+    }
+  ]
 }
 ```
 
 - `posts` містить об'єкти `PostResponse`;
 - `comments` містить об'єкти `CommentResponse`;
+- `actionAt` містить UTC-час створення відповідного `Like`, `Bookmark` або `Repost`; у звичайних content endpoints це поле дорівнює `null`;
 - `/likes` використовує `UserLikesResponse`;
 - `/bookmarks` використовує `UserBookmarksResponse`;
 - `/reposts` використовує `UserRepostsResponse`;
 - кожна колекція окремо відсортована від найновішої взаємодії до найстарішої; спільного сортування між posts і comments немає;
-- персоналізовані поля `IsLikedByCurrentUser`, `IsBookmarkedByCurrentUser` і `IsRepostedByCurrentUser` формуються для поточного користувача.
+- клієнт може об'єднати `posts` і `comments` та відсортувати спільний список за `actionAt` у спадному порядку;
+- публічні endpoints не вимагають авторизації, але за наявності Bearer token персоналізовані поля формуються відносно поточного viewer-а;
+- bookmarks доступні лише власнику через `/api/me/bookmarks`.
 
 ### Posts
 

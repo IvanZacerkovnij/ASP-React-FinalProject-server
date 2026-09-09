@@ -72,7 +72,10 @@ public class CommentService : ICommentService
         var comments = await _commentRepository.GetBookmarkedByUserIdAsync(userId, cancellationToken);
 
         return comments
-            .Select(comment => MapCommentResponse(comment, currentUserId))
+            .Select(comment => MapCommentResponse(
+                comment,
+                currentUserId,
+                comment.Bookmarks.FirstOrDefault(bookmark => bookmark.UserId == userId)?.CreatedAt))
             .ToList();
     }
 
@@ -84,7 +87,10 @@ public class CommentService : ICommentService
         var comments = await _commentRepository.GetLikedByUserIdAsync(userId, cancellationToken);
 
         return comments
-            .Select(comment => MapCommentResponse(comment, currentUserId))
+            .Select(comment => MapCommentResponse(
+                comment,
+                currentUserId,
+                comment.Likes.FirstOrDefault(like => like.UserId == userId)?.CreatedAt))
             .ToList();
     }
 
@@ -96,7 +102,10 @@ public class CommentService : ICommentService
         var comments = await _commentRepository.GetRepostedByUserIdAsync(userId, cancellationToken);
 
         return comments
-            .Select(comment => MapCommentResponse(comment, currentUserId))
+            .Select(comment => MapCommentResponse(
+                comment,
+                currentUserId,
+                comment.Reposts.FirstOrDefault(repost => repost.UserId == userId)?.CreatedAt))
             .ToList();
     }
 
@@ -420,7 +429,10 @@ public class CommentService : ICommentService
             : MapCommentResponse(updatedComment, userId);
     }
 
-    private CommentResponse MapCommentResponse(Comment comment, Guid? currentUserId = null)
+    private CommentResponse MapCommentResponse(
+        Comment comment,
+        Guid? currentUserId = null,
+        DateTimeOffset? actionAt = null)
     {
         var response = _mapper.Map<CommentResponse>(comment);
 
@@ -441,6 +453,7 @@ public class CommentService : ICommentService
             IsRepostedByCurrentUser = currentUserId.HasValue &&
                 comment.Reposts.Any(repost => repost.UserId == currentUserId.Value),
             ViewsCount = response.ViewsCount,
+            ActionAt = actionAt,
             CreatedAt = response.CreatedAt,
             UpdatedAt = response.UpdatedAt
         };

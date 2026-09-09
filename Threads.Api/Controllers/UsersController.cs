@@ -1,7 +1,10 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
+using Threads.Application.DTOs.Likes;
 using Threads.Application.DTOs.Posts;
+using Threads.Application.DTOs.Reposts;
 using Threads.Application.DTOs.Users;
+using Threads.Application.Interfaces.Comments;
 using Threads.Application.Interfaces.Posts;
 using Threads.Application.Interfaces.Users;
 
@@ -13,11 +16,16 @@ public class UsersController : ControllerBase
 {
     private readonly IUserService _userService;
     private readonly IPostService _postService;
+    private readonly ICommentService _commentService;
 
-    public UsersController(IUserService userService, IPostService postService)
+    public UsersController(
+        IUserService userService,
+        IPostService postService,
+        ICommentService commentService)
     {
         _userService = userService;
         _postService = postService;
+        _commentService = commentService;
     }
 
     [HttpGet("by-id/{id:guid}")]
@@ -50,12 +58,15 @@ public class UsersController : ControllerBase
             return NotFound(new { message = "User was not found." });
         }
 
-        var posts = await _postService.GetByAuthorIdAsync(user.Id, cancellationToken);
+        var posts = await _postService.GetByAuthorIdAsync(
+            user.Id,
+            cancellationToken,
+            GetCurrentUserId());
         return Ok(posts);
     }
 
     [HttpGet("{username}/likes")]
-    public async Task<ActionResult<IReadOnlyCollection<PostResponse>>> GetLikedPostsByUsername(
+    public async Task<ActionResult<UserLikesResponse>> GetLikedByUsername(
         string username,
         CancellationToken cancellationToken)
     {
@@ -68,12 +79,17 @@ public class UsersController : ControllerBase
 
         var currentUserId = GetCurrentUserId();
         var posts = await _postService.GetLikedByUserIdAsync(user.Id, cancellationToken, currentUserId);
+        var comments = await _commentService.GetLikedByUserIdAsync(user.Id, cancellationToken, currentUserId);
 
-        return Ok(posts);
+        return Ok(new UserLikesResponse
+        {
+            Posts = posts,
+            Comments = comments
+        });
     }
 
     [HttpGet("{username}/reposts")]
-    public async Task<ActionResult<IReadOnlyCollection<PostResponse>>> GetRepostedPostsByUsername(
+    public async Task<ActionResult<UserRepostsResponse>> GetRepostedByUsername(
         string username,
         CancellationToken cancellationToken)
     {
@@ -86,8 +102,13 @@ public class UsersController : ControllerBase
 
         var currentUserId = GetCurrentUserId();
         var posts = await _postService.GetRepostedByUserIdAsync(user.Id, cancellationToken, currentUserId);
+        var comments = await _commentService.GetRepostedByUserIdAsync(user.Id, cancellationToken, currentUserId);
 
-        return Ok(posts);
+        return Ok(new UserRepostsResponse
+        {
+            Posts = posts,
+            Comments = comments
+        });
     }
 
     private Guid? GetCurrentUserId()
