@@ -1,10 +1,6 @@
-using System.Security.Claims;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Threads.Application.DTOs.Auth;
 using Threads.Application.Interfaces.Auth;
-using Threads.Application.Interfaces.Users;
-using Threads.Application.DTOs.Users;
 
 namespace Threads.Api.Controllers;
 
@@ -13,12 +9,10 @@ namespace Threads.Api.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
-    private readonly IUserService _userService;
 
-    public AuthController(IAuthService authService, IUserService userService)
+    public AuthController(IAuthService authService)
     {
         _authService = authService;
-        _userService = userService;
     }
 
     [HttpPost("register")]
@@ -166,59 +160,6 @@ public class AuthController : ControllerBase
             return wasSent
                 ? Ok(new { message = "Verification code has been sent to your email." })
                 : NotFound(new { message = "Pending registration was not found or expired." });
-        }
-        catch (ArgumentException exception)
-        {
-            return BadRequest(new { message = exception.Message });
-        }
-        catch (InvalidOperationException exception)
-        {
-            return BadRequest(new { message = exception.Message });
-        }
-    }
-
-    [Authorize]
-    [HttpPost("change-password")]
-    public async Task<IActionResult> ChangePassword(
-        ChangePasswordRequest request,
-        CancellationToken cancellationToken)
-    {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-
-        if (!Guid.TryParse(userId, out var parsedUserId))
-        {
-            return Unauthorized(new { message = "Invalid token claims." });
-        }
-
-        try
-        {
-            var result = await _authService.ChangePasswordAsync(parsedUserId, request, cancellationToken);
-
-            return result.Status switch
-            {
-                ChangePasswordStatus.ConfirmationCodeSent => Ok(new
-                {
-                    message = "Password change confirmation code has been sent to your email."
-                }),
-                ChangePasswordStatus.PasswordChanged => Ok(new
-                {
-                    message = "Password changed successfully."
-                }),
-                ChangePasswordStatus.UserNotFound => NotFound(new { message = "User was not found." }),
-                ChangePasswordStatus.InvalidCurrentPassword => BadRequest(new
-                {
-                    message = "Current password is invalid."
-                }),
-                ChangePasswordStatus.InvalidConfirmationCode => BadRequest(new
-                {
-                    message = "Confirmation code is invalid or expired."
-                }),
-                ChangePasswordStatus.NoPendingPasswordChange => Conflict(new
-                {
-                    message = "There is no pending password change request."
-                }),
-                _ => BadRequest(new { message = "Unable to change password." })
-            };
         }
         catch (ArgumentException exception)
         {

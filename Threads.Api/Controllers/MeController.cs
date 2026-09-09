@@ -2,8 +2,10 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Threads.Api.Requests.Users;
+using Threads.Application.DTOs.Auth;
 using Threads.Application.DTOs.Posts;
 using Threads.Application.DTOs.Users;
+using Threads.Application.Interfaces.Auth;
 using Threads.Application.Interfaces.Posts;
 using Threads.Application.Interfaces.Users;
 
@@ -11,18 +13,21 @@ namespace Threads.Api.Controllers;
 
 [ApiController]
 [Authorize]
-[Route("api/me")]
+[Route("api/[controller]")]
 public class MeController : ControllerBase
 {
     private readonly IUserService _userService;
     private readonly IPostService _postService;
+    private readonly IAuthService _authService;
     
     public MeController(
         IUserService userService,
-        IPostService postService)
+        IPostService postService,
+        IAuthService authService)
     {
         _userService = userService;
         _postService = postService;
+        _authService = authService;
     }
     
     [HttpGet]
@@ -192,6 +197,58 @@ public class MeController : ControllerBase
             currentUserId.Value);
 
         return Ok(posts);
+    }
+    
+    [HttpPost("change-password")]
+    public async Task<IActionResult> ChangePassword(
+        ChangePasswordRequest request,
+        CancellationToken cancellationToken)
+    {
+        var currentUserId = GetCurrentUserId();
+        
+        if (currentUserId is null)
+        {
+            return Unauthorized(new { message = "Invalid token claims." });
+        }
+        
+        try
+        {
+            var result = await _authService.ChangePasswordAsync(currentUserId.Value, request, cancellationToken);
+
+            return result.Status switch
+            {
+                ChangePasswordStatus.ConfirmationCodeSent => Ok(new
+                {
+                    message = "Password change confirmation code has been sent to your email."
+                }),
+                ChangePasswordStatus.PasswordChanged => Ok(new
+                {
+                    message = "Password changed successfully."
+                }),
+                ChangePasswordStatus.UserNotFound => NotFound(new { message = "User was not found." }),
+                ChangePasswordStatus.InvalidCurrentPassword => BadRequest(new
+                {
+                    message = "Current password is invalid."
+                }),
+                ChangePasswordStatus.InvalidConfirmationCode => BadRequest(new
+                {
+                    message = "Confirmation code is invalid or expired."
+                }),
+                ChangePasswordStatus.NoPendingPasswordChange => Conflict(new
+                {
+                    message = "There is no pending password change request."
+                }),
+                _ => BadRequest(new { message = "Unable to change password." })
+            };
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+        catch (InvalidOperationException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
     }
 
     private Guid? GetCurrentUserId()

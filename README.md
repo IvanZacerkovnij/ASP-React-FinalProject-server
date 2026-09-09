@@ -39,8 +39,8 @@ Backend для соціального застосунку у стилі Threads
 BackEndForFinalProject
 ├── Threads.Api
 │   ├── Controllers
-│   │   ├── AuthController.cs       # registration, login і password flows
-│   │   ├── MeController.cs         # профіль і колекції поточного користувача
+│   │   ├── AuthController.cs       # registration, sessions, verification і password recovery
+│   │   ├── MeController.cs         # профіль, колекції та пароль поточного користувача
 │   │   ├── UsersController.cs      # публічні профілі та їхні колекції
 │   │   ├── PostsController.cs      # пости та взаємодії з ними
 │   │   ├── CommentsController.cs   # коментарі та відповіді
@@ -107,6 +107,8 @@ BackEndForFinalProject
 ### 1. Підготуй `.env`
 
 Створи в корені репозиторію файл `.env` і заповни мінімальні змінні:
+
+> Не зберігай реальні паролі, API keys або connection strings у `appsettings*.json`. Для локальної розробки використовуй environment variables або .NET User Secrets, а випадково опубліковані credentials одразу відкликай і замінюй.
 
 ```env
 ASPNETCORE_ENVIRONMENT=Production
@@ -205,7 +207,7 @@ API стартує після успішного healthcheck Redis. Для Redis
 
 ### База даних
 
-У репозиторії є початкова EF Core migration від `2026-09-04`. Застосувати її можна командою:
+У репозиторії є початкова EF Core migration `20260909111719_Initial` від `2026-09-09`. Застосувати її можна командою:
 
 ```bash
 dotnet ef database update \
@@ -244,7 +246,6 @@ dotnet ef database update \
 | `POST` | `/api/auth/reset-password` | Ні | Скинути пароль за підтвердженим code |
 | `POST` | `/api/auth/verify-email` | Ні | Підтвердити email і створити користувача |
 | `POST` | `/api/auth/resend-verification-code` | Ні | Повторно надіслати email verification code |
-| `POST` | `/api/auth/change-password` | Так | Змінити пароль з email confirmation |
 
 ### Users
 
@@ -261,7 +262,7 @@ dotnet ef database update \
 
 ### Me
 
-Усі операції з авторизованим користувачем згруповані під `/api/me` і потребують Bearer access token.
+Основні операції з авторизованим користувачем згруповані під `/api/me` і потребують Bearer access token. Canonical-маршрут зміни пароля також знаходиться тут.
 
 | Method | Route | Auth | Призначення |
 |---|---|---|---|
@@ -272,6 +273,7 @@ dotnet ef database update \
 | `GET` | `/api/me/likes` | Так | Отримати лайкнуті пости поточного користувача |
 | `GET` | `/api/me/bookmarks` | Так | Отримати збережені пости поточного користувача |
 | `GET` | `/api/me/reposts` | Так | Отримати репости поточного користувача |
+| `POST` | `/api/me/change-password` | Так | Змінити пароль із підтвердженням через email code |
 
 ### Posts
 
@@ -364,6 +366,6 @@ dotnet ef database update \
 ## Примітки
 
 - Swagger у поточному проєкті не підключений.
-- README описує фактичні контролери й конфігурацію, які є в коді зараз.
+- README описує фактичні контролери, маршрути й конфігурацію, які є в коді зараз.
 - Для `Like`, `Bookmark`, `Repost` і `View` тепер використовується єдина сутність на `post` або `comment` target.
-- Останні зміни від `2026-09-07`: додано Redis, L1/L2-кешування Giphy та Geoapify, Redis healthcheck і початкову EF Core migration.
+- Останні зміни від `2026-09-09`: додано `MeController`, згруповано операції поточного користувача під `/api/me` та актуалізовано початкову EF Core migration.
