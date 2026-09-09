@@ -50,7 +50,12 @@ BackEndForFinalProject
 │   ├── Requests                    # HTTP-моделі для multipart/form-data
 │   └── Program.cs                  # entrypoint і DI-конфігурація API
 ├── Threads.Application
-│   ├── DTOs                        # request/response DTO бізнес-рівня
+│   ├── DTOs
+│   │   ├── Posts / Comments        # DTO публікацій і коментарів
+│   │   ├── Likes                   # combined response для лайкнутих targets
+│   │   ├── Bookmarks               # combined response для збережених targets
+│   │   ├── Reposts                 # combined response для repost targets
+│   │   └── Auth / Users / Media    # інші request/response DTO
 │   ├── Interfaces                  # контракти сервісів і репозиторіїв
 │   ├── Mapping                     # AutoMapper profiles
 │   ├── Services                    # бізнес-логіка застосунку
@@ -269,10 +274,29 @@ dotnet ef database update \
 | `PUT` | `/api/me` | Так | Оновити профіль, avatar і banner через `multipart/form-data` |
 | `DELETE` | `/api/me` | Так | Видалити акаунт поточного користувача |
 | `GET` | `/api/me/posts` | Так | Отримати власні пости поточного користувача |
-| `GET` | `/api/me/likes` | Так | Отримати лайкнуті пости поточного користувача |
-| `GET` | `/api/me/bookmarks` | Так | Отримати збережені пости поточного користувача |
-| `GET` | `/api/me/reposts` | Так | Отримати репости поточного користувача |
+| `GET` | `/api/me/likes` | Так | Отримати лайкнуті пости та коментарі поточного користувача |
+| `GET` | `/api/me/bookmarks` | Так | Отримати збережені пости та коментарі поточного користувача |
+| `GET` | `/api/me/reposts` | Так | Отримати репости постів і коментарів поточного користувача |
 | `POST` | `/api/me/change-password` | Так | Змінити пароль із підтвердженням через email code |
+
+#### Формат interaction collections
+
+`GET /api/me/likes`, `GET /api/me/bookmarks` і `GET /api/me/reposts` повертають один об'єкт із двома типізованими колекціями:
+
+```json
+{
+  "posts": [],
+  "comments": []
+}
+```
+
+- `posts` містить об'єкти `PostResponse`;
+- `comments` містить об'єкти `CommentResponse`;
+- `/likes` використовує `UserLikesResponse`;
+- `/bookmarks` використовує `UserBookmarksResponse`;
+- `/reposts` використовує `UserRepostsResponse`;
+- кожна колекція окремо відсортована від найновішої взаємодії до найстарішої; спільного сортування між posts і comments немає;
+- персоналізовані поля `IsLikedByCurrentUser`, `IsBookmarkedByCurrentUser` і `IsRepostedByCurrentUser` формуються для поточного користувача.
 
 ### Posts
 
@@ -368,4 +392,4 @@ dotnet ef database update \
 - Swagger у поточному проєкті не підключений.
 - README описує фактичні контролери, маршрути й конфігурацію, які є в коді зараз.
 - Для `Like`, `Bookmark`, `Repost` і `View` тепер використовується єдина сутність на `post` або `comment` target.
-- Останні зміни від `2026-09-09`: додано `MeController`, згруповано операції поточного користувача під `/api/me` та актуалізовано початкову EF Core migration.
+- Останні зміни від `2026-09-09`: `MeController` повертає likes, bookmarks і reposts постів та коментарів через єдині combined responses; для comment interactions додано окремі service/repository retrieval-ланцюжки.

@@ -3,9 +3,13 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Threads.Api.Requests.Users;
 using Threads.Application.DTOs.Auth;
+using Threads.Application.DTOs.Bookmarks;
+using Threads.Application.DTOs.Likes;
 using Threads.Application.DTOs.Posts;
+using Threads.Application.DTOs.Reposts;
 using Threads.Application.DTOs.Users;
 using Threads.Application.Interfaces.Auth;
+using Threads.Application.Interfaces.Comments;
 using Threads.Application.Interfaces.Posts;
 using Threads.Application.Interfaces.Users;
 
@@ -19,15 +23,18 @@ public class MeController : ControllerBase
     private readonly IUserService _userService;
     private readonly IPostService _postService;
     private readonly IAuthService _authService;
+    private readonly ICommentService _commentService;
     
     public MeController(
         IUserService userService,
         IPostService postService,
-        IAuthService authService)
+        IAuthService authService,
+        ICommentService commentService)
     {
         _userService = userService;
         _postService = postService;
         _authService = authService;
+        _commentService = commentService;
     }
     
     [HttpGet]
@@ -145,7 +152,7 @@ public class MeController : ControllerBase
     }
     
     [HttpGet("likes")]
-    public async Task<ActionResult<IReadOnlyCollection<PostResponse>>> GetLiked(CancellationToken cancellationToken)
+    public async Task<ActionResult<UserLikesResponse>> GetLiked(CancellationToken cancellationToken)
     {
         var currentUserId = GetCurrentUserId();
 
@@ -159,11 +166,20 @@ public class MeController : ControllerBase
             cancellationToken,
             currentUserId.Value);
 
-        return Ok(posts);
+        var comments = await _commentService.GetLikedByUserIdAsync(
+            currentUserId.Value,
+            cancellationToken,
+            currentUserId.Value);
+
+        return Ok(new UserLikesResponse
+        {
+            Posts = posts,
+            Comments = comments
+        });
     }
     
     [HttpGet("bookmarks")]
-    public async Task<ActionResult<IReadOnlyCollection<PostResponse>>> GetBookmarked(
+    public async Task<ActionResult<UserBookmarksResponse>> GetBookmarked(
         CancellationToken cancellationToken)
     {
         var currentUserId = GetCurrentUserId();
@@ -178,11 +194,20 @@ public class MeController : ControllerBase
             cancellationToken,
             currentUserId.Value);
 
-        return Ok(posts);
+        var comments = await _commentService.GetBookmarkedByUserIdAsync(
+            currentUserId.Value,
+            cancellationToken,
+            currentUserId.Value);
+
+        return Ok(new UserBookmarksResponse
+        {
+            Posts = posts,
+            Comments = comments
+        });
     }
     
     [HttpGet("reposts")]
-    public async Task<ActionResult<IReadOnlyCollection<PostResponse>>> GetReposted(CancellationToken cancellationToken)
+    public async Task<ActionResult<UserRepostsResponse>> GetReposted(CancellationToken cancellationToken)
     {
         var currentUserId = GetCurrentUserId();
 
@@ -196,7 +221,16 @@ public class MeController : ControllerBase
             cancellationToken,
             currentUserId.Value);
 
-        return Ok(posts);
+        var comments = await _commentService.GetRepostedByUserIdAsync(
+            currentUserId.Value,
+            cancellationToken,
+            currentUserId.Value);
+
+        return Ok(new UserRepostsResponse
+        {
+            Posts = posts,
+            Comments = comments
+        });
     }
     
     [HttpPost("change-password")]

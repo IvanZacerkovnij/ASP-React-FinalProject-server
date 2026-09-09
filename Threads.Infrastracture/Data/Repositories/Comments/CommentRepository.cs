@@ -42,6 +42,87 @@ public class CommentRepository : ICommentRepository
             .FirstOrDefaultAsync(comment => comment.Id == id, cancellationToken);
     }
 
+    public async Task<IReadOnlyCollection<Comment>> GetBookmarkedByUserIdAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        var bookmarkedCommentIds = await _dbContext.Bookmarks
+            .AsNoTracking()
+            .Where(bookmark =>
+                bookmark.UserId == userId &&
+                bookmark.CommentId.HasValue &&
+                bookmark.PostId == null)
+            .OrderByDescending(bookmark => bookmark.CreatedAt)
+            .Select(bookmark => bookmark.CommentId!.Value)
+            .ToListAsync(cancellationToken);
+
+        return await GetByOrderedIdsAsync(bookmarkedCommentIds, cancellationToken);
+    }
+
+    public async Task<IReadOnlyCollection<Comment>> GetLikedByUserIdAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        var likedCommentIds = await _dbContext.Likes
+            .AsNoTracking()
+            .Where(like =>
+                like.UserId == userId &&
+                like.CommentId.HasValue &&
+                like.PostId == null)
+            .OrderByDescending(like => like.CreatedAt)
+            .Select(like => like.CommentId!.Value)
+            .ToListAsync(cancellationToken);
+
+        return await GetByOrderedIdsAsync(likedCommentIds, cancellationToken);
+    }
+
+    public async Task<IReadOnlyCollection<Comment>> GetRepostedByUserIdAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        var repostedCommentIds = await _dbContext.Reposts
+            .AsNoTracking()
+            .Where(repost =>
+                repost.UserId == userId &&
+                repost.CommentId.HasValue &&
+                repost.PostId == null)
+            .OrderByDescending(repost => repost.CreatedAt)
+            .Select(repost => repost.CommentId!.Value)
+            .ToListAsync(cancellationToken);
+
+        return await GetByOrderedIdsAsync(repostedCommentIds.Distinct().ToList(), cancellationToken);
+    }
+
+    private async Task<IReadOnlyCollection<Comment>> GetByOrderedIdsAsync(
+        IReadOnlyCollection<Guid> commentIds,
+        CancellationToken cancellationToken)
+    {
+        if (commentIds.Count == 0)
+        {
+            return [];
+        }
+
+        var comments = await _dbContext.Comments
+            .AsNoTracking()
+            .AsSplitQuery()
+            .Include(comment => comment.Author)
+            .Include(comment => comment.Replies)
+            .Include(comment => comment.Likes)
+            .Include(comment => comment.Bookmarks)
+            .Include(comment => comment.Reposts)
+            .Include(comment => comment.Views)
+            .Where(comment => commentIds.Contains(comment.Id))
+            .ToListAsync(cancellationToken);
+
+        var commentOrder = commentIds
+            .Select((id, index) => new { id, index })
+            .ToDictionary(item => item.id, item => item.index);
+
+        return comments
+            .OrderBy(comment => commentOrder[comment.Id])
+            .ToList();
+    }
+
     public async Task AddAsync(Comment comment, CancellationToken cancellationToken = default)
     {
         await _dbContext.Comments.AddAsync(comment, cancellationToken);

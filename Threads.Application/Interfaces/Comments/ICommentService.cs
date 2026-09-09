@@ -12,6 +12,18 @@ public interface ICommentService
         Guid id,
         CancellationToken cancellationToken = default,
         Guid? currentUserId = null);
+    Task<IReadOnlyCollection<CommentResponse>> GetLikedByUserIdAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default,
+        Guid? currentUserId = null);
+    Task<IReadOnlyCollection<CommentResponse>> GetBookmarkedByUserIdAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default,
+        Guid? currentUserId = null);
+    Task<IReadOnlyCollection<CommentResponse>> GetRepostedByUserIdAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default,
+        Guid? currentUserId = null);
     Task<CommentResponse> CreateAsync(Guid authorId, CreateCommentRequest request, CancellationToken cancellationToken = default);
     Task<CommentResponse?> UpdateAsync(
         Guid id,

@@ -64,6 +64,42 @@ public class CommentService : ICommentService
             : MapCommentResponse(comment, currentUserId);
     }
 
+    public async Task<IReadOnlyCollection<CommentResponse>> GetBookmarkedByUserIdAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default,
+        Guid? currentUserId = null)
+    {
+        var comments = await _commentRepository.GetBookmarkedByUserIdAsync(userId, cancellationToken);
+
+        return comments
+            .Select(comment => MapCommentResponse(comment, currentUserId))
+            .ToList();
+    }
+
+    public async Task<IReadOnlyCollection<CommentResponse>> GetLikedByUserIdAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default,
+        Guid? currentUserId = null)
+    {
+        var comments = await _commentRepository.GetLikedByUserIdAsync(userId, cancellationToken);
+
+        return comments
+            .Select(comment => MapCommentResponse(comment, currentUserId))
+            .ToList();
+    }
+
+    public async Task<IReadOnlyCollection<CommentResponse>> GetRepostedByUserIdAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default,
+        Guid? currentUserId = null)
+    {
+        var comments = await _commentRepository.GetRepostedByUserIdAsync(userId, cancellationToken);
+
+        return comments
+            .Select(comment => MapCommentResponse(comment, currentUserId))
+            .ToList();
+    }
+
     public async Task<CommentResponse> CreateAsync(
         Guid authorId,
         CreateCommentRequest request,

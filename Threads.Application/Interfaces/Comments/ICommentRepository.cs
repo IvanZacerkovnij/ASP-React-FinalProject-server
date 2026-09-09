@@ -12,6 +12,18 @@ public interface ICommentRepository
         Guid id,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyCollection<Comment>> GetLikedByUserIdAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyCollection<Comment>> GetBookmarkedByUserIdAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyCollection<Comment>> GetRepostedByUserIdAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default);
+
     void AttachView(View view);
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
     Task AddAsync(Comment comment, CancellationToken cancellationToken = default);
