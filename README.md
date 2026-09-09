@@ -222,12 +222,13 @@ dotnet ef database update \
 
 ### Users і Follows
 
+Оновлено `2026-09-09 11:58 EEST`: endpoint `GET /api/users/by-username/{username}` видалено, оскільки він повністю дублював логіку `GET /api/users/{username}`.
+
 | Method | Route | Призначення |
 |---|---|---|
 | `GET` | `/api/users` | Список користувачів |
 | `GET` | `/api/users/{id}` | Користувач за `Guid` |
 | `GET` | `/api/users/{username}` | Користувач за username |
-| `GET` | `/api/users/by-username/{username}` | Явний route за username |
 | `GET` | `/api/users/{id}/posts` | Пости користувача |
 | `GET` | `/api/users/{username}/likes` | Лайкнуті пости користувача |
 | `GET` | `/api/users/{username}/reposts` | Репости користувача |

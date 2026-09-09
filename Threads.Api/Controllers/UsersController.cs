@@ -48,16 +48,6 @@ public class UsersController : ControllerBase
             : Ok(user);
     }
 
-    [HttpGet("by-username/{username}")]
-    public async Task<ActionResult<UserResponse>> GetByUsernameExplicit(string username, CancellationToken cancellationToken)
-    {
-        var user = await _userService.GetByUsernameAsync(username, cancellationToken, GetCurrentUserId());
-
-        return user is null
-            ? NotFound(new { message = "User was not found." })
-            : Ok(user);
-    }
-
     [HttpGet("{id:guid}/posts")]
     public async Task<ActionResult<IReadOnlyCollection<PostResponse>>> GetPostsByUser(
         Guid id,
