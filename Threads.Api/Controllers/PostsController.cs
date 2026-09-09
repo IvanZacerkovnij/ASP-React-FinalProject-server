@@ -72,19 +72,22 @@ public class PostsController : ControllerBase
         return Ok(posts);
     }
 
-    [HttpGet("user/{username}")]
-    public async Task<ActionResult<IReadOnlyCollection<PostResponse>>> GetByUsername(
-        string username,
+    [Authorize]
+    [HttpGet("bookmarked")]
+    public async Task<ActionResult<IReadOnlyCollection<PostResponse>>> GetBookmarked(
         CancellationToken cancellationToken)
     {
-        var user = await _userService.GetByUsernameAsync(username, cancellationToken, GetCurrentUserId());
+        var currentUserId = GetCurrentUserId();
 
-        if (user is null)
+        if (currentUserId is null)
         {
-            return NotFound(new { message = "User was not found." });
+            return Unauthorized(new { message = "Invalid token claims." });
         }
 
-        var posts = await _postService.GetByAuthorIdAsync(user.Id, cancellationToken, GetCurrentUserId());
+        var posts = await _postService.GetBookmarkedByUserIdAsync(
+            currentUserId.Value,
+            cancellationToken,
+            currentUserId.Value);
 
         return Ok(posts);
     }

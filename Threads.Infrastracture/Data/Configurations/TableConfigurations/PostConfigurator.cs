@@ -39,9 +39,6 @@ public class PostConfigurator : IEntityTypeConfiguration<Post>
         builder.Property(post => post.ViewsCount)
             .IsRequired();
 
-        builder.Property(post => post.RepostsCount)
-            .IsRequired();
-
         builder.Property(post => post.CreatedAt)
             .IsRequired();
 
@@ -49,11 +46,6 @@ public class PostConfigurator : IEntityTypeConfiguration<Post>
             table.HasCheckConstraint(
                 "CK_Posts_ViewsCount",
                 "\"ViewsCount\" >= 0"));
-
-        builder.ToTable(table =>
-            table.HasCheckConstraint(
-                "CK_Posts_RepostsCount",
-                "\"RepostsCount\" >= 0"));
 
         builder.HasIndex(post => post.AuthorId);
 

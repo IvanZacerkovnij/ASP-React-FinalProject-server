@@ -245,34 +245,35 @@ dotnet ef database update \
 
 Comments interactions and unified target entities updated: `2026-09-04`
 
-| Method | Route | Призначення |
-|---|---|---|
-| `GET` | `/api/posts` | Усі пости |
-| `GET` | `/api/posts/feed` | Стрічка |
-| `GET` | `/api/posts/liked` | Лайкнуті пости поточного юзера |
-| `GET` | `/api/posts/reposted` | Репости поточного юзера |
-| `GET` | `/api/posts/user/{username}` | Пости автора |
-| `GET` | `/api/posts/{id}` | Пост за `Guid` |
-| `POST` | `/api/posts/{id}/view` | Зареєструвати перегляд |
-| `POST` | `/api/posts/{id}/like` | Поставити лайк |
-| `DELETE` | `/api/posts/{id}/like` | Прибрати лайк |
-| `POST` | `/api/posts/{id}/repost` | Репост |
-| `DELETE` | `/api/posts/{id}/repost` | Скасувати репост |
-| `POST` | `/api/posts/{id}/bookmark` | Додати пост у bookmarks |
-| `DELETE` | `/api/posts/{id}/bookmark` | Прибрати пост з bookmarks |
-| `POST` | `/api/posts/{id}/poll/vote` | Проголосувати в poll |
-| `POST` | `/api/posts` | Створити пост |
-| `PUT` | `/api/posts/{id}` | Оновити пост |
-| `DELETE` | `/api/posts/{id}` | Видалити пост |
+| Method | Route                         | Призначення |
+|---|-------------------------------|---|
+| `GET` | `/api/posts`                  | Усі пости |
+| `GET` | `/api/posts/feed`             | Стрічка |
+| `GET` | `/api/posts/liked`            | Лайкнуті пости поточного юзера |
+| `GET` | `/api/posts/bookmarks`        | Збережені пости поточного юзера |
+| `GET` | `/api/posts/reposted`         | Репости поточного юзера |
+| `GET` | `/api/posts/user/{username}`  | Пости автора |
+| `GET` | `/api/posts/{id}`             | Пост за `Guid` |
+| `POST` | `/api/posts/{id}/view`        | Зареєструвати перегляд |
+| `POST` | `/api/posts/{id}/like`        | Поставити лайк |
+| `DELETE` | `/api/posts/{id}/like`        | Прибрати лайк |
+| `POST` | `/api/posts/{id}/repost`      | Репост |
+| `DELETE` | `/api/posts/{id}/repost`      | Скасувати репост |
+| `POST` | `/api/posts/{id}/bookmark`    | Додати пост у bookmarks |
+| `DELETE` | `/api/posts/{id}/bookmark`    | Прибрати пост з bookmarks |
+| `POST` | `/api/posts/{id}/poll/vote`   | Проголосувати в poll |
+| `POST` | `/api/posts`                  | Створити пост |
+| `PUT` | `/api/posts/{id}`             | Оновити пост |
+| `DELETE` | `/api/posts/{id}`             | Видалити пост |
 | `GET` | `/api/comments/post/{postId}` | Коментарі поста |
-| `POST` | `/api/comments` | Створити коментар |
-| `PUT` | `/api/comments/{id}` | Оновити коментар |
-| `DELETE` | `/api/comments/{id}` | Видалити коментар |
-| `POST` | `/api/comments/{id}/view` | Зареєструвати перегляд коментаря |
-| `POST` | `/api/comments/{id}/like` | Поставити лайк коментарю |
-| `DELETE` | `/api/comments/{id}/like` | Прибрати лайк з коментаря |
-| `POST` | `/api/comments/{id}/repost` | Репост коментаря |
-| `DELETE` | `/api/comments/{id}/repost` | Скасувати репост коментаря |
+| `POST` | `/api/comments`               | Створити коментар |
+| `PUT` | `/api/comments/{id}`          | Оновити коментар |
+| `DELETE` | `/api/comments/{id}`          | Видалити коментар |
+| `POST` | `/api/comments/{id}/view`     | Зареєструвати перегляд коментаря |
+| `POST` | `/api/comments/{id}/like`     | Поставити лайк коментарю |
+| `DELETE` | `/api/comments/{id}/like`     | Прибрати лайк з коментаря |
+| `POST` | `/api/comments/{id}/repost`   | Репост коментаря |
+| `DELETE` | `/api/comments/{id}/repost`   | Скасувати репост коментаря |
 | `POST` | `/api/comments/{id}/bookmark` | Додати коментар у bookmarks |
 | `DELETE` | `/api/comments/{id}/bookmark` | Прибрати коментар з bookmarks |
 

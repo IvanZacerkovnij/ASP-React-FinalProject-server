@@ -82,6 +82,18 @@ public class PostService : IPostService
             .ToList();
     }
 
+    public async Task<IReadOnlyCollection<PostResponse>> GetBookmarkedByUserIdAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default,
+        Guid? currentUserId = null)
+    {
+        var posts = await _postRepository.GetBookmarkedByUserIdAsync(userId, cancellationToken);
+
+        return posts
+            .Select(post => MapPostResponse(post, currentUserId))
+            .ToList();
+    }
+
     public async Task<IReadOnlyCollection<PostResponse>> GetRepostedByUserIdAsync(
         Guid userId,
         CancellationToken cancellationToken = default,

@@ -29,7 +29,7 @@ public class UsersController : ControllerBase
         return Ok(users);
     }
 
-    [HttpGet("{id:guid}")]
+    [HttpGet("by-id/{id:guid}")]
     public async Task<ActionResult<UserResponse>> GetById(Guid id, CancellationToken cancellationToken)
     {
         var user = await _userService.GetByIdAsync(id, cancellationToken, GetCurrentUserId());
@@ -38,7 +38,7 @@ public class UsersController : ControllerBase
             ? NotFound(new { message = "User was not found." })
             : Ok(user);
     }
-    [HttpGet("{username}")]
+    [HttpGet("by-username/{username}")]
     public async Task<ActionResult<UserResponse>> GetByUsername(string username, CancellationToken cancellationToken)
     {
         var user = await _userService.GetByUsernameAsync(username, cancellationToken, GetCurrentUserId());
@@ -46,6 +46,21 @@ public class UsersController : ControllerBase
         return user is null
             ? NotFound(new { message = "User was not found." })
             : Ok(user);
+    }
+
+    [HttpGet("{username}/posts")]
+    public async Task<ActionResult<IReadOnlyCollection<PostResponse>>> GetPostsByUsername(
+        string username,
+        CancellationToken cancellationToken)
+    {
+        var user = await _userService.GetByUsernameAsync(username, cancellationToken);
+        if (user is null)
+        {
+            return NotFound(new { message = "User was not found." });
+        }
+         
+        var posts = _postService.GetByAuthorIdAsync(user.Id, cancellationToken).GetAwaiter().GetResult();
+        return Ok(posts);
     }
 
     [HttpGet("{username}/likes")]

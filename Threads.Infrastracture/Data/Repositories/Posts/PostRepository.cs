@@ -84,6 +84,35 @@ public class PostRepository : IPostRepository
             .ToList();
     }
 
+    public async Task<IReadOnlyCollection<Post>> GetBookmarkedByUserIdAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        var bookmarkedPostIds = await _dbContext.Bookmarks
+            .AsNoTracking()
+            .Where(bookmark => bookmark.UserId == userId && bookmark.PostId.HasValue && bookmark.CommentId == null)
+            .OrderByDescending(bookmark => bookmark.CreatedAt)
+            .Select(bookmark => bookmark.PostId!.Value)
+            .ToListAsync(cancellationToken);
+
+        if (bookmarkedPostIds.Count == 0)
+        {
+            return [];
+        }
+
+        var posts = await BuildPostQuery(trackChanges: false)
+            .Where(post => bookmarkedPostIds.Contains(post.Id))
+            .ToListAsync(cancellationToken);
+
+        var postOrder = bookmarkedPostIds
+            .Select((id, index) => new { id, index })
+            .ToDictionary(item => item.id, item => item.index);
+
+        return posts
+            .OrderBy(post => postOrder[post.Id])
+            .ToList();
+    }
+
     public async Task<IReadOnlyCollection<Post>> GetRepostedByUserIdAsync(
         Guid userId,
         CancellationToken cancellationToken = default)

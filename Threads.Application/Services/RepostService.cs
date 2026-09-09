@@ -31,8 +31,6 @@ public class RepostService : IRepostService
             return false;
         }
 
-        post.RepostsCount++;
-
         var repost = new Repost
         {
             UserId = userId,
@@ -46,7 +44,6 @@ public class RepostService : IRepostService
         }
         catch (Exception exception) when (IsDuplicateWriteException(exception))
         {
-            post.RepostsCount--;
             return false;
         }
 
@@ -60,13 +57,6 @@ public class RepostService : IRepostService
         if (repost is null)
         {
             return false;
-        }
-
-        var post = await _postRepository.GetByIdAsync(postId, cancellationToken);
-
-        if (post is not null && post.RepostsCount > 0)
-        {
-            post.RepostsCount--;
         }
 
         await _repostRepository.DeleteAsync(repost, cancellationToken);

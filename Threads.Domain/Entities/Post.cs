@@ -27,8 +27,6 @@ public class Post : BaseEntity
 
     public int ViewsCount { get; set; }
 
-    public int RepostsCount { get; set; }
-
     public Guid AuthorId { get; set; }
 
     public User Author { get; set; } = null!;
