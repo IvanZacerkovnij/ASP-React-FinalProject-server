@@ -471,7 +471,6 @@ public class UserService : IUserService
         {
             Id = response.Id,
             Username = response.Username,
-            Email = response.Email,
             DisplayName = response.DisplayName,
             Location = MapLocation(
                 user.LocationPlaceId,
@@ -494,6 +493,7 @@ public class UserService : IUserService
         {
             Id = response.Id,
             Username = response.Username,
+            Email = response.Email,
             DisplayName = response.DisplayName,
             Bio = response.Bio,
             DateOfBirth = response.DateOfBirth,
