@@ -13,12 +13,6 @@ public class UserRepository : IUserRepository
         _dbContext = dbContext;
     }
 
-    public async Task<IReadOnlyCollection<User>> GetAllAsync(CancellationToken cancellationToken = default)
-    {
-        return await BuildUserQuery(trackChanges: false)
-            .ToListAsync(cancellationToken);
-    }
-
     public async Task<IReadOnlyCollection<User>> SearchAsync(
         string query,
         int take = 20,

@@ -39,17 +39,6 @@ public class UserService : IUserService
         _mapper = mapper;
     }
 
-    public async Task<IReadOnlyCollection<UserShortResponse>> GetAllAsync(
-        CancellationToken cancellationToken = default,
-        Guid? currentUserId = null)
-    {
-        var users = await _userRepository.GetAllAsync(cancellationToken);
-
-        return users
-            .Select(MapUserShortResponse)
-            .ToList();
-    }
-
     public async Task<IReadOnlyCollection<UserShortResponse>> SearchAsync(
         string query,
         CancellationToken cancellationToken = default,

@@ -4,7 +4,6 @@ namespace Threads.Application.Interfaces.Users;
 
 public interface IUserRepository
 {
-    Task<IReadOnlyCollection<User>> GetAllAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyCollection<User>> SearchAsync(string query, int take = 20, CancellationToken cancellationToken = default);
     Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default);

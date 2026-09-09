@@ -1,7 +1,5 @@
 using System.Security.Claims;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Threads.Api.Requests.Users;
 using Threads.Application.DTOs.Posts;
 using Threads.Application.DTOs.Users;
 using Threads.Application.Interfaces.Posts;
@@ -20,13 +18,6 @@ public class UsersController : ControllerBase
     {
         _userService = userService;
         _postService = postService;
-    }
-
-    [HttpGet]
-    public async Task<ActionResult<IReadOnlyCollection<UserShortResponse>>> GetAll(CancellationToken cancellationToken)
-    {
-        var users = await _userService.GetAllAsync(cancellationToken, GetCurrentUserId());
-        return Ok(users);
     }
 
     [HttpGet("by-id/{id:guid}")]

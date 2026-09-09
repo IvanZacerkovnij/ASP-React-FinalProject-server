@@ -253,7 +253,6 @@ dotnet ef database update \
 
 | Method | Route | Auth | Призначення |
 |---|---|---|---|
-| `GET` | `/api/users` | Ні | Отримати список користувачів |
 | `GET` | `/api/users/by-id/{id}` | Ні | Отримати профіль за `Guid` |
 | `GET` | `/api/users/by-username/{username}` | Ні | Отримати профіль за username |
 | `GET` | `/api/users/{username}/posts` | Ні | Отримати пости користувача |
