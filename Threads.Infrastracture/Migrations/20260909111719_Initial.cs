@@ -106,7 +106,6 @@ namespace Threads.Infrastracture.Migrations
                     EmbedDescription = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
                     EmbedThumbnailUrl = table.Column<string>(type: "character varying(2048)", maxLength: 2048, nullable: true),
                     ViewsCount = table.Column<int>(type: "integer", nullable: false),
-                    RepostsCount = table.Column<int>(type: "integer", nullable: false),
                     AuthorId = table.Column<Guid>(type: "uuid", nullable: false),
                     CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
@@ -114,7 +113,6 @@ namespace Threads.Infrastracture.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Posts", x => x.Id);
-                    table.CheckConstraint("CK_Posts_RepostsCount", "\"RepostsCount\" >= 0");
                     table.CheckConstraint("CK_Posts_ViewsCount", "\"ViewsCount\" >= 0");
                     table.ForeignKey(
                         name: "FK_Posts_Users_AuthorId",

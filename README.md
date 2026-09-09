@@ -2,7 +2,7 @@
 
 Backend для соціального застосунку у стилі Threads, побудований на `ASP.NET Core Web API` з `PostgreSQL`, `EF Core`, `JWT`, `AWS S3` і обробкою медіа через `ffmpeg`.
 
-> Останнє оновлення документації: `2026-09-09 14:17 EEST`
+> Останнє оновлення документації: `2026-09-09`
 
 ## Зміст
 
@@ -37,14 +37,39 @@ Backend для соціального застосунку у стилі Threads
 
 ```text
 BackEndForFinalProject
-├── Threads.Api               # controllers, entrypoint, HTTP layer
-├── Threads.Application       # DTOs, interfaces, business services
-├── Threads.Domain            # domain entities
-├── Threads.Infrastracture    # EF Core, repositories, integrations, security
-│   └── Migrations            # EF Core migrations і model snapshot
-├── deploy/nginx              # nginx config for reverse proxy
-├── Dockerfile
-└── docker-compose.yml
+├── Threads.Api
+│   ├── Controllers
+│   │   ├── AuthController.cs       # registration, login і password flows
+│   │   ├── MeController.cs         # профіль і колекції поточного користувача
+│   │   ├── UsersController.cs      # публічні профілі та їхні колекції
+│   │   ├── PostsController.cs      # пости та взаємодії з ними
+│   │   ├── CommentsController.cs   # коментарі та відповіді
+│   │   ├── FollowsController.cs    # followers і following
+│   │   ├── SearchController.cs     # пошук користувачів, постів, GIF і локацій
+│   │   └── MediaController.cs      # upload і доступ до медіа
+│   ├── Requests                    # HTTP-моделі для multipart/form-data
+│   └── Program.cs                  # entrypoint і DI-конфігурація API
+├── Threads.Application
+│   ├── DTOs                        # request/response DTO бізнес-рівня
+│   ├── Interfaces                  # контракти сервісів і репозиторіїв
+│   ├── Mapping                     # AutoMapper profiles
+│   ├── Services                    # бізнес-логіка застосунку
+│   └── Exceptions                  # application exceptions
+├── Threads.Domain
+│   ├── Common                      # базові domain-моделі
+│   ├── Entities                    # EF/domain entities
+│   └── Enums                       # domain enums
+├── Threads.Infrastracture
+│   ├── Data
+│   │   ├── Configurations          # EF Core і table configurations
+│   │   └── Repositories            # реалізації repository interfaces
+│   ├── Migrations                  # EF Core migrations і model snapshot
+│   ├── Security                    # JWT, password hashing, CORS і policies
+│   └── Services                    # S3, Redis, email, GIF, location і ffmpeg
+├── deploy/nginx                    # nginx reverse proxy configuration
+├── Dockerfile                      # образ API
+├── docker-compose.yml              # API та Redis для локального запуску
+└── BackEndForFinalProject.sln      # solution file
 ```
 
 ### Архітектурний потік
@@ -223,7 +248,7 @@ dotnet ef database update \
 
 ### Users
 
-Оновлено `2026-09-09 14:17 EEST`: профільні колекції доступні за username, а операції з поточним профілем згруповані під `/api/users/me`.
+Публічні профілі та їхні колекції доступні за `id` або `username`.
 
 | Method | Route | Auth | Призначення |
 |---|---|---|---|
@@ -233,19 +258,26 @@ dotnet ef database update \
 | `GET` | `/api/users/{username}/posts` | Ні | Отримати пости користувача |
 | `GET` | `/api/users/{username}/likes` | Ні | Отримати лайкнуті користувачем пости |
 | `GET` | `/api/users/{username}/reposts` | Ні | Отримати репости користувача |
-| `GET` | `/api/users/me` | Так | Отримати профіль поточного користувача |
-| `PUT` | `/api/users/me` | Так | Оновити профіль, avatar і banner через `multipart/form-data` |
-| `DELETE` | `/api/users/me` | Так | Видалити акаунт поточного користувача |
+
+### Me
+
+Усі операції з авторизованим користувачем згруповані під `/api/me` і потребують Bearer access token.
+
+| Method | Route | Auth | Призначення |
+|---|---|---|---|
+| `GET` | `/api/me` | Так | Отримати профіль поточного користувача |
+| `PUT` | `/api/me` | Так | Оновити профіль, avatar і banner через `multipart/form-data` |
+| `DELETE` | `/api/me` | Так | Видалити акаунт поточного користувача |
+| `GET` | `/api/me/posts` | Так | Отримати власні пости поточного користувача |
+| `GET` | `/api/me/likes` | Так | Отримати лайкнуті пости поточного користувача |
+| `GET` | `/api/me/bookmarks` | Так | Отримати збережені пости поточного користувача |
+| `GET` | `/api/me/reposts` | Так | Отримати репости поточного користувача |
 
 ### Posts
 
 | Method | Route | Auth | Призначення |
 |---|---|---|---|
 | `GET` | `/api/posts/feed` | Ні | Отримати публічну стрічку постів |
-| `GET` | `/api/posts` | Так | Отримати власні пости поточного користувача |
-| `GET` | `/api/posts/liked` | Так | Отримати лайкнуті пости поточного користувача |
-| `GET` | `/api/posts/bookmarked` | Так | Отримати збережені пости поточного користувача |
-| `GET` | `/api/posts/reposted` | Так | Отримати репости поточного користувача |
 | `GET` | `/api/posts/{id}` | Ні | Отримати пост за `Guid` |
 | `POST` | `/api/posts/{id}/view` | Так | Зареєструвати перегляд поста |
 | `POST` | `/api/posts/{id}/like` | Так | Поставити лайк посту |

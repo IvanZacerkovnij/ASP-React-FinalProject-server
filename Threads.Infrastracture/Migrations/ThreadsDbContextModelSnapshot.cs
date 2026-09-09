@@ -440,9 +440,6 @@ namespace Threads.Infrastracture.Migrations
                         .HasMaxLength(1024)
                         .HasColumnType("character varying(1024)");
 
-                    b.Property<int>("RepostsCount")
-                        .HasColumnType("integer");
-
                     b.Property<DateTimeOffset?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -455,8 +452,6 @@ namespace Threads.Infrastracture.Migrations
 
                     b.ToTable("Posts", null, t =>
                         {
-                            t.HasCheckConstraint("CK_Posts_RepostsCount", "\"RepostsCount\" >= 0");
-
                             t.HasCheckConstraint("CK_Posts_ViewsCount", "\"ViewsCount\" >= 0");
                         });
                 });

@@ -8,10 +8,6 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <Folder Include="Controllers\" />
-    </ItemGroup>
-
-    <ItemGroup>
       <Compile Update="Controllers\FollowsController.cs" />
       <Compile Update="Controllers\MediaController.cs" />
     </ItemGroup>
