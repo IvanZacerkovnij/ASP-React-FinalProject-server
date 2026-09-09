@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Threads.Application.DTOs.Users;
 using Threads.Application.Interfaces.Users;
 using Threads.Domain.Entities;
 
@@ -35,6 +36,36 @@ public class UserRepository : IUserRepository
             .FirstOrDefaultAsync(user => user.Id == id, cancellationToken);
     }
 
+    public async Task<UserProfileReadModel?> GetProfileByIdAsync(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Users
+            .AsNoTracking()
+            .Where(user => user.Id == id)
+            .Select(user => new UserProfileReadModel
+            {
+                Id = user.Id,
+                Username = user.Username,
+                DisplayName = user.DisplayName,
+                Bio = user.Bio,
+                DateOfBirth = user.DateOfBirth,
+                LocationPlaceId = user.LocationPlaceId,
+                LocationName = user.Location,
+                LocationCountry = user.LocationCountry,
+                LocationLatitude = user.LocationLatitude,
+                LocationLongitude = user.LocationLongitude,
+                AvatarObjectKey = user.AvatarObjectKey,
+                BannerObjectKey = user.BannerObjectKey,
+                FollowersCount = user.FollowerRelations.Count,
+                FollowingCount = user.FollowingRelations.Count,
+                PostsCount = user.Posts.Count,
+                IsVerified = user.IsVerified,
+                CreatedAt = user.CreatedAt
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     public async Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
         var normalizedEmail = email.ToLower();
@@ -49,6 +80,17 @@ public class UserRepository : IUserRepository
 
         return await BuildUserQuery(trackChanges: false)
             .FirstOrDefaultAsync(user => user.Username.ToLower() == normalizedUsername, cancellationToken);
+    }
+
+    public async Task<Guid?> GetIdByUsernameAsync(string username, CancellationToken cancellationToken = default)
+    {
+        var normalizedUsername = username.ToLowerInvariant();
+
+        return await _dbContext.Users
+            .AsNoTracking()
+            .Where(user => user.Username == normalizedUsername)
+            .Select(user => (Guid?)user.Id)
+            .FirstOrDefaultAsync(cancellationToken);
     }
 
     public async Task AddAsync(User user, CancellationToken cancellationToken = default)

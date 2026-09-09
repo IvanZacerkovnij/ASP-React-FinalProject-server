@@ -1,6 +1,8 @@
 using AutoMapper;
+using Microsoft.Extensions.Caching.Hybrid;
 using Threads.Application.DTOs.Locations;
 using Threads.Application.DTOs.Users;
+using Threads.Application.Interfaces.Follows;
 using Threads.Application.Interfaces.Media;
 using Threads.Application.Interfaces.Users;
 using Threads.Domain.Entities;
@@ -17,6 +19,7 @@ public class UserService : IUserService
     };
 
     private const long MaxImageSizeInBytes = 10 * 1024 * 1024;
+    private const int MaxUsernameLength = 50;
     private const int MaxDisplayNameLength = 100;
     private const int MaxBioLength = 500;
     private const int MaxLocationLength = 255;
@@ -24,19 +27,25 @@ public class UserService : IUserService
     private const int MaxLocationIdLength = 1024;
     private readonly IMediaRepository _mediaRepository;
     private readonly IUserRepository _userRepository;
+    private readonly IFollowRepository _followRepository;
     private readonly IObjectStorageService _objectStorageService;
     private readonly IMapper _mapper;
+    private readonly HybridCache _cache;
 
     public UserService(
         IUserRepository userRepository,
+        IFollowRepository followRepository,
         IMediaRepository mediaRepository,
         IObjectStorageService objectStorageService,
-        IMapper mapper)
+        IMapper mapper,
+        HybridCache cache)
     {
         _userRepository = userRepository;
+        _followRepository = followRepository;
         _mediaRepository = mediaRepository;
         _objectStorageService = objectStorageService;
         _mapper = mapper;
+        _cache = cache;
     }
 
     public async Task<IReadOnlyCollection<UserShortResponse>> SearchAsync(
@@ -61,11 +70,20 @@ public class UserService : IUserService
         CancellationToken cancellationToken = default,
         Guid? currentUserId = null)
     {
-        var user = await _userRepository.GetByIdAsync(id, cancellationToken);
+        var cacheKey = UserProfileCache.GetProfileKey(id);
+        var publicProfile = await _cache.GetOrCreateAsync<UserProfileReadModel?>(
+            cacheKey,
+            async token => await _userRepository.GetProfileByIdAsync(id, token),
+            UserProfileCache.ProfileEntryOptions,
+            cancellationToken: cancellationToken);
 
-        return user is null
-            ? null
-            : MapUserResponse(user, currentUserId);
+        if (publicProfile is null)
+        {
+            await UserProfileCache.TryRemoveAsync(_cache, cacheKey);
+            return null;
+        }
+
+        return await AddCurrentUserStateAsync(publicProfile, currentUserId, cancellationToken);
     }
 
     public async Task<UserResponse?> GetByUsernameAsync(
@@ -73,11 +91,39 @@ public class UserService : IUserService
         CancellationToken cancellationToken = default,
         Guid? currentUserId = null)
     {
-        var user = await _userRepository.GetByUsernameAsync(username, cancellationToken);
+        if (string.IsNullOrWhiteSpace(username))
+        {
+            return null;
+        }
 
-        return user is null
-            ? null
-            : MapUserResponse(user, currentUserId);
+        var normalizedUsername = username.Trim().ToLowerInvariant();
+
+        if (normalizedUsername.Length > MaxUsernameLength)
+        {
+            return null;
+        }
+
+        var cacheKey = UserProfileCache.GetUsernameKey(normalizedUsername);
+        var userId = await _cache.GetOrCreateAsync<Guid?>(
+            cacheKey,
+            async token => await _userRepository.GetIdByUsernameAsync(normalizedUsername, token),
+            UserProfileCache.UsernameEntryOptions,
+            cancellationToken: cancellationToken);
+
+        if (!userId.HasValue)
+        {
+            await UserProfileCache.TryRemoveAsync(_cache, cacheKey);
+            return null;
+        }
+
+        var user = await GetByIdAsync(userId.Value, cancellationToken, currentUserId);
+
+        if (user is null)
+        {
+            await UserProfileCache.TryRemoveAsync(_cache, cacheKey);
+        }
+
+        return user;
     }
 
     public async Task<UserResponse?> UpdateAsync(
@@ -182,6 +228,8 @@ public class UserService : IUserService
                 user.BannerObjectKey),
             cancellationToken);
 
+        await UserProfileCache.TryRemoveAsync(_cache, UserProfileCache.GetProfileKey(id));
+
         return MapUserResponse(user, id);
     }
 
@@ -195,8 +243,19 @@ public class UserService : IUserService
         }
 
         var uploadedMediaStorageKeys = await _mediaRepository.GetStorageKeysByUploaderIdAsync(id, cancellationToken);
+        var affectedProfileCacheKeys = user.FollowingRelations
+            .Select(relation => relation.FollowingId)
+            .Concat(user.FollowerRelations.Select(relation => relation.FollowerId))
+            .Append(id)
+            .Distinct()
+            .Select(UserProfileCache.GetProfileKey)
+            .Append(UserProfileCache.GetUsernameKey(user.Username.ToLowerInvariant()))
+            .ToArray();
 
         await _userRepository.DeleteAsync(user, cancellationToken);
+        await UserProfileCache.TryRemoveAsync(
+            _cache,
+            affectedProfileCacheKeys);
         await TryDeleteObjectsAsync(
             uploadedMediaStorageKeys
                 .Concat(
@@ -207,6 +266,49 @@ public class UserService : IUserService
             cancellationToken);
 
         return true;
+    }
+
+    private async Task<UserResponse> AddCurrentUserStateAsync(
+        UserProfileReadModel publicProfile,
+        Guid? currentUserId,
+        CancellationToken cancellationToken)
+    {
+        var isFollowedByCurrentUser = false;
+
+        if (currentUserId.HasValue && currentUserId.Value != publicProfile.Id)
+        {
+            isFollowedByCurrentUser = await _followRepository.GetByFollowerAndFollowingAsync(
+                currentUserId.Value,
+                publicProfile.Id,
+                cancellationToken) is not null;
+        }
+
+        return new UserResponse
+        {
+            Id = publicProfile.Id,
+            Username = publicProfile.Username,
+            DisplayName = publicProfile.DisplayName,
+            Bio = publicProfile.Bio,
+            DateOfBirth = publicProfile.DateOfBirth,
+            Location = MapLocation(
+                publicProfile.LocationPlaceId,
+                publicProfile.LocationName,
+                publicProfile.LocationCountry,
+                publicProfile.LocationLatitude,
+                publicProfile.LocationLongitude),
+            AvatarUrl = string.IsNullOrWhiteSpace(publicProfile.AvatarObjectKey)
+                ? null
+                : _objectStorageService.GetReadUrl(publicProfile.AvatarObjectKey),
+            BannerUrl = string.IsNullOrWhiteSpace(publicProfile.BannerObjectKey)
+                ? null
+                : _objectStorageService.GetReadUrl(publicProfile.BannerObjectKey),
+            FollowersCount = publicProfile.FollowersCount,
+            FollowingCount = publicProfile.FollowingCount,
+            PostsCount = publicProfile.PostsCount,
+            IsFollowedByCurrentUser = isFollowedByCurrentUser,
+            IsVerified = publicProfile.IsVerified,
+            CreatedAt = publicProfile.CreatedAt.UtcDateTime
+        };
     }
 
     private async Task<string> UploadProfileImageAsync(

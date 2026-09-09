@@ -1,4 +1,5 @@
 using AutoMapper;
+using Microsoft.Extensions.Caching.Hybrid;
 using Threads.Application.DTOs.Locations;
 using Threads.Application.DTOs.Users;
 using Threads.Application.Interfaces.Follows;
@@ -14,17 +15,20 @@ public class FollowService : IFollowService
     private readonly IUserRepository _userRepository;
     private readonly IObjectStorageService _objectStorageService;
     private readonly IMapper _mapper;
+    private readonly HybridCache _cache;
 
     public FollowService(
         IFollowRepository followRepository,
         IUserRepository userRepository,
         IObjectStorageService objectStorageService,
-        IMapper mapper)
+        IMapper mapper,
+        HybridCache cache)
     {
         _followRepository = followRepository;
         _userRepository = userRepository;
         _objectStorageService = objectStorageService;
         _mapper = mapper;
+        _cache = cache;
     }
 
     public async Task<bool> AddFollowAsync(Guid followerId, Guid followingId, CancellationToken cancellationToken = default)
@@ -67,6 +71,7 @@ public class FollowService : IFollowService
             return false;
         }
 
+        await InvalidateProfileCacheAsync(followerId, followingId);
         return true;
     }
 
@@ -84,7 +89,16 @@ public class FollowService : IFollowService
 
         await _followRepository.DeleteAsync(existingFollow, cancellationToken);
 
+        await InvalidateProfileCacheAsync(followerId, followingId);
         return true;
+    }
+
+    private async Task InvalidateProfileCacheAsync(Guid followerId, Guid followingId)
+    {
+        await UserProfileCache.TryRemoveAsync(
+            _cache,
+            UserProfileCache.GetProfileKey(followerId),
+            UserProfileCache.GetProfileKey(followingId));
     }
 
     public async Task<IReadOnlyCollection<UserShortResponse>> GetFollowersAsync(Guid userId, CancellationToken cancellationToken = default)

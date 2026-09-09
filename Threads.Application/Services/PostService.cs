@@ -1,4 +1,5 @@
 using AutoMapper;
+using Microsoft.Extensions.Caching.Hybrid;
 using Threads.Application.DTOs.Locations;
 using Threads.Application.DTOs.Polls;
 using Threads.Application.DTOs.Posts;
@@ -23,17 +24,20 @@ public class PostService : IPostService
     private readonly IMediaRepository _mediaRepository;
     private readonly IObjectStorageService _objectStorageService;
     private readonly IMapper _mapper;
+    private readonly HybridCache _cache;
 
     public PostService(
         IPostRepository postRepository,
         IMediaRepository mediaRepository,
         IObjectStorageService objectStorageService,
-        IMapper mapper)
+        IMapper mapper,
+        HybridCache cache)
     {
         _postRepository = postRepository;
         _mediaRepository = mediaRepository;
         _objectStorageService = objectStorageService;
         _mapper = mapper;
+        _cache = cache;
     }
 
     public async Task<IReadOnlyCollection<PostResponse>> GetAllAsync(
@@ -165,6 +169,7 @@ public class PostService : IPostService
         await ApplyMediaAsync(post, authorId, mediaIds, cancellationToken);
 
         await _postRepository.AddAsync(post, cancellationToken);
+        await UserProfileCache.TryRemoveAsync(_cache, UserProfileCache.GetProfileKey(authorId));
 
         var createdPost = await _postRepository.GetByIdAsync(post.Id, cancellationToken);
 
@@ -265,6 +270,7 @@ public class PostService : IPostService
             .ToArray();
 
         await _postRepository.DeleteAsync(post, cancellationToken);
+        await UserProfileCache.TryRemoveAsync(_cache, UserProfileCache.GetProfileKey(post.AuthorId));
         await TryDeleteObjectsAsync(mediaStorageKeys, cancellationToken);
 
         return true;
