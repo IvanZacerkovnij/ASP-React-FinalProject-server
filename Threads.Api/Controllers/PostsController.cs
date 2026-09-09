@@ -39,17 +39,24 @@ public class PostsController : ControllerBase
         _bookmarkService = bookmarkService;
     }
 
-    [HttpGet]
-    public async Task<ActionResult<IReadOnlyCollection<PostResponse>>> GetAll(CancellationToken cancellationToken)
-    {
-        var posts = await _postService.GetAllAsync(cancellationToken, GetCurrentUserId());
-        return Ok(posts);
-    }
-
     [HttpGet("feed")]
     public async Task<ActionResult<IReadOnlyCollection<PostResponse>>> GetFeed(CancellationToken cancellationToken)
     {
         var posts = await _postService.GetFeedAsync(cancellationToken, GetCurrentUserId());
+        return Ok(posts);
+    }
+    
+    [Authorize]
+    [HttpGet]
+    public async Task<ActionResult<IReadOnlyCollection<PostResponse>>> GetPosted(CancellationToken cancellationToken)
+    {
+        var currentUserId = GetCurrentUserId();
+        if (currentUserId is null)
+        {
+            return Unauthorized(new { message = "Invalid token claims." });
+        }
+        
+        var posts = await _postService.GetByAuthorIdAsync(currentUserId.Value, cancellationToken);
         return Ok(posts);
     }
 

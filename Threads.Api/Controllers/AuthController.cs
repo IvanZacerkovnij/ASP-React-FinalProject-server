@@ -229,24 +229,4 @@ public class AuthController : ControllerBase
             return BadRequest(new { message = exception.Message });
         }
     }
-
-    [Authorize]
-    [HttpGet("me")]
-    public async Task<ActionResult<UserResponse>> Me(CancellationToken cancellationToken)
-    {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-
-        if (!Guid.TryParse(userId, out var parsedUserId))
-        {
-            return Unauthorized(new { message = "Invalid token claims." });
-        }
-
-        var user = await _userService.GetByIdAsync(parsedUserId, cancellationToken);
-
-        if (user is null)
-        {
-            return NotFound(new { message = "User was not found." });
-        }
-        return Ok(user);
-    }
 }

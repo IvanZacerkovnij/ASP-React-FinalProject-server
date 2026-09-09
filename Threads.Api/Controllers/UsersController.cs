@@ -58,8 +58,8 @@ public class UsersController : ControllerBase
         {
             return NotFound(new { message = "User was not found." });
         }
-         
-        var posts = _postService.GetByAuthorIdAsync(user.Id, cancellationToken).GetAwaiter().GetResult();
+
+        var posts = await _postService.GetByAuthorIdAsync(user.Id, cancellationToken);
         return Ok(posts);
     }
 
@@ -97,6 +97,26 @@ public class UsersController : ControllerBase
         var posts = await _postService.GetRepostedByUserIdAsync(user.Id, cancellationToken, currentUserId);
 
         return Ok(posts);
+    }
+    
+    [Authorize]
+    [HttpGet("me")]
+    public async Task<ActionResult<UserResponse>> Me(CancellationToken cancellationToken)
+    {
+        var userId = GetCurrentUserId();
+
+        if (userId is null)
+        {
+            return Unauthorized(new { message = "Invalid token claims." });
+        }
+
+        var user = await _userService.GetByIdAsync(userId.Value, cancellationToken);
+
+        if (user is null)
+        {
+            return NotFound(new { message = "User was not found." });
+        }
+        return Ok(user);
     }
 
     [Authorize]
