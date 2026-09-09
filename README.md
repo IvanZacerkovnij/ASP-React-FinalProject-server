@@ -13,6 +13,7 @@ Backend для соціального застосунку у стилі Threads
 - [Конфігурація](#конфігурація)
 - [Рольова авторизація](#рольова-авторизація)
 - [Огляд API](#огляд-api)
+- [Логіка CommentService](#логіка-commentservice)
 - [Кешування](#кешування)
 - [Обробка медіа](#обробка-медіа)
 - [Розгортання](#розгортання)
@@ -345,6 +346,102 @@ dotnet ef database update \
 | `DELETE` | `/api/comments/{id}/repost` | Так | Скасувати repost коментаря |
 | `POST` | `/api/comments/{id}/bookmark` | Так | Додати коментар у bookmarks |
 | `DELETE` | `/api/comments/{id}/bookmark` | Так | Прибрати коментар із bookmarks |
+
+### Логіка CommentService
+
+`CommentService` знаходиться у `Threads.Application/Services/CommentService.cs` і виконує бізнес-логіку між API-контролерами та репозиторіями. Для роботи він використовує `ICommentRepository`, `IPostRepository`, репозиторії likes/bookmarks/reposts, `IObjectStorageService` для URL аватара та `IMapper` для перетворення entities на response DTO.
+
+Усі публічні методи асинхронні та приймають `CancellationToken`, щоб запит до БД можна було скасувати, якщо клієнт розірвав HTTP-з'єднання або застосунок завершує роботу.
+
+#### Отримання коментарів
+
+| Метод | Що робить |
+|---|---|
+| `GetByPostIdAsync(postId, cancellationToken, currentUserId)` | Завантажує всі коментарі поста разом з авторами, replies, likes, bookmarks, reposts і views. Результат сортується за `CreatedAt` від старих коментарів до нових. Запит фільтрує лише за `PostId`, тому повертає і кореневі коментарі, і відповіді з `ParentCommentId`. |
+| `GetByIdAsync(id, cancellationToken, currentUserId)` | Повертає один коментар за `Guid`. Якщо коментар не існує, повертає `null`, який контролер перетворює на `404 Not Found`. |
+| `GetLikedByUserIdAsync(userId, cancellationToken, currentUserId)` | Повертає коментарі, які лайкнув користувач `userId`, від найновішого лайка до найстарішого. У `ActionAt` записується час створення лайка. |
+| `GetBookmarkedByUserIdAsync(userId, cancellationToken, currentUserId)` | Повертає збережені користувачем коментарі, від найновішої закладки до найстарішої. У `ActionAt` записується час створення bookmark. |
+| `GetRepostedByUserIdAsync(userId, cancellationToken, currentUserId)` | Повертає репостнуті користувачем коментарі, від найновішого репосту до найстарішого. У `ActionAt` записується час репосту. |
+
+У collection-методах `userId` визначає, чию колекцію потрібно отримати, а `currentUserId` — відносно якого viewer-а потрібно обчислити персональні поля `IsLikedByCurrentUser`, `IsBookmarkedByCurrentUser` та `IsRepostedByCurrentUser`. Якщо `currentUserId` не переданий, усі ці поля мають значення `false`.
+
+#### Створення, оновлення і видалення
+
+##### `CreateAsync`
+
+Метод створює звичайний коментар або відповідь на інший коментар:
+
+1. Відхиляє порожній текст або рядок лише з пробілів через `InvalidOperationException`.
+2. Перевіряє існування поста з `request.PostId`.
+3. Якщо переданий `ParentCommentId`, перевіряє існування батьківського коментаря та належність до того самого поста.
+4. Створює `Comment` через AutoMapper, встановлює `AuthorId` із поточного користувача та обрізає зовнішні пробіли через `Trim()`.
+5. Зберігає entity та повторно завантажує її з навігаційними властивостями для повної API-відповіді.
+
+База обмежує довжину `Content` до `1000` символів. Сервіс окремо перевіряє тільки те, що текст не порожній.
+
+##### `UpdateAsync`
+
+Метод перевіряє новий текст, знаходить коментар, оновлює тільки `Content`, виставляє `UpdatedAt` у UTC і зберігає зміни. Якщо коментар не знайдений, повертає `null`. Автор, пост і `ParentCommentId` не змінюються.
+
+##### `DeleteAsync`
+
+Метод повертає `false`, якщо коментар не знайдений, або видаляє його і повертає `true`. Через cascade delete разом із коментарем видаляються його replies, likes, bookmarks, reposts і views.
+
+Перевірка того, що редагувати або видаляти коментар намагається саме його автор, зараз виконується в `CommentsController`, а не всередині `CommentService`.
+
+#### Likes, bookmarks і reposts
+
+Пари методів `LikeAsync` / `UnlikeAsync`, `BookmarkAsync` / `UnbookmarkAsync` і `RepostAsync` / `UnrepostAsync` працюють за однаковим принципом:
+
+1. Перевіряють існування коментаря; якщо його немає — повертають `null`.
+2. Шукають interaction за парою `userId + commentId`.
+3. Add-метод створює interaction тільки тоді, коли його ще немає.
+4. Remove-метод видаляє interaction тільки тоді, коли він існує.
+5. Повторно завантажують коментар та повертають актуальні counters і персональні flags.
+
+Операції є ідемпотентними: повторний like/bookmark/repost не створює логічний дублікат, а повторне видалення відсутньої взаємодії не завершується помилкою. На рівні БД також є унікальні індекси для пари користувач-коментар. Якщо два однакові add-запити виконуються одночасно, сервіс перехоплює `DbUpdateException`, після чого повертає актуальний стан коментаря.
+
+Для interaction коментаря завжди встановлюється `CommentId`, а `PostId` залишається `null`, оскільки одна interaction entity може посилатися або на пост, або на коментар.
+
+#### `ViewAsync`
+
+Метод реєструє унікальний перегляд коментаря авторизованим користувачем:
+
+1. Завантажує коментар разом із його `Views`.
+2. Перевіряє, чи вже існує перегляд від `userId`.
+3. Якщо перегляду немає, додає `View` із `CommentId` і `ViewerId`.
+4. Повторно завантажує коментар і повертає актуальний `ViewsCount`.
+
+Один користувач збільшує лічильник конкретного коментаря лише один раз. Повторні та одночасні запити додатково захищені унікальним індексом у БД.
+
+#### Формування CommentResponse
+
+Приватний метод `MapCommentResponse` формує фінальний `CommentResponse` із такими даними:
+
+- основні поля: `Id`, `PostId`, `ParentCommentId`, `Content`, `CreatedAt`, `UpdatedAt`;
+- автор: `Id`, `Username`, `DisplayName`, `Location`, `AvatarUrl`, `IsVerified`;
+- counters: `LikesCount`, `RepliesCount`, `RepostsCount`, `ViewsCount`;
+- viewer state: `IsLikedByCurrentUser`, `IsBookmarkedByCurrentUser`, `IsRepostedByCurrentUser`;
+- `ActionAt`: час like/bookmark/repost у відповідній interaction collection або `null` у звичайних content endpoints.
+
+URL аватара не зберігається безпосередньо в DTO: якщо в користувача є `AvatarObjectKey`, `CommentService` формує read URL через `IObjectStorageService`. Якщо локація автора не задана, `Location` дорівнює `null`.
+
+#### Відповідність методів HTTP endpoints
+
+| Service method | HTTP endpoint |
+|---|---|
+| `GetByPostIdAsync` | `GET /api/comments/post/{postId}` |
+| `GetByIdAsync` | `GET /api/comments/{id}` |
+| `CreateAsync` | `POST /api/comments` |
+| `UpdateAsync` | `PUT /api/comments/{id}` |
+| `DeleteAsync` | `DELETE /api/comments/{id}` |
+| `ViewAsync` | `POST /api/comments/{id}/view` |
+| `LikeAsync` / `UnlikeAsync` | `POST` / `DELETE /api/comments/{id}/like` |
+| `BookmarkAsync` / `UnbookmarkAsync` | `POST` / `DELETE /api/comments/{id}/bookmark` |
+| `RepostAsync` / `UnrepostAsync` | `POST` / `DELETE /api/comments/{id}/repost` |
+| `GetLikedByUserIdAsync` | `/api/users/{username}/likes`, `/api/me/likes` |
+| `GetBookmarkedByUserIdAsync` | `/api/me/bookmarks` |
+| `GetRepostedByUserIdAsync` | `/api/users/{username}/reposts`, `/api/me/reposts` |
 
 ### Follows
 
