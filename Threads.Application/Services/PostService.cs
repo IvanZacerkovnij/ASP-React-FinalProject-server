@@ -46,17 +46,6 @@ public class PostService : IPostService
         _cache = cache;
     }
 
-    public async Task<IReadOnlyCollection<PostResponse>> GetAllAsync(
-        CancellationToken cancellationToken = default,
-        Guid? currentUserId = null)
-    {
-        var posts = await _postRepository.GetAllAsync(cancellationToken);
-
-        return posts
-            .Select(post => MapPostResponse(post, currentUserId))
-            .ToList();
-    }
-
     public async Task<IReadOnlyCollection<PostResponse>> GetFeedAsync(
         CancellationToken cancellationToken = default,
         Guid? currentUserId = null)

@@ -5,7 +5,6 @@ namespace Threads.Application.Interfaces.Posts;
 
 public interface IPostService
 {
-    Task<IReadOnlyCollection<PostResponse>> GetAllAsync(CancellationToken cancellationToken = default, Guid? currentUserId = null);
     Task<IReadOnlyCollection<PostResponse>> GetFeedAsync(CancellationToken cancellationToken = default, Guid? currentUserId = null);
     Task<IReadOnlyCollection<PostResponse>> GetByAuthorIdAsync(Guid authorId, CancellationToken cancellationToken = default, Guid? currentUserId = null);
     Task<IReadOnlyCollection<PostResponse>> GetLikedByUserIdAsync(Guid userId, CancellationToken cancellationToken = default, Guid? currentUserId = null);

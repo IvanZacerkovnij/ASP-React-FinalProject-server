@@ -143,8 +143,10 @@ RESEND_FROM_NAME=Threads API
 
 GIPHY_API_KEY=your-giphy-key
 GIPHY_RATING=pg-13
+GifApi__BaseURL=https://api.giphy.com/
 
 GEOAPIFY_API_KEY=your-geoapify-key
+LocationApi__BaseURL=https://api.geoapify.com/
 
 REDIS_PASSWORD=your-strong-redis-password
 
@@ -210,6 +212,8 @@ API стартує після успішного healthcheck Redis. Для Redis
 - `MediaProcessing__VideoCompression__AudioBitrateKbps=128`
 - `MediaProcessing__VideoCompression__MaxWidth=1280`
 - `GIPHY_RATING=pg-13`
+- `GifApi__BaseURL=https://api.giphy.com/`
+- `LocationApi__BaseURL=https://api.geoapify.com/`
 
 ### База даних
 
@@ -278,7 +282,29 @@ dotnet ef database update \
 | `GET` | `/api/me/likes` | Так | Отримати лайкнуті пости та коментарі поточного користувача |
 | `GET` | `/api/me/bookmarks` | Так | Отримати збережені пости та коментарі поточного користувача |
 | `GET` | `/api/me/reposts` | Так | Отримати репости постів і коментарів поточного користувача |
-| `POST` | `/api/me/change-password` | Так | Змінити пароль із підтвердженням через email code |
+| `POST` | `/api/me/change-password/start` | Так | Перевірити поточний пароль, зберегти pending password hash і надіслати email code |
+| `POST` | `/api/me/change-password/confirm` | Так | Підтвердити зміну пароля шестизначним email code |
+
+Зміна пароля виконується у два етапи. Спочатку клієнт надсилає поточний і новий пароль:
+
+```json
+{
+  "currentPassword": "current-password",
+  "newPassword": "new-password"
+}
+```
+
+`POST /api/me/change-password/start` перевіряє активність користувача, правильність поточного пароля і те, що новий пароль відрізняється від поточного. Після цього API зберігає pending password hash та надсилає шестизначний код на email користувача.
+
+Для завершення зміни клієнт надсилає отриманий код:
+
+```json
+{
+  "code": "123456"
+}
+```
+
+`POST /api/me/change-password/confirm` перевіряє наявність pending-зміни та строк дії коду, застосовує новий password hash і відкликає всі refresh tokens користувача. Обидва endpoint-и потребують Bearer access token.
 
 `UserResponse` використовується і для публічного профілю, і для `/api/me`. Поле `email` є nullable: у відповідях `/api/users/...` воно завжди дорівнює `null`, а `GET /api/me` і успішний `PUT /api/me` повертають email поточного користувача. Приватний профіль завантажується окремо від кешованого публічного профілю, щоб email не потрапляв у public profile cache.
 
@@ -504,4 +530,4 @@ URL аватара не зберігається безпосередньо в D
 - Swagger у поточному проєкті не підключений.
 - README описує фактичні контролери, маршрути й конфігурацію, які є в коді зараз.
 - Для `Like`, `Bookmark`, `Repost` і `View` тепер використовується єдина сутність на `post` або `comment` target.
-- Останні зміни від `2026-09-09`: `MeController` повертає likes, bookmarks і reposts постів та коментарів через єдині combined responses; для comment interactions додано окремі service/repository retrieval-ланцюжки.
+- Останні зміни від `2026-09-12`: зміна пароля розділена на start/confirm endpoint-и з окремими request DTO; реєстрації залежностей і конфігурація middleware згруповані в `Program.cs`; base URL для Giphy та Geoapify винесені в конфігурацію.

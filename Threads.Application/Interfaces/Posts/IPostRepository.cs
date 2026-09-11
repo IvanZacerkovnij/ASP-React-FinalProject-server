@@ -6,7 +6,6 @@ namespace Threads.Application.Interfaces.Posts;
 
 public interface IPostRepository
 {
-    Task<IReadOnlyCollection<Post>> GetAllAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyCollection<Post>> GetRandomAsync(int count, CancellationToken cancellationToken = default);
     Task<IReadOnlyCollection<Post>> GetByAuthorIdAsync(Guid authorId, CancellationToken cancellationToken = default);
     Task<IReadOnlyCollection<Post>> GetLikedByUserIdAsync(Guid userId, CancellationToken cancellationToken = default);

@@ -14,13 +14,6 @@ public class PostRepository : IPostRepository
         _dbContext = dbContext;
     }
 
-    public async Task<IReadOnlyCollection<Post>> GetAllAsync(CancellationToken cancellationToken = default)
-    {
-        return await BuildPostQuery(trackChanges: false)
-            .OrderByDescending(post => post.CreatedAt)
-            .ToListAsync(cancellationToken);
-    }
-
     public async Task<IReadOnlyCollection<Post>> GetRandomAsync(int count, CancellationToken cancellationToken = default)
     {
         var postIds = await _dbContext.Posts

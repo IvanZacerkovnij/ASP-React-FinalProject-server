@@ -7,5 +7,6 @@ public enum ChangePasswordStatus
     UserNotFound,
     InvalidCurrentPassword,
     InvalidConfirmationCode,
-    NoPendingPasswordChange
+    NoPendingPasswordChange,
+    InvalidNewPassword
 }

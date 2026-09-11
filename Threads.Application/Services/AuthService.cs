@@ -181,12 +181,13 @@ public class AuthService : IAuthService
         return true;
     }
 
-    public async Task<ChangePasswordResult> ChangePasswordAsync(
+    public async Task<ChangePasswordResult> StartPasswordChangeAsync(
         Guid userId,
-        ChangePasswordRequest request,
+        StartPasswordChangeRequest request,
         CancellationToken cancellationToken = default)
     {
         var normalizedCurrentPassword = NormalizePassword(request.CurrentPassword, nameof(request.CurrentPassword));
+        var normalizedNewPassword =  NormalizePassword(request.NewPassword, nameof(request.NewPassword));
         var user = await _userRepository.GetByIdAsync(userId, cancellationToken);
 
         if (user is null || !user.IsActive)
@@ -199,12 +200,48 @@ public class AuthService : IAuthService
             return CreateChangePasswordResult(ChangePasswordStatus.InvalidCurrentPassword);
         }
 
-        if (!string.IsNullOrWhiteSpace(request.Code))
+        if (_passwordHasher.VerifyPassword(normalizedNewPassword, user.PasswordHash))
         {
-            return await ConfirmPasswordChangeAsync(user, request.Code, cancellationToken);
+            return CreateChangePasswordResult(ChangePasswordStatus.InvalidNewPassword);
         }
 
-        return await StartPasswordChangeAsync(user, request.NewPassword, cancellationToken);
+        var code = GenerateCode();
+        user.PendingPasswordHash = _passwordHasher.HashPassword(normalizedNewPassword);
+        SetPasswordResetCode(user, code);
+        user.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await _userRepository.UpdateAsync(user, cancellationToken);
+        await _authEmailService.SendPasswordChangeCodeAsync(user.Email, code, cancellationToken);
+
+        return CreateChangePasswordResult(ChangePasswordStatus.ConfirmationCodeSent);
+    }
+
+    public async Task<ChangePasswordResult> ConfirmPasswordChangeAsync(
+        Guid userId,
+        ConfirmPasswordChangeRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var code = request.Code;
+        var user = await _userRepository.GetByIdAsync(userId, cancellationToken);
+
+        if (user is null || !user.IsActive)
+        {
+            return CreateChangePasswordResult(ChangePasswordStatus.UserNotFound);
+        }
+
+        if (user.PendingPasswordHash is null)
+        {
+            return CreateChangePasswordResult(ChangePasswordStatus.NoPendingPasswordChange);
+        }
+        
+        if (!IsPasswordResetCodeValid(user, code))
+        {
+            return CreateChangePasswordResult(ChangePasswordStatus.InvalidConfirmationCode);
+        }
+
+        await ApplyPasswordChangeAsync(user, user.PendingPasswordHash, cancellationToken);
+
+        return CreateChangePasswordResult(ChangePasswordStatus.PasswordChanged);
     }
 
     private async Task<(PendingRegistration PendingRegistration, bool IsNew)> ResolvePendingRegistrationAsync(
@@ -332,49 +369,6 @@ public class AuthService : IAuthService
 
         await _userRepository.UpdateAsync(user, cancellationToken);
         await _authEmailService.SendPasswordResetCodeAsync(user.Email, code, cancellationToken);
-    }
-
-    private async Task<ChangePasswordResult> ConfirmPasswordChangeAsync(
-        User user,
-        string code,
-        CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(user.PendingPasswordHash))
-        {
-            return CreateChangePasswordResult(ChangePasswordStatus.NoPendingPasswordChange);
-        }
-
-        if (!IsPasswordResetCodeValid(user, code))
-        {
-            return CreateChangePasswordResult(ChangePasswordStatus.InvalidConfirmationCode);
-        }
-
-        await ApplyPasswordChangeAsync(user, user.PendingPasswordHash, cancellationToken);
-
-        return CreateChangePasswordResult(ChangePasswordStatus.PasswordChanged);
-    }
-
-    private async Task<ChangePasswordResult> StartPasswordChangeAsync(
-        User user,
-        string? newPassword,
-        CancellationToken cancellationToken)
-    {
-        var normalizedNewPassword = NormalizePassword(newPassword, nameof(ChangePasswordRequest.NewPassword));
-
-        if (_passwordHasher.VerifyPassword(normalizedNewPassword, user.PasswordHash))
-        {
-            throw new InvalidOperationException("New password must be different from the current password.");
-        }
-
-        var code = GenerateCode();
-        user.PendingPasswordHash = _passwordHasher.HashPassword(normalizedNewPassword);
-        SetPasswordResetCode(user, code);
-        user.UpdatedAt = DateTimeOffset.UtcNow;
-
-        await _userRepository.UpdateAsync(user, cancellationToken);
-        await _authEmailService.SendPasswordChangeCodeAsync(user.Email, code, cancellationToken);
-
-        return CreateChangePasswordResult(ChangePasswordStatus.ConfirmationCodeSent);
     }
 
     private async Task ApplyPasswordChangeAsync(

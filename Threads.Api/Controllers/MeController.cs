@@ -234,9 +234,9 @@ public class MeController : ControllerBase
         });
     }
     
-    [HttpPost("change-password")]
-    public async Task<IActionResult> ChangePassword(
-        [FromBody] ChangePasswordRequest request,
+    [HttpPost("change-password/start")]
+    public async Task<IActionResult> StartPasswordChange(
+        [FromBody] StartPasswordChangeRequest request,
         CancellationToken cancellationToken)
     {
         var currentUserId = GetCurrentUserId();
@@ -248,7 +248,7 @@ public class MeController : ControllerBase
         
         try
         {
-            var result = await _authService.ChangePasswordAsync(currentUserId.Value, request, cancellationToken);
+            var result = await _authService.StartPasswordChangeAsync(currentUserId.Value, request, cancellationToken);
 
             return result.Status switch
             {
@@ -256,19 +256,52 @@ public class MeController : ControllerBase
                 {
                     message = "Password change confirmation code has been sent to your email."
                 }),
+                ChangePasswordStatus.UserNotFound => NotFound(new { message = "User was not found." }),
+                ChangePasswordStatus.InvalidNewPassword => BadRequest(new
+                {
+                    message = "New password must be different from the current password."
+                }),
+                ChangePasswordStatus.InvalidCurrentPassword => BadRequest(new
+                {
+                    message = "Current password is invalid."
+                }),
+                _ => BadRequest(new { message = "Unable to change password." })
+            };
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+        catch (InvalidOperationException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+    }
+
+    [HttpPost("change-password/confirm")]
+    public async Task<IActionResult> ConfirmPasswordChange(
+        [FromBody] ConfirmPasswordChangeRequest request,
+        CancellationToken cancellationToken)
+    {
+        var currentUserId = GetCurrentUserId();
+
+        if (currentUserId is null)
+        {
+            return Unauthorized(new { message = "Invalid token claims." });
+        }
+
+        try
+        {
+            var result = await _authService.ConfirmPasswordChangeAsync(currentUserId.Value, request, cancellationToken);
+
+            return result.Status switch
+            {
                 ChangePasswordStatus.PasswordChanged => Ok(new
                 {
                     message = "Password changed successfully."
                 }),
                 ChangePasswordStatus.UserNotFound => NotFound(new { message = "User was not found." }),
-                ChangePasswordStatus.InvalidCurrentPassword => BadRequest(new
-                {
-                    message = "Current password is invalid."
-                }),
-                ChangePasswordStatus.InvalidConfirmationCode => BadRequest(new
-                {
-                    message = "Confirmation code is invalid or expired."
-                }),
+                ChangePasswordStatus.InvalidConfirmationCode => BadRequest(new { message = "Invalid confirmation code." }),
                 ChangePasswordStatus.NoPendingPasswordChange => Conflict(new
                 {
                     message = "There is no pending password change request."

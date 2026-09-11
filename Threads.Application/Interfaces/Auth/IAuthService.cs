@@ -16,8 +16,12 @@ public interface IAuthService
     Task ForgotPasswordAsync(ForgotPasswordRequest request, CancellationToken cancellationToken = default);
     Task<bool> VerifyResetCodeAsync(VerifyResetCodeRequest request, CancellationToken cancellationToken = default);
     Task<bool> ResetPasswordAsync(ResetPasswordRequest request, CancellationToken cancellationToken = default);
-    Task<ChangePasswordResult> ChangePasswordAsync(
+    Task<ChangePasswordResult> StartPasswordChangeAsync(
         Guid userId,
-        ChangePasswordRequest request,
+        StartPasswordChangeRequest request,
+        CancellationToken cancellationToken = default);
+    Task<ChangePasswordResult> ConfirmPasswordChangeAsync(
+        Guid userId,
+        ConfirmPasswordChangeRequest request,
         CancellationToken cancellationToken = default);
 }
