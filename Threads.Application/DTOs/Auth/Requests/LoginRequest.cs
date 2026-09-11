@@ -4,7 +4,7 @@ namespace Threads.Application.DTOs.Auth.Requests;
 
 public sealed class LoginRequest
 {
-    [Required]
+    [Required, StringLength(255, MinimumLength = 1)]
     public required string EmailOrUsername { get; init; }
     
     [Required, StringLength(32, MinimumLength = 8)]

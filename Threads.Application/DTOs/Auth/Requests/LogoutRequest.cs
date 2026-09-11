@@ -4,6 +4,6 @@ namespace Threads.Application.DTOs.Auth.Requests;
 
 public class LogoutRequest
 {
-    [Required]
+    [Required, StringLength(44, MinimumLength = 44)]
     public required string RefreshToken { get; init; }
 }
