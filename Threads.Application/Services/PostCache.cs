@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Caching.Hybrid;
 using Threads.Application.DTOs.Posts;
+using Threads.Application.DTOs.Posts.Models;
 
 namespace Threads.Application.Services;
 

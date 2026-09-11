@@ -1,4 +1,5 @@
 using Threads.Application.DTOs.Posts;
+using Threads.Application.DTOs.Posts.Models;
 using Threads.Domain.Entities;
 
 namespace Threads.Application.Interfaces.Posts;

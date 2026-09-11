@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using Threads.Application.DTOs.Posts;
+using Threads.Application.DTOs.Posts.Models;
 using Threads.Application.Interfaces.Posts;
 using Threads.Domain.Entities;
 

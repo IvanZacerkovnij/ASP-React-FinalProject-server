@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Threads.Application.DTOs.Gifs;
 using Threads.Application.DTOs.Locations;
 using Threads.Application.DTOs.Posts;
+using Threads.Application.DTOs.Posts.Responses;
 using Threads.Application.DTOs.Users;
 using Threads.Application.Interfaces.Gifs;
 using Threads.Application.Interfaces.Locations;

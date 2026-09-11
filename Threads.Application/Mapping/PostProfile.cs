@@ -1,5 +1,6 @@
 using AutoMapper;
-using Threads.Application.DTOs.Posts;
+using Threads.Application.DTOs.Posts.Requests;
+using Threads.Application.DTOs.Posts.Responses;
 using Threads.Domain.Entities;
 
 namespace Threads.Application.Mapping;

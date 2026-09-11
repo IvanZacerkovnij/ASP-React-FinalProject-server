@@ -36,16 +36,8 @@ namespace Threads.Api;
 
 public class Program
 {
-    public static void Main(string[] args)
+    private static void AddRepositories(WebApplicationBuilder builder)
     {
-        var builder = WebApplication.CreateBuilder(args);
-
-        builder.WebHost.ConfigureKestrel(options => UploadConfigurator.Configure(options));
-
-        builder.Services.AddDbContext<ThreadsDbContext>(options => DbConfigurator.Configure(options, builder.Configuration));
-        builder.Services.Configure<FormOptions>(options => UploadConfigurator.Configure(options));
-        builder.Services.AddAutoMapper(cfg => { }, typeof(UserProfile));
-
         builder.Services.AddScoped<IUserRepository, UserRepository>();
         builder.Services.AddScoped<IPostRepository, PostRepository>();
         builder.Services.AddScoped<ICommentRepository, CommentRepository>();
@@ -54,32 +46,48 @@ public class Program
         builder.Services.AddScoped<IRepostRepository, RepostRepository>();
         builder.Services.AddScoped<IBookmarkRepository, BookmarkRepository>();
         builder.Services.AddScoped<IMediaRepository, MediaRepository>();
-        builder.Services.AddScoped<IMediaProcessingService, FfmpegMediaProcessingService>();
-        builder.Services.AddScoped<IObjectStorageService, S3ObjectStorageService>();
         builder.Services.AddScoped<IPollRepository, PollRepository>();
         builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         builder.Services.AddScoped<IPendingRegistrationRepository, PendingRegistrationRepository>();
-        builder.Services.AddScoped<IAuthEmailService, AuthEmailService>();
+    }
 
+    private static void AddServices(WebApplicationBuilder builder)
+    {
         builder.Services.AddScoped<IUserService, UserService>();
         builder.Services.AddScoped<IPostService, PostService>();
         builder.Services.AddScoped<IPollService, PollService>();
         builder.Services.AddScoped<ICommentService, CommentService>();
         builder.Services.AddScoped<IFollowService, FollowService>();
-        builder.Services.AddHttpClient<IGifSearchService, GiphyGifSearchService>(client =>
-        {
-            client.BaseAddress = new Uri("https://api.giphy.com/");
-        });
-        builder.Services.AddHttpClient<ILocationSearchService, GeoapifyLocationSearchService>(client =>
-        {
-            client.BaseAddress = new Uri("https://api.geoapify.com/");
-        });
         builder.Services.AddScoped<ILikeService, LikeService>();
         builder.Services.AddScoped<IRepostService, RepostService>();
         builder.Services.AddScoped<IBookmarkService, BookmarkService>();
         builder.Services.AddScoped<IMediaService, MediaService>();
         builder.Services.AddScoped<IAuthService, AuthService>();
+        builder.Services.AddAutoMapper(cfg => { }, typeof(UserProfile));
+    }
 
+    private static void AddInfrastructureServices(WebApplicationBuilder builder)
+    {
+        builder.Services.AddScoped<IMediaProcessingService, FfmpegMediaProcessingService>();
+        builder.Services.AddScoped<IObjectStorageService, S3ObjectStorageService>();
+        builder.Services.AddScoped<IAuthEmailService, AuthEmailService>();
+        builder.Services.AddResend(options => ResendConfigurator.Configure(options, builder.Configuration));
+    }
+
+    private static void AddForeignApi(WebApplicationBuilder builder)
+    {
+        builder.Services.AddHttpClient<IGifSearchService, GiphyGifSearchService>(client => GifConfigurator.Configure(client, builder.Configuration));
+        builder.Services.AddHttpClient<ILocationSearchService, GeoapifyLocationSearchService>(client => LocationConfigurator.Configure(client, builder.Configuration));
+    }
+
+    private static void AddCache(WebApplicationBuilder builder)
+    {
+        builder.Services.AddStackExchangeRedisCache(options => RedisConfigurator.Configure(options, builder.Configuration));
+        builder.Services.AddHybridCache(HybridCacheConfigurator.Configure);
+    }
+
+    private static void AddSecurityServices(WebApplicationBuilder builder)
+    {
         builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
         builder.Services.AddScoped<ITokenService, JwtTokenService>();
 
@@ -87,15 +95,23 @@ public class Program
             .AddJwtBearer(options => JwtBearerConfigurator.Configure(options, builder.Configuration));
 
         builder.Services.AddAuthorization(AuthorizationConfigurator.Configure);
-        builder.Services.AddControllers();
-        
+
         builder.Services.AddCors(options => CORSConfigurator.Configure(options, builder.Configuration));
-        builder.Services.AddResend(options => ResendConfigurator.Configure(options, builder.Configuration));
-        builder.Services.AddStackExchangeRedisCache(options => RedisConfigurator.Configure(options, builder.Configuration));
-        builder.Services.AddHybridCache(HybridCacheConfigurator.Configure);
+    }
 
-        var app = builder.Build();
+    private static void AddUploadConfiguration(WebApplicationBuilder builder)
+    {
+        builder.WebHost.ConfigureKestrel(options => UploadConfigurator.Configure(options));
+        builder.Services.Configure<FormOptions>(options => UploadConfigurator.Configure(options));
+    }
 
+    private static void AddDbConfiguration(WebApplicationBuilder builder)
+    {
+        builder.Services.AddDbContext<ThreadsDbContext>(options => DbConfigurator.Configure(options, builder.Configuration));
+    }
+
+    private static void ConfigureApplication(WebApplication app)
+    {
         app.UseCors("AllowAll");
         
         app.UseHttpsRedirection();
@@ -103,6 +119,29 @@ public class Program
         app.UseAuthorization();
 
         app.MapControllers();
+    }
+
+    public static void Main(string[] args)
+    {
+        var builder = WebApplication.CreateBuilder(args);
+
+        AddUploadConfiguration(builder);
+        AddDbConfiguration(builder);
+
+        AddRepositories(builder);
+        AddServices(builder);
+        AddInfrastructureServices(builder);
+        AddSecurityServices(builder);
+
+        AddForeignApi(builder);
+
+        AddCache(builder);
+
+        builder.Services.AddControllers();
+
+        var app = builder.Build();
+
+        ConfigureApplication(app);
 
         app.Run();
     }

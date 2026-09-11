@@ -1,5 +1,5 @@
 using Threads.Application.DTOs.Comments;
-using Threads.Application.DTOs.Posts;
+using Threads.Application.DTOs.Posts.Responses;
 
 namespace Threads.Application.DTOs.Reposts;
 

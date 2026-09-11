@@ -1,4 +1,5 @@
-using Threads.Application.DTOs.Posts;
+using Threads.Application.DTOs.Posts.Requests;
+using Threads.Application.DTOs.Posts.Responses;
 
 namespace Threads.Application.Interfaces.Posts;
 

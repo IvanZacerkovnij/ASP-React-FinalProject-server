@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
-using Threads.Application.DTOs.Auth;
+using Threads.Application.DTOs.Auth.Requests;
+using Threads.Application.DTOs.Auth.Responses;
 using Threads.Application.Interfaces.Auth;
 using Threads.Application.Interfaces.Security;
 using Threads.Application.Interfaces.Users;

@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Threads.Application.DTOs.Likes;
 using Threads.Application.DTOs.Posts;
+using Threads.Application.DTOs.Posts.Responses;
 using Threads.Application.DTOs.Reposts;
 using Threads.Application.DTOs.Users;
 using Threads.Application.Interfaces.Comments;

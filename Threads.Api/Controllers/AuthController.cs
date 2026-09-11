@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
-using Threads.Application.DTOs.Auth;
+using Threads.Application.DTOs.Auth.Requests;
+using Threads.Application.DTOs.Auth.Responses;
 using Threads.Application.Interfaces.Auth;
 
 namespace Threads.Api.Controllers;

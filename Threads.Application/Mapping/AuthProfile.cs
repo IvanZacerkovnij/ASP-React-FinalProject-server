@@ -1,5 +1,5 @@
 using AutoMapper;
-using Threads.Application.DTOs.Auth;
+using Threads.Application.DTOs.Auth.Requests;
 using Threads.Domain.Entities;
 
 namespace Threads.Application.Mapping;

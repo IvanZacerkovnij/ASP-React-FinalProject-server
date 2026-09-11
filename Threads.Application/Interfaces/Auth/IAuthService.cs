@@ -1,5 +1,5 @@
-using System;
-using Threads.Application.DTOs.Auth;
+using Threads.Application.DTOs.Auth.Requests;
+using Threads.Application.DTOs.Auth.Responses;
 
 namespace Threads.Application.Interfaces.Auth;
 
