@@ -21,7 +21,7 @@ public class MediaController : ControllerBase
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<MediaUrlResponse>> GetById(
-        Guid id,
+        [FromRoute] Guid id,
         CancellationToken cancellationToken)
     {
         var media = await _mediaService.GetUrlAsync(id, GetCurrentUserId(), cancellationToken);

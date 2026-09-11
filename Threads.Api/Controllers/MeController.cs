@@ -235,7 +235,7 @@ public class MeController : ControllerBase
     
     [HttpPost("change-password")]
     public async Task<IActionResult> ChangePassword(
-        ChangePasswordRequest request,
+        [FromBody] ChangePasswordRequest request,
         CancellationToken cancellationToken)
     {
         var currentUserId = GetCurrentUserId();
