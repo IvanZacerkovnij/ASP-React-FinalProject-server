@@ -74,7 +74,7 @@ public class Program
         builder.Services.AddResend(options => ResendConfigurator.Configure(options, builder.Configuration));
     }
 
-    private static void AddForeignApi(WebApplicationBuilder builder)
+    private static void AddExternalApi(WebApplicationBuilder builder)
     {
         builder.Services.AddHttpClient<IGifSearchService, GiphyGifSearchService>(client => GifConfigurator.Configure(client, builder.Configuration));
         builder.Services.AddHttpClient<ILocationSearchService, GeoapifyLocationSearchService>(client => LocationConfigurator.Configure(client, builder.Configuration));
@@ -133,7 +133,7 @@ public class Program
         AddInfrastructureServices(builder);
         AddSecurityServices(builder);
 
-        AddForeignApi(builder);
+        AddExternalApi(builder);
 
         AddCache(builder);
 
