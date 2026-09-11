@@ -48,7 +48,9 @@ public class PostsController : ControllerBase
     
 
     [HttpGet("{id:guid}")]
-    public async Task<ActionResult<PostResponse>> GetById(Guid id, CancellationToken cancellationToken)
+    public async Task<ActionResult<PostResponse>> GetById(
+        [FromRoute] Guid id,
+        CancellationToken cancellationToken)
     {
         var post = await _postService.GetByIdAsync(id, cancellationToken, GetCurrentUserId());
 
@@ -59,7 +61,9 @@ public class PostsController : ControllerBase
 
     [Authorize]
     [HttpPost("{id:guid}/view")]
-    public async Task<ActionResult<PostViewResponse>> RegisterView(Guid id, CancellationToken cancellationToken)
+    public async Task<ActionResult<PostViewResponse>> RegisterView(
+        [FromRoute] Guid id,
+        CancellationToken cancellationToken)
     {
         var currentUserId = GetCurrentUserId();
 
@@ -77,7 +81,9 @@ public class PostsController : ControllerBase
 
     [Authorize]
     [HttpPost("{id:guid}/like")]
-    public async Task<ActionResult<PostLikeStateResponse>> LikePost(Guid id, CancellationToken cancellationToken)
+    public async Task<ActionResult<PostLikeStateResponse>> LikePost(
+        [FromRoute] Guid id,
+        CancellationToken cancellationToken)
     {
         var currentUserId = GetCurrentUserId();
 
@@ -103,7 +109,9 @@ public class PostsController : ControllerBase
 
     [Authorize]
     [HttpPost("{id:guid}/repost")]
-    public async Task<ActionResult<PostRepostStateResponse>> RepostPost(Guid id, CancellationToken cancellationToken)
+    public async Task<ActionResult<PostRepostStateResponse>> RepostPost(
+        [FromRoute] Guid id,
+        CancellationToken cancellationToken)
     {
         var currentUserId = GetCurrentUserId();
 
@@ -139,7 +147,9 @@ public class PostsController : ControllerBase
 
     [Authorize]
     [HttpDelete("{id:guid}/repost")]
-    public async Task<ActionResult<PostRepostStateResponse>> UndoRepostPost(Guid id, CancellationToken cancellationToken)
+    public async Task<ActionResult<PostRepostStateResponse>> UndoRepostPost(
+        [FromRoute] Guid id,
+        CancellationToken cancellationToken)
     {
         var currentUserId = GetCurrentUserId();
 
@@ -175,7 +185,9 @@ public class PostsController : ControllerBase
 
     [Authorize]
     [HttpDelete("{id:guid}/like")]
-    public async Task<ActionResult<PostLikeStateResponse>> UnlikePost(Guid id, CancellationToken cancellationToken)
+    public async Task<ActionResult<PostLikeStateResponse>> UnlikePost(
+        [FromRoute] Guid id,
+        CancellationToken cancellationToken)
     {
         var currentUserId = GetCurrentUserId();
 
@@ -201,7 +213,8 @@ public class PostsController : ControllerBase
 
     [Authorize]
     [HttpPost("{id:guid}/bookmark")]
-    public async Task<ActionResult<PostBookmarkStateResponse>> BookmarkPost(Guid id,
+    public async Task<ActionResult<PostBookmarkStateResponse>> BookmarkPost(
+        [FromRoute] Guid id,
         CancellationToken cancellationToken)
     {
         var currentUserId = GetCurrentUserId();
@@ -237,7 +250,8 @@ public class PostsController : ControllerBase
     
     [Authorize]
     [HttpDelete("{id:guid}/bookmark")]
-    public async Task<ActionResult<PostBookmarkStateResponse>> UnBookmarkPost(Guid id,
+    public async Task<ActionResult<PostBookmarkStateResponse>> UnBookmarkPost(
+        [FromRoute] Guid id,
         CancellationToken cancellationToken)
     {
         var currentUserId = GetCurrentUserId();
@@ -274,8 +288,8 @@ public class PostsController : ControllerBase
     [Authorize]
     [HttpPost("{id:guid}/poll/vote")]
     public async Task<ActionResult<PollResponse>> VotePoll(
-        Guid id,
-        VotePollRequest request,
+        [FromRoute] Guid id,
+        [FromBody] VotePollRequest request,
         CancellationToken cancellationToken)
     {
         var currentUserId = GetCurrentUserId();
@@ -302,7 +316,7 @@ public class PostsController : ControllerBase
     [Authorize]
     [HttpPost]
     public async Task<ActionResult<PostResponse>> Create(
-        CreatePostRequest request,
+        [FromBody] CreatePostRequest request,
         CancellationToken cancellationToken)
     {
         var currentUserId = GetCurrentUserId();
@@ -327,8 +341,8 @@ public class PostsController : ControllerBase
     [Authorize]
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<PostResponse>> Update(
-        Guid id,
-        UpdatePostRequest request,
+        [FromRoute] Guid id,
+        [FromBody] UpdatePostRequest request,
         CancellationToken cancellationToken)
     {
         var currentUserId = GetCurrentUserId();
@@ -366,7 +380,9 @@ public class PostsController : ControllerBase
 
     [Authorize]
     [HttpDelete("{id:guid}")]
-    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    public async Task<IActionResult> Delete(
+        [FromRoute] Guid id,
+        CancellationToken cancellationToken)
     {
         var currentUserId = GetCurrentUserId();
 

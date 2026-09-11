@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Threads.Application.DTOs.Gifs;
 using Threads.Application.DTOs.Locations;

@@ -29,7 +29,9 @@ public class UsersController : ControllerBase
     }
 
     [HttpGet("by-id/{id:guid}")]
-    public async Task<ActionResult<UserResponse>> GetById(Guid id, CancellationToken cancellationToken)
+    public async Task<ActionResult<UserResponse>> GetById(
+        [FromRoute] Guid id,
+        CancellationToken cancellationToken)
     {
         var user = await _userService.GetByIdAsync(id, cancellationToken, GetCurrentUserId());
 
@@ -38,7 +40,9 @@ public class UsersController : ControllerBase
             : Ok(user);
     }
     [HttpGet("by-username/{username}")]
-    public async Task<ActionResult<UserResponse>> GetByUsername(string username, CancellationToken cancellationToken)
+    public async Task<ActionResult<UserResponse>> GetByUsername(
+        [FromRoute] string username,
+        CancellationToken cancellationToken)
     {
         var user = await _userService.GetByUsernameAsync(username, cancellationToken, GetCurrentUserId());
 
@@ -49,7 +53,7 @@ public class UsersController : ControllerBase
 
     [HttpGet("{username}/posts")]
     public async Task<ActionResult<IReadOnlyCollection<PostResponse>>> GetPostsByUsername(
-        string username,
+        [FromRoute] string username,
         CancellationToken cancellationToken)
     {
         var user = await _userService.GetByUsernameAsync(username, cancellationToken);
@@ -67,7 +71,7 @@ public class UsersController : ControllerBase
 
     [HttpGet("{username}/likes")]
     public async Task<ActionResult<UserLikesResponse>> GetLikedByUsername(
-        string username,
+        [FromRoute] string username,
         CancellationToken cancellationToken)
     {
         var user = await _userService.GetByUsernameAsync(username, cancellationToken);
@@ -90,7 +94,7 @@ public class UsersController : ControllerBase
 
     [HttpGet("{username}/reposts")]
     public async Task<ActionResult<UserRepostsResponse>> GetRepostedByUsername(
-        string username,
+        [FromRoute] string username,
         CancellationToken cancellationToken)
     {
         var user = await _userService.GetByUsernameAsync(username, cancellationToken);

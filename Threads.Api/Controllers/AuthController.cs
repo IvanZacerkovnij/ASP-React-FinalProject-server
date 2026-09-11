@@ -17,7 +17,7 @@ public class AuthController : ControllerBase
 
     [HttpPost("register")]
     public async Task<IActionResult> Register(
-        RegisterRequest request,
+        [FromBody] RegisterRequest request,
         CancellationToken cancellationToken)
     {
         try
@@ -37,7 +37,7 @@ public class AuthController : ControllerBase
 
     [HttpPost("login")]
     public async Task<ActionResult<AuthResponse>> Login(
-        LoginRequest request,
+        [FromBody] LoginRequest request,
         CancellationToken cancellationToken)
     {
         var response = await _authService.LoginAsync(request, cancellationToken);
@@ -49,7 +49,7 @@ public class AuthController : ControllerBase
 
     [HttpPost("refresh")]
     public async Task<ActionResult<AuthResponse>> Refresh(
-        RefreshTokenRequest request,
+        [FromBody] RefreshTokenRequest request,
         CancellationToken cancellationToken)
     {
         var response = await _authService.RefreshTokenAsync(request, cancellationToken);
@@ -61,7 +61,7 @@ public class AuthController : ControllerBase
 
     [HttpPost("logout")]
     public async Task<IActionResult> Logout(
-        LogoutRequest request,
+        [FromBody] LogoutRequest request,
         CancellationToken cancellationToken)
     {
         var wasLoggedOut = await _authService.LogoutAsync(request, cancellationToken);
@@ -73,7 +73,7 @@ public class AuthController : ControllerBase
 
     [HttpPost("forgot-password")]
     public async Task<IActionResult> ForgotPassword(
-        ForgotPasswordRequest request,
+        [FromBody] ForgotPasswordRequest request,
         CancellationToken cancellationToken)
     {
         try
@@ -89,7 +89,7 @@ public class AuthController : ControllerBase
 
     [HttpPost("verify-reset-code")]
     public async Task<IActionResult> VerifyResetCode(
-        VerifyResetCodeRequest request,
+        [FromBody] VerifyResetCodeRequest request,
         CancellationToken cancellationToken)
     {
         try
@@ -108,7 +108,7 @@ public class AuthController : ControllerBase
 
     [HttpPost("reset-password")]
     public async Task<IActionResult> ResetPassword(
-        ResetPasswordRequest request,
+        [FromBody] ResetPasswordRequest request,
         CancellationToken cancellationToken)
     {
         try
@@ -127,7 +127,7 @@ public class AuthController : ControllerBase
 
     [HttpPost("verify-email")]
     public async Task<ActionResult<AuthResponse>> VerifyEmail(
-        VerifyEmailRequest request,
+        [FromBody] VerifyEmailRequest request,
         CancellationToken cancellationToken)
     {
         try
@@ -150,7 +150,7 @@ public class AuthController : ControllerBase
     
     [HttpPost("resend-verification-code")]
     public async Task<IActionResult> ResendVerifyEmail(
-        ResendVerificationCodeRequest request,
+        [FromBody] ResendVerificationCodeRequest request,
         CancellationToken cancellationToken)
     {
         try

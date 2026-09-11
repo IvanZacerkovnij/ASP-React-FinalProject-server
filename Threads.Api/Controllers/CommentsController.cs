@@ -19,7 +19,7 @@ public class CommentsController : ControllerBase
 
     [HttpGet("post/{postId:guid}")]
     public async Task<ActionResult<IReadOnlyCollection<CommentResponse>>> GetByPostId(
-        Guid postId,
+        [FromRoute] Guid postId,
         CancellationToken cancellationToken)
     {
         var comments = await _commentService.GetByPostIdAsync(
@@ -32,7 +32,7 @@ public class CommentsController : ControllerBase
     [Authorize]
     [HttpPost]
     public async Task<ActionResult<CommentResponse>> Create(
-        CreateCommentRequest request,
+        [FromBody] CreateCommentRequest request,
         CancellationToken cancellationToken)
     {
         var currentUserId = GetCurrentUserId();
@@ -54,7 +54,9 @@ public class CommentsController : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
-    public async Task<ActionResult<CommentResponse>> GetById(Guid id, CancellationToken cancellationToken)
+    public async Task<ActionResult<CommentResponse>> GetById(
+        [FromRoute] Guid id,
+        CancellationToken cancellationToken)
     {
         var comment = await _commentService.GetByIdAsync(
             id,
@@ -70,8 +72,8 @@ public class CommentsController : ControllerBase
     [Authorize]
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<CommentResponse>> Update(
-        Guid id,
-        UpdateCommentRequest request,
+        [FromRoute] Guid id,
+        [FromBody] UpdateCommentRequest request,
         CancellationToken cancellationToken)
     {
         var currentUserId = GetCurrentUserId();
@@ -110,7 +112,9 @@ public class CommentsController : ControllerBase
 
     [Authorize]
     [HttpDelete("{id:guid}")]
-    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    public async Task<IActionResult> Delete(
+        [FromRoute] Guid id,
+        CancellationToken cancellationToken)
     {
         var currentUserId = GetCurrentUserId();
 
@@ -140,7 +144,9 @@ public class CommentsController : ControllerBase
 
     [Authorize]
     [HttpPost("{id:guid}/like")]
-    public async Task<ActionResult<CommentResponse>> LikeComment(Guid id, CancellationToken cancellationToken)
+    public async Task<ActionResult<CommentResponse>> LikeComment(
+        [FromRoute] Guid id,
+        CancellationToken cancellationToken)
     {
         var currentUserId = GetCurrentUserId();
 
@@ -158,7 +164,9 @@ public class CommentsController : ControllerBase
 
     [Authorize]
     [HttpPost("{id:guid}/view")]
-    public async Task<ActionResult<CommentResponse>> ViewComment(Guid id, CancellationToken cancellationToken)
+    public async Task<ActionResult<CommentResponse>> ViewComment(
+        [FromRoute] Guid id,
+        CancellationToken cancellationToken)
     {
         var currentUserId = GetCurrentUserId();
 
@@ -176,7 +184,9 @@ public class CommentsController : ControllerBase
 
     [Authorize]
     [HttpDelete("{id:guid}/like")]
-    public async Task<ActionResult<CommentResponse>> UnlikeComment(Guid id, CancellationToken cancellationToken)
+    public async Task<ActionResult<CommentResponse>> UnlikeComment(
+        [FromRoute] Guid id,
+        CancellationToken cancellationToken)
     {
         var currentUserId = GetCurrentUserId();
 
@@ -194,7 +204,9 @@ public class CommentsController : ControllerBase
 
     [Authorize]
     [HttpPost("{id:guid}/bookmark")]
-    public async Task<ActionResult<CommentResponse>> BookmarkComment(Guid id, CancellationToken cancellationToken)
+    public async Task<ActionResult<CommentResponse>> BookmarkComment(
+        [FromRoute] Guid id,
+        CancellationToken cancellationToken)
     {
         var currentUserId = GetCurrentUserId();
 
@@ -212,7 +224,9 @@ public class CommentsController : ControllerBase
 
     [Authorize]
     [HttpDelete("{id:guid}/bookmark")]
-    public async Task<ActionResult<CommentResponse>> UnbookmarkComment(Guid id, CancellationToken cancellationToken)
+    public async Task<ActionResult<CommentResponse>> UnbookmarkComment(
+        [FromRoute] Guid id,
+        CancellationToken cancellationToken)
     {
         var currentUserId = GetCurrentUserId();
 
@@ -230,7 +244,9 @@ public class CommentsController : ControllerBase
 
     [Authorize]
     [HttpPost("{id:guid}/repost")]
-    public async Task<ActionResult<CommentResponse>> RepostComment(Guid id, CancellationToken cancellationToken)
+    public async Task<ActionResult<CommentResponse>> RepostComment(
+        [FromRoute] Guid id,
+        CancellationToken cancellationToken)
     {
         var currentUserId = GetCurrentUserId();
 
@@ -248,7 +264,9 @@ public class CommentsController : ControllerBase
 
     [Authorize]
     [HttpDelete("{id:guid}/repost")]
-    public async Task<ActionResult<CommentResponse>> UnrepostComment(Guid id, CancellationToken cancellationToken)
+    public async Task<ActionResult<CommentResponse>> UnrepostComment(
+        [FromRoute] Guid id,
+        CancellationToken cancellationToken)
     {
         var currentUserId = GetCurrentUserId();
 

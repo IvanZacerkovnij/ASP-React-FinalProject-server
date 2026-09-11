@@ -22,7 +22,9 @@ public class FollowsController : ControllerBase
 
     [Authorize]
     [HttpPost("{userId:guid}")]
-    public async Task<ActionResult> Follow(Guid userId, CancellationToken cancellationToken)
+    public async Task<ActionResult> Follow(
+        [FromRoute] Guid userId,
+        CancellationToken cancellationToken)
     {
         var currentUserId = GetCurrentUserId();
 
@@ -47,7 +49,9 @@ public class FollowsController : ControllerBase
 
     [Authorize]
     [HttpDelete("{userId:guid}")]
-    public async Task<ActionResult> Unfollow(Guid userId, CancellationToken cancellationToken)
+    public async Task<ActionResult> Unfollow(
+        [FromRoute] Guid userId,
+        CancellationToken cancellationToken)
     {
         var currentUserId = GetCurrentUserId();
 
@@ -72,7 +76,7 @@ public class FollowsController : ControllerBase
 
     [HttpGet("{userId:guid}/followers")]
     public async Task<ActionResult<IReadOnlyCollection<UserShortResponse>>> GetFollowers(
-        Guid userId,
+        [FromRoute] Guid userId,
         CancellationToken cancellationToken)
     {
         var user = await _userService.GetByIdAsync(userId, cancellationToken);
@@ -89,7 +93,7 @@ public class FollowsController : ControllerBase
 
     [HttpGet("{userId:guid}/following")]
     public async Task<ActionResult<IReadOnlyCollection<UserShortResponse>>> GetFollowing(
-        Guid userId,
+        [FromRoute] Guid userId,
         CancellationToken cancellationToken)
     {
         var user = await _userService.GetByIdAsync(userId, cancellationToken);
@@ -106,7 +110,10 @@ public class FollowsController : ControllerBase
 
     [Authorize]
     [HttpDelete("{userId:guid}/followers/{followId:guid}")]
-    public async Task<ActionResult> RemoveFollower(Guid userId, Guid followId, CancellationToken cancellationToken)
+    public async Task<ActionResult> RemoveFollower(
+        [FromRoute] Guid userId,
+        [FromRoute] Guid followId,
+        CancellationToken cancellationToken)
     {
         var currentUserId = GetCurrentUserId();
 

@@ -1,4 +1,3 @@
-using System.ComponentModel.DataAnnotations;
 using Threads.Domain.Common;
 
 namespace Threads.Domain.Entities;
