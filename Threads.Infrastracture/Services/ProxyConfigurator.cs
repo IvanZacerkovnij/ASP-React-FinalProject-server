@@ -9,7 +9,7 @@ public static class ProxyConfigurator
     public static IPAddress GetProxy(IConfiguration configuration)
     {
         const string configurationKey = "ReverseProxy:KnownProxy";
-        var knownProxyValue = configuration[configurationKey];
+        var knownProxyValue = configuration[configurationKey] ?? "127.0.0.1";
         
         if (string.IsNullOrWhiteSpace(knownProxyValue))
         {
