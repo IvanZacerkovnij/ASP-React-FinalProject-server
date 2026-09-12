@@ -2,7 +2,7 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Threads.Api", "Threads.Api\Threads.Api.csproj", "{CC196691-642A-49F1-814B-A96C6DE0F333}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Threads.Infrastracture", "Threads.Infrastracture\Threads.Infrastracture.csproj", "{1C96F289-B3F7-41A3-84E2-14C3E2A1F47A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Threads.Infrastructure", "Threads.Infrastructure\Threads.Infrastructure.csproj", "{1C96F289-B3F7-41A3-84E2-14C3E2A1F47A}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Threads.Domain", "Threads.Domain\Threads.Domain.csproj", "{3A05826A-E065-4169-9EC0-C8C2F2DEE216}"
 EndProject

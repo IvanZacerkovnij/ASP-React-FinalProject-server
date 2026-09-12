@@ -69,7 +69,7 @@ BackEndForFinalProject
 │   ├── Common                      # базові domain-моделі
 │   ├── Entities                    # EF/domain entities
 │   └── Enums                       # domain enums
-├── Threads.Infrastracture
+├── Threads.Infrastructure
 │   ├── Data
 │   │   ├── Configurations          # EF Core і table configurations
 │   │   └── Repositories            # реалізації repository interfaces
@@ -88,7 +88,7 @@ BackEndForFinalProject
 1. Запит приходить у контролер з `Threads.Api`.
 2. Контролер дістає auth context і валідує route-level умови.
 3. Application service виконує бізнес-логіку.
-4. Репозиторії та зовнішні інтеграції працюють через `Threads.Infrastracture`.
+4. Репозиторії та зовнішні інтеграції працюють через `Threads.Infrastructure`.
 5. Очікувані негативні результати повертаються через `null`, `bool` або status DTO.
 6. Необроблені винятки проходять через глобальний exception handler і перетворюються на `ProblemDetails`.
 7. API повертає DTO або стандартизовану помилку у вигляді JSON-відповіді.
@@ -240,7 +240,7 @@ API стартує після успішного healthcheck Redis. Для Redis
 
 ```bash
 dotnet ef database update \
-  --project Threads.Infrastracture \
+  --project Threads.Infrastructure \
   --startup-project Threads.Api
 ```
 
@@ -271,7 +271,7 @@ API використовує `GlobalExceptionHandler` із `IExceptionHandler`, 
 | `MediaProcessingException` | `500 Internal Server Error` | Помилка обробки зображення або відео |
 | Інший `Exception` | `500 Internal Server Error` | Непередбачена внутрішня помилка |
 
-Application exceptions розміщені в `Threads.Application/Exceptions`, а технічні винятки конфігурації — у `Threads.Infrastracture/Exceptions`. Giphy та Geoapify перетворюють мережеві помилки й некоректний JSON на `ExternalServiceException`, не передаючи клієнту внутрішні деталі інтеграції.
+Application exceptions розміщені в `Threads.Application/Exceptions`, а технічні винятки конфігурації — у `Threads.Infrastructure/Exceptions`. Giphy та Geoapify перетворюють мережеві помилки й некоректний JSON на `ExternalServiceException`, не передаючи клієнту внутрішні деталі інтеграції.
 
 Винятки використовуються лише для переривання сценарію. Очікувані результати, наприклад неправильні credentials, недійсний refresh token, прострочений verification code або повторне видалення interaction, залишаються `null`, `false` чи окремим status і обробляються контролером.
 

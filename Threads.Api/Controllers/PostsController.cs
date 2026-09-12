@@ -11,7 +11,7 @@ using Threads.Application.Interfaces.Polls;
 using Threads.Application.Interfaces.Posts;
 using Threads.Application.Interfaces.Reposts;
 using Threads.Application.Interfaces.Users;
-using Threads.Infrastracture.Services;
+using Threads.Infrastructure.Services;
 
 namespace Threads.Api.Controllers;
 

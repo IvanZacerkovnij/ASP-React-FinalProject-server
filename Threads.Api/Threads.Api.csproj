@@ -24,7 +24,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\Threads.Application\Threads.Application.csproj" />
-      <ProjectReference Include="..\Threads.Infrastracture\Threads.Infrastracture.csproj" />
+      <ProjectReference Include="..\Threads.Infrastructure\Threads.Infrastructure.csproj" />
     </ItemGroup>
 
     <ItemGroup>

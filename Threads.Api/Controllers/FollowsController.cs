@@ -5,7 +5,7 @@ using Threads.Api.Extensions;
 using Threads.Application.DTOs.Users;
 using Threads.Application.Interfaces.Follows;
 using Threads.Application.Interfaces.Users;
-using Threads.Infrastracture.Services;
+using Threads.Infrastructure.Services;
 
 namespace Threads.Api.Controllers;
 

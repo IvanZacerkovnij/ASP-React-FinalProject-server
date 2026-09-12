@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Threads.Application.Exceptions;
-using Threads.Infrastracture.Exceptions;
+using Threads.Infrastructure.Exceptions;
 
 namespace Threads.Api.ExceptionHandling;
 

@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using Threads.Application.DTOs.Auth.Requests;
 using Threads.Application.DTOs.Auth.Responses;
 using Threads.Application.Interfaces.Auth;
-using Threads.Infrastracture.Services;
+using Threads.Infrastructure.Services;
 
 namespace Threads.Api.Controllers;
 

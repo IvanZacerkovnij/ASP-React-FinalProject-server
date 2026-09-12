@@ -14,7 +14,7 @@ using Threads.Application.Interfaces.Auth;
 using Threads.Application.Interfaces.Comments;
 using Threads.Application.Interfaces.Posts;
 using Threads.Application.Interfaces.Users;
-using Threads.Infrastracture.Services;
+using Threads.Infrastructure.Services;
 
 namespace Threads.Api.Controllers;
 

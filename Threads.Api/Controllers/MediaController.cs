@@ -5,7 +5,7 @@ using Threads.Api.Extensions;
 using Threads.Api.Requests.Media;
 using Threads.Application.DTOs.Media;
 using Threads.Application.Interfaces.Media;
-using Threads.Infrastracture.Services;
+using Threads.Infrastructure.Services;
 
 namespace Threads.Api.Controllers;
 

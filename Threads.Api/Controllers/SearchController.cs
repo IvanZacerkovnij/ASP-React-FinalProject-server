@@ -9,7 +9,7 @@ using Threads.Application.Interfaces.Gifs;
 using Threads.Application.Interfaces.Locations;
 using Threads.Application.Interfaces.Posts;
 using Threads.Application.Interfaces.Users;
-using Threads.Infrastracture.Services;
+using Threads.Infrastructure.Services;
 
 namespace Threads.Api.Controllers;
 

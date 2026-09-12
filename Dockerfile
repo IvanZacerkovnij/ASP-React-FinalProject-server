@@ -5,7 +5,7 @@ WORKDIR /src
 COPY ["Threads.Api/Threads.Api.csproj", "Threads.Api/"]
 COPY ["Threads.Application/Threads.Application.csproj", "Threads.Application/"]
 COPY ["Threads.Domain/Threads.Domain.csproj", "Threads.Domain/"]
-COPY ["Threads.Infrastracture/Threads.Infrastracture.csproj", "Threads.Infrastracture/"]
+COPY ["Threads.Infrastructure/Threads.Infrastructure.csproj", "Threads.Infrastructure/"]
 
 RUN dotnet restore "Threads.Api/Threads.Api.csproj"
 
