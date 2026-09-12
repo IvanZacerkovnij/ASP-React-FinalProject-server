@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Threads.Api.Extensions;
 using Threads.Api.Requests.Users;
 using Threads.Application.DTOs.Auth.Requests;
@@ -13,6 +14,7 @@ using Threads.Application.Interfaces.Auth;
 using Threads.Application.Interfaces.Comments;
 using Threads.Application.Interfaces.Posts;
 using Threads.Application.Interfaces.Users;
+using Threads.Infrastracture.Services;
 
 namespace Threads.Api.Controllers;
 
@@ -229,6 +231,7 @@ public class MeController : ControllerBase
     }
     
     [HttpPost("change-password/start")]
+    [EnableRateLimiting(RateLimiterConfigurator.ChangePasswordStartPolicyName)]
     public async Task<IActionResult> StartPasswordChange(
         [FromBody] StartPasswordChangeRequest request,
         CancellationToken cancellationToken)
@@ -262,6 +265,7 @@ public class MeController : ControllerBase
     }
 
     [HttpPost("change-password/confirm")]
+    [EnableRateLimiting(RateLimiterConfigurator.ChangePasswordConfirmPolicyName)]
     public async Task<IActionResult> ConfirmPasswordChange(
         [FromBody] ConfirmPasswordChangeRequest request,
         CancellationToken cancellationToken)

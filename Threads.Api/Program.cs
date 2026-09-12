@@ -117,14 +117,30 @@ public class Program
         builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
     }
 
+    private static void AddForwardedHeaders(WebApplicationBuilder builder)
+    {
+        builder.Services.Configure<ForwardedHeadersOptions>(options =>
+            ForwardedHeadersConfigurator.Configure(
+                options,
+                ProxyConfigurator.GetProxy(builder.Configuration)));
+    }
+
+    private static void AddRateLimit(WebApplicationBuilder builder)
+    {
+        builder.Services.AddRateLimiter(RateLimiterConfigurator.Configure);
+    }
+
     private static void ConfigureApplication(WebApplication app)
     {
+        app.UseForwardedHeaders();
         app.UseExceptionHandler();
         
         app.UseCors("AllowAll");
         
         app.UseHttpsRedirection();
+        
         app.UseAuthentication();
+        app.UseRateLimiter();
         app.UseAuthorization();
 
         app.MapControllers();
@@ -146,6 +162,8 @@ public class Program
 
         AddCache(builder);
         AddGlobalExceptionHandler(builder);
+        AddForwardedHeaders(builder);
+        AddRateLimit(builder);
 
         builder.Services.AddControllers();
 

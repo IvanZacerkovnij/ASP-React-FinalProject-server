@@ -3,7 +3,7 @@ using Microsoft.Extensions.Configuration;
 
 namespace Threads.Infrastracture.Security;
 
-public static  class CORSConfigurator
+public static class CORSConfigurator
 {
     private const string FrontendCorsPolicyName = "AllowAll";
     

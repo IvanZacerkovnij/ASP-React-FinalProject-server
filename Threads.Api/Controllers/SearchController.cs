@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Threads.Api.Extensions;
 using Threads.Application.DTOs.Gifs;
 using Threads.Application.DTOs.Locations;
@@ -8,6 +9,7 @@ using Threads.Application.Interfaces.Gifs;
 using Threads.Application.Interfaces.Locations;
 using Threads.Application.Interfaces.Posts;
 using Threads.Application.Interfaces.Users;
+using Threads.Infrastracture.Services;
 
 namespace Threads.Api.Controllers;
 
@@ -55,6 +57,7 @@ public class SearchController : ControllerBase
     }
 
     [HttpGet("gifs")]
+    [EnableRateLimiting(RateLimiterConfigurator.ExternalSearchPolicyName)]
     public async Task<ActionResult<IReadOnlyCollection<GifResponse>>> SearchGifs(
         [FromQuery] string? q,
         CancellationToken cancellationToken)
@@ -64,6 +67,7 @@ public class SearchController : ControllerBase
     }
 
     [HttpGet("locations")]
+    [EnableRateLimiting(RateLimiterConfigurator.ExternalSearchPolicyName)]
     public async Task<ActionResult<IReadOnlyCollection<LocationResponse>>> SearchLocations(
         [FromQuery] string? q,
         CancellationToken cancellationToken)

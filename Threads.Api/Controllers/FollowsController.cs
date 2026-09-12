@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Threads.Api.Extensions;
 using Threads.Application.DTOs.Users;
 using Threads.Application.Interfaces.Follows;
 using Threads.Application.Interfaces.Users;
+using Threads.Infrastracture.Services;
 
 namespace Threads.Api.Controllers;
 
@@ -22,6 +24,7 @@ public class FollowsController : ControllerBase
 
     [Authorize]
     [HttpPost("{userId:guid}")]
+    [EnableRateLimiting(RateLimiterConfigurator.InteractionPolicyName)]
     public async Task<ActionResult> Follow(
         [FromRoute] Guid userId,
         CancellationToken cancellationToken)
@@ -49,6 +52,7 @@ public class FollowsController : ControllerBase
 
     [Authorize]
     [HttpDelete("{userId:guid}")]
+    [EnableRateLimiting(RateLimiterConfigurator.InteractionPolicyName)]
     public async Task<ActionResult> Unfollow(
         [FromRoute] Guid userId,
         CancellationToken cancellationToken)
@@ -110,6 +114,7 @@ public class FollowsController : ControllerBase
 
     [Authorize]
     [HttpDelete("{userId:guid}/followers/{followId:guid}")]
+    [EnableRateLimiting(RateLimiterConfigurator.InteractionPolicyName)]
     public async Task<ActionResult> RemoveFollower(
         [FromRoute] Guid userId,
         [FromRoute] Guid followId,

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Threads.Api.Extensions;
 using Threads.Application.DTOs.Polls;
 using Threads.Application.DTOs.Posts.Requests;
@@ -10,6 +11,7 @@ using Threads.Application.Interfaces.Polls;
 using Threads.Application.Interfaces.Posts;
 using Threads.Application.Interfaces.Reposts;
 using Threads.Application.Interfaces.Users;
+using Threads.Infrastracture.Services;
 
 namespace Threads.Api.Controllers;
 
@@ -66,6 +68,7 @@ public class PostsController : ControllerBase
 
     [Authorize]
     [HttpPost("{id:guid}/view")]
+    [EnableRateLimiting(RateLimiterConfigurator.InteractionPolicyName)]
     public async Task<ActionResult<PostViewResponse>> RegisterView(
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
@@ -86,6 +89,7 @@ public class PostsController : ControllerBase
 
     [Authorize]
     [HttpPost("{id:guid}/like")]
+    [EnableRateLimiting(RateLimiterConfigurator.InteractionPolicyName)]
     public async Task<ActionResult<PostLikeStateResponse>> LikePost(
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
@@ -114,6 +118,7 @@ public class PostsController : ControllerBase
 
     [Authorize]
     [HttpPost("{id:guid}/repost")]
+    [EnableRateLimiting(RateLimiterConfigurator.InteractionPolicyName)]
     public async Task<ActionResult<PostRepostStateResponse>> RepostPost(
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
@@ -152,6 +157,7 @@ public class PostsController : ControllerBase
 
     [Authorize]
     [HttpDelete("{id:guid}/repost")]
+    [EnableRateLimiting(RateLimiterConfigurator.InteractionPolicyName)]
     public async Task<ActionResult<PostRepostStateResponse>> UndoRepostPost(
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
@@ -190,6 +196,7 @@ public class PostsController : ControllerBase
 
     [Authorize]
     [HttpDelete("{id:guid}/like")]
+    [EnableRateLimiting(RateLimiterConfigurator.InteractionPolicyName)]
     public async Task<ActionResult<PostLikeStateResponse>> UnlikePost(
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
@@ -218,6 +225,7 @@ public class PostsController : ControllerBase
 
     [Authorize]
     [HttpPost("{id:guid}/bookmark")]
+    [EnableRateLimiting(RateLimiterConfigurator.InteractionPolicyName)]
     public async Task<ActionResult<PostBookmarkStateResponse>> BookmarkPost(
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
@@ -255,6 +263,7 @@ public class PostsController : ControllerBase
     
     [Authorize]
     [HttpDelete("{id:guid}/bookmark")]
+    [EnableRateLimiting(RateLimiterConfigurator.InteractionPolicyName)]
     public async Task<ActionResult<PostBookmarkStateResponse>> UnBookmarkPost(
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
@@ -292,6 +301,7 @@ public class PostsController : ControllerBase
 
     [Authorize]
     [HttpPost("{id:guid}/poll/vote")]
+    [EnableRateLimiting(RateLimiterConfigurator.InteractionPolicyName)]
     public async Task<ActionResult<PollResponse>> VotePoll(
         [FromRoute] Guid id,
         [FromBody] VotePollRequest request,
@@ -320,6 +330,7 @@ public class PostsController : ControllerBase
 
     [Authorize]
     [HttpPost]
+    [EnableRateLimiting(RateLimiterConfigurator.PostCreationPolicyName)]
     public async Task<ActionResult<PostResponse>> Create(
         [FromBody] CreatePostRequest request,
         CancellationToken cancellationToken)

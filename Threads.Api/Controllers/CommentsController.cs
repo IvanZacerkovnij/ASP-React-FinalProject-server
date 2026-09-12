@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Threads.Api.Extensions;
 using Threads.Application.DTOs.Comments;
 using Threads.Application.Interfaces.Comments;
+using Threads.Infrastracture.Services;
 
 namespace Threads.Api.Controllers;
 
@@ -33,6 +35,7 @@ public class CommentsController : ControllerBase
 
     [Authorize]
     [HttpPost]
+    [EnableRateLimiting(RateLimiterConfigurator.CommentCreationPolicyName)]
     public async Task<ActionResult<CommentResponse>> Create(
         [FromBody] CreateCommentRequest request,
         CancellationToken cancellationToken)
@@ -137,6 +140,7 @@ public class CommentsController : ControllerBase
 
     [Authorize]
     [HttpPost("{id:guid}/like")]
+    [EnableRateLimiting(RateLimiterConfigurator.InteractionPolicyName)]
     public async Task<ActionResult<CommentResponse>> LikeComment(
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
@@ -157,6 +161,7 @@ public class CommentsController : ControllerBase
 
     [Authorize]
     [HttpPost("{id:guid}/view")]
+    [EnableRateLimiting(RateLimiterConfigurator.InteractionPolicyName)]
     public async Task<ActionResult<CommentResponse>> ViewComment(
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
@@ -177,6 +182,7 @@ public class CommentsController : ControllerBase
 
     [Authorize]
     [HttpDelete("{id:guid}/like")]
+    [EnableRateLimiting(RateLimiterConfigurator.InteractionPolicyName)]
     public async Task<ActionResult<CommentResponse>> UnlikeComment(
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
@@ -197,6 +203,7 @@ public class CommentsController : ControllerBase
 
     [Authorize]
     [HttpPost("{id:guid}/bookmark")]
+    [EnableRateLimiting(RateLimiterConfigurator.InteractionPolicyName)]
     public async Task<ActionResult<CommentResponse>> BookmarkComment(
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
@@ -217,6 +224,7 @@ public class CommentsController : ControllerBase
 
     [Authorize]
     [HttpDelete("{id:guid}/bookmark")]
+    [EnableRateLimiting(RateLimiterConfigurator.InteractionPolicyName)]
     public async Task<ActionResult<CommentResponse>> UnbookmarkComment(
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
@@ -237,6 +245,7 @@ public class CommentsController : ControllerBase
 
     [Authorize]
     [HttpPost("{id:guid}/repost")]
+    [EnableRateLimiting(RateLimiterConfigurator.InteractionPolicyName)]
     public async Task<ActionResult<CommentResponse>> RepostComment(
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
@@ -257,6 +266,7 @@ public class CommentsController : ControllerBase
 
     [Authorize]
     [HttpDelete("{id:guid}/repost")]
+    [EnableRateLimiting(RateLimiterConfigurator.InteractionPolicyName)]
     public async Task<ActionResult<CommentResponse>> UnrepostComment(
         [FromRoute] Guid id,
         CancellationToken cancellationToken)

@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Threads.Application.DTOs.Auth.Requests;
 using Threads.Application.DTOs.Auth.Responses;
 using Threads.Application.Interfaces.Auth;
+using Threads.Infrastracture.Services;
 
 namespace Threads.Api.Controllers;
 
@@ -17,6 +19,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("register")]
+    [EnableRateLimiting(RateLimiterConfigurator.RegisterPolicyName)]
     public async Task<IActionResult> Register(
         [FromBody] RegisterRequest request,
         CancellationToken cancellationToken)
@@ -26,6 +29,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("login")]
+    [EnableRateLimiting(RateLimiterConfigurator.LoginPolicyName)]
     public async Task<ActionResult<AuthResponse>> Login(
         [FromBody] LoginRequest request,
         CancellationToken cancellationToken)
@@ -38,6 +42,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("refresh")]
+    [EnableRateLimiting(RateLimiterConfigurator.RefreshPolicyName)]
     public async Task<ActionResult<AuthResponse>> Refresh(
         [FromBody] RefreshTokenRequest request,
         CancellationToken cancellationToken)
@@ -62,6 +67,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("forgot-password")]
+    [EnableRateLimiting(RateLimiterConfigurator.ForgotPasswordPolicyName)]
     public async Task<IActionResult> ForgotPassword(
         [FromBody] ForgotPasswordRequest request,
         CancellationToken cancellationToken)
@@ -71,6 +77,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("verify-reset-code")]
+    [EnableRateLimiting(RateLimiterConfigurator.VerificationPolicyName)]
     public async Task<IActionResult> VerifyResetCode(
         [FromBody] VerifyResetCodeRequest request,
         CancellationToken cancellationToken)
@@ -83,6 +90,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("reset-password")]
+    [EnableRateLimiting(RateLimiterConfigurator.VerificationPolicyName)]
     public async Task<IActionResult> ResetPassword(
         [FromBody] ResetPasswordRequest request,
         CancellationToken cancellationToken)
@@ -95,6 +103,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("verify-email")]
+    [EnableRateLimiting(RateLimiterConfigurator.VerificationPolicyName)]
     public async Task<ActionResult<AuthResponse>> VerifyEmail(
         [FromBody] VerifyEmailRequest request,
         CancellationToken cancellationToken)
@@ -107,14 +116,16 @@ public class AuthController : ControllerBase
     }
     
     [HttpPost("resend-verification-code")]
+    [EnableRateLimiting(RateLimiterConfigurator.ResendVerificationPolicyName)]
     public async Task<IActionResult> ResendVerifyEmail(
         [FromBody] ResendVerificationCodeRequest request,
         CancellationToken cancellationToken)
     {
-        var wasSent = await _authService.ResendVerificationCodeAsync(request, cancellationToken);
+        await _authService.ResendVerificationCodeAsync(request, cancellationToken);
 
-        return wasSent
-            ? Ok(new { message = "Verification code has been sent to your email." })
-            : NotFound(new { message = "Pending registration was not found or expired." });
+        return Ok(new
+        {
+            message = "If a pending registration exists, a verification code has been sent."
+        });
     }
 }

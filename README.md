@@ -2,7 +2,7 @@
 
 Backend для соціального застосунку у стилі Threads, побудований на `ASP.NET Core Web API` з `PostgreSQL`, `EF Core`, `JWT`, `AWS S3` і обробкою медіа через `ffmpeg`.
 
-> Останнє оновлення документації: `2026-09-09`
+> Останнє оновлення документації: `2026-09-12`
 
 ## Зміст
 
@@ -13,6 +13,7 @@ Backend для соціального застосунку у стилі Threads
 - [Конфігурація](#конфігурація)
 - [Рольова авторизація](#рольова-авторизація)
 - [Обробка помилок](#обробка-помилок)
+- [Rate limiting](#rate-limiting)
 - [Огляд API](#огляд-api)
 - [Логіка CommentService](#логіка-commentservice)
 - [Кешування](#кешування)
@@ -34,6 +35,7 @@ Backend для соціального застосунку у стилі Threads
 - дворівневе кешування пошуку через `HybridCache` і `Redis`
 - завантаження зображень і відео в `AWS S3`
 - стиснення відео та генерація thumbnail перед upload
+- endpoint-specific rate limiting для auth, створення контенту, interactions, upload і зовнішнього пошуку
 
 ## Структура проєкту
 
@@ -101,6 +103,7 @@ BackEndForFinalProject
 - `.NET HybridCache` (L1 memory + L2 Redis)
 - `Npgsql`
 - `JWT Bearer Authentication`
+- `ASP.NET Core Rate Limiting Middleware`
 - `AWS S3`
 - `ffmpeg` / `ffprobe`
 - `Resend`
@@ -123,6 +126,7 @@ BackEndForFinalProject
 
 ```env
 ASPNETCORE_ENVIRONMENT=Production
+ReverseProxy__KnownProxy=172.18.0.1
 
 ConnectionStrings__DefaultConnection=Host=host.docker.internal;Port=5432;Database=threads_db;Username=postgres;Password=postgres
 
@@ -159,6 +163,13 @@ Cors__AllowedOrigins__0=http://localhost:8000
 Cors__AllowedOrigins__1=http://127.0.0.1:8000
 ```
 
+`ReverseProxy__KnownProxy` — адреса Docker gateway, з якої Nginx підключається до API-контейнера. Актуальне значення можна отримати після створення контейнера:
+
+```bash
+docker inspect threads-api \
+  --format '{{range .NetworkSettings.Networks}}{{.Gateway}}{{end}}'
+```
+
 ### 2. Підійми контейнер
 
 ```bash
@@ -183,6 +194,7 @@ API стартує після успішного healthcheck Redis. Для Redis
 - `Jwt__Issuer`
 - `Jwt__Audience`
 - `Jwt__Key`
+- `ReverseProxy__KnownProxy`
 - `Redis__ConnectionString` при запуску без `docker compose`
 
 При запуску через `docker compose` замість ручного `Redis__ConnectionString` достатньо задати `REDIS_PASSWORD` у `.env`.
@@ -272,6 +284,42 @@ Application exceptions розміщені в `Threads.Application/Exceptions`, �
   "instance": "/api/posts"
 }
 ```
+
+## Rate limiting
+
+API використовує named policies з `Microsoft.AspNetCore.RateLimiting`. Політики реєструються через `RateLimiterConfigurator`, підключаються middleware `UseRateLimiter()` і призначаються endpoint-ам атрибутом `[EnableRateLimiting]`.
+
+IP-based політики використовують `HttpContext.Connection.RemoteIpAddress`. Nginx передає адресу клієнта через `X-Forwarded-For`, а `ForwardedHeadersMiddleware` приймає forwarded headers лише від proxy, вказаного в `ReverseProxy__KnownProxy`.
+
+| Policy | Алгоритм і ліміт | Partition | Застосування |
+|---|---|---|---|
+| `LoginPolicy` | fixed window: `5 / 1 хв` | IP | login |
+| `RegisterPolicy` | fixed window: `3 / 15 хв` | IP | registration |
+| `ForgotPasswordPolicy` | fixed window: `3 / 15 хв` | IP | запит reset code |
+| `ResendVerificationPolicy` | fixed window: `5 / 10 хв` | IP | повторна відправка verification code |
+| `VerificationPolicy` | fixed window: `5 / 10 хв` | IP | verify email, verify reset code і reset password |
+| `RefreshPolicy` | fixed window: `20 / 1 хв` | IP | refresh token |
+| `ChangePasswordStartPolicy` | fixed window: `3 / 15 хв` | user ID | початок зміни пароля |
+| `ChangePasswordConfirmPolicy` | fixed window: `5 / 10 хв` | user ID | підтвердження зміни пароля |
+| `PostCreationPolicy` | token bucket: burst `5`, `+1 / 30 с` | user ID | створення постів |
+| `CommentCreationPolicy` | token bucket: burst `15`, `+5 / 30 с` | user ID | створення коментарів |
+| `InteractionPolicy` | token bucket: burst `60`, `+30 / 30 с` | user ID | views, likes, bookmarks, reposts, follows і poll votes |
+| `MediaUploadPolicy` | token bucket: burst `5`, `+1 / 1 хв` | user ID | upload медіа |
+| `ExternalSearchPolicy` | token bucket: burst `10`, `+5 / 10 с` | IP | Giphy і Geoapify search |
+
+Endpoint-и з однаковою named policy використовують спільний bucket у межах одного partition key. Наприклад, усі interactions одного користувача витрачають спільні токени `InteractionPolicy`, а GIF і location search з однієї IP використовують спільні токени `ExternalSearchPolicy`.
+
+При перевищенні ліміту API повертає `429 Too Many Requests`:
+
+```json
+{
+  "message": "Too many requests. Please try again later."
+}
+```
+
+Якщо limiter надає час відновлення, відповідь також містить HTTP-заголовок `Retry-After` із кількістю секунд до наступної дозволеної спроби.
+
+Поточні limiter-и зберігають стан у пам'яті API-процесу. Це відповідає поточному deployment з одним `api` container. При горизонтальному масштабуванні rate limiting потрібно перенести на reverse proxy/API gateway або реалізувати спільні атомарні лічильники в Redis.
 
 ## Огляд API
 
@@ -560,10 +608,12 @@ URL аватара не зберігається безпосередньо в D
 - Redis працює в окремому контейнері `threads-redis`, захищений паролем і має healthcheck
 - API залежить від успішного Redis healthcheck
 - конфіг `deploy/nginx/threads.conf` проксіює трафік на `127.0.0.1:7000`
+- Nginx передає `X-Forwarded-For` і `X-Forwarded-Proto`; API довіряє лише proxy з `ReverseProxy__KnownProxy`
+- forwarded headers обробляються до authentication та rate limiting, тому IP-based policies використовують адресу клієнта, а не Docker gateway
 
 ## Примітки
 
 - Swagger у поточному проєкті не підключений.
 - README описує фактичні контролери, маршрути й конфігурацію, які є в коді зараз.
 - Для `Like`, `Bookmark`, `Repost` і `View` тепер використовується єдина сутність на `post` або `comment` target.
-- Останні зміни від `2026-09-12`: зміна пароля розділена на start/confirm endpoint-и з окремими request DTO; додано глобальний exception handler і типізовані Application/Infrastructure exceptions; контролери більше не дублюють `try/catch`; помилки Giphy та Geoapify перетворюються на безпечні `502 Bad Gateway` responses.
+- Останні зміни від `2026-09-12`: зміна пароля розділена на start/confirm endpoint-и з окремими request DTO; додано глобальний exception handler і типізовані Application/Infrastructure exceptions; контролери більше не дублюють `try/catch`; помилки Giphy та Geoapify перетворюються на безпечні `502 Bad Gateway` responses; додано endpoint-specific rate limiting і trusted forwarded headers для Nginx.

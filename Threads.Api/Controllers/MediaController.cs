@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Threads.Api.Extensions;
 using Threads.Api.Requests.Media;
 using Threads.Application.DTOs.Media;
 using Threads.Application.Interfaces.Media;
+using Threads.Infrastracture.Services;
 
 namespace Threads.Api.Controllers;
 
@@ -34,6 +36,7 @@ public class MediaController : ControllerBase
 
     [Authorize]
     [HttpPost("upload")]
+    [EnableRateLimiting(RateLimiterConfigurator.MediaUploadPolicyName)]
     [RequestSizeLimit(104_857_600)]
     [RequestFormLimits(MultipartBodyLengthLimit = 104_857_600)]
     public async Task<ActionResult<UploadMediaResponse>> Upload(
