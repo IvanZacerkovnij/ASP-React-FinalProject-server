@@ -19,13 +19,9 @@ jobs:
           host: ${{ vars.DEPLOY_HOST }}
           username: ${{ vars.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          debug: true
-          request_pty: true
 
           script: |
-            exec > "$HOME/threads-deploy.log" 2>&1
-            set -Ee
-            trap 'exit_code=$?; echo "FAILED at line $LINENO with exit code $exit_code"' ERR
+            set -e
 
             echo "STEP 1: remote shell started"
             id
