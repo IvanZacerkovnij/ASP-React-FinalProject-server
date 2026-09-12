@@ -170,6 +170,8 @@ docker inspect threads-api \
   --format '{{range .NetworkSettings.Networks}}{{.Gateway}}{{end}}'
 ```
 
+Для локального Development-запуску без Docker використовується `127.0.0.1` з `appsettings.Development.json`. У Docker застосунок працює в `Production`, тому адресу proxy отримує з `.env`.
+
 ### 2. Підійми контейнер
 
 ```bash

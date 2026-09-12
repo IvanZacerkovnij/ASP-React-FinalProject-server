@@ -6,18 +6,20 @@ namespace Threads.Infrastracture.Services;
 
 public static class ProxyConfigurator
 {
-    public static IPAddress GetProxy(IConfiguration configurator)
+    public static IPAddress GetProxy(IConfiguration configuration)
     {
-        var knownProxyValue = configurator["ReverseProxy:KnownProxy"];
+        const string configurationKey = "ReverseProxy:KnownProxy";
+        var knownProxyValue = configuration[configurationKey];
         
         if (string.IsNullOrWhiteSpace(knownProxyValue))
         {
-            throw new InfrastructureConfigurationException("ReverseProxy:KnownProxy is missing");
+            throw new InfrastructureConfigurationException(configurationKey);
         }
 
         if (!IPAddress.TryParse(knownProxyValue, out var knownProxy))
         {
-            throw new InfrastructureConfigurationException("ReverseProxy:KnownProxy must contain a valid IP address.");
+            throw new InvalidOperationException(
+                $"Configuration key '{configurationKey}' must contain a valid IP address.");
         }
 
         return knownProxy;
