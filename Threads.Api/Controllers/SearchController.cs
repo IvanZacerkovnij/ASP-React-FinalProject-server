@@ -1,8 +1,7 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
+using Threads.Api.Extensions;
 using Threads.Application.DTOs.Gifs;
 using Threads.Application.DTOs.Locations;
-using Threads.Application.DTOs.Posts;
 using Threads.Application.DTOs.Posts.Responses;
 using Threads.Application.DTOs.Users;
 using Threads.Application.Interfaces.Gifs;
@@ -38,7 +37,9 @@ public class SearchController : ControllerBase
         [FromQuery] string? q,
         CancellationToken cancellationToken)
     {
-        var users = await _userService.SearchAsync(q ?? string.Empty, cancellationToken, GetCurrentUserId());
+        var currentUserId = User.GetCurrentUserId();
+        
+        var users = await _userService.SearchAsync(q ?? string.Empty, cancellationToken, currentUserId);
         return Ok(users);
     }
 
@@ -47,7 +48,9 @@ public class SearchController : ControllerBase
         [FromQuery] string? q,
         CancellationToken cancellationToken)
     {
-        var posts = await _postService.SearchAsync(q ?? string.Empty, cancellationToken, GetCurrentUserId());
+        var currentUserId = User.GetCurrentUserId();
+        
+        var posts = await _postService.SearchAsync(q ?? string.Empty, cancellationToken, currentUserId);
         return Ok(posts);
     }
 
@@ -97,14 +100,5 @@ public class SearchController : ControllerBase
         {
             return StatusCode(StatusCodes.Status502BadGateway, new { message = exception.Message });
         }
-    }
-
-    private Guid? GetCurrentUserId()
-    {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-
-        return Guid.TryParse(userId, out var parsedUserId)
-            ? parsedUserId
-            : null;
     }
 }

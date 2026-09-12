@@ -1,6 +1,6 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Threads.Api.Extensions;
 using Threads.Api.Requests.Media;
 using Threads.Application.DTOs.Media;
 using Threads.Application.Exceptions;
@@ -24,7 +24,9 @@ public class MediaController : ControllerBase
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
     {
-        var media = await _mediaService.GetUrlAsync(id, GetCurrentUserId(), cancellationToken);
+        var currentUserId = User.GetCurrentUserId();
+        
+        var media = await _mediaService.GetUrlAsync(id, currentUserId, cancellationToken);
 
         return media is null
             ? NotFound(new { message = "Media was not found." })
@@ -39,7 +41,7 @@ public class MediaController : ControllerBase
         [FromForm] UploadMediaRequest request,
         CancellationToken cancellationToken)
     {
-        var currentUserId = GetCurrentUserId();
+        var currentUserId = User.GetCurrentUserId();
 
         if (currentUserId is null)
         {
@@ -77,14 +79,5 @@ public class MediaController : ControllerBase
         {
             return BadRequest(new { message = exception.Message });
         }
-    }
-
-    private Guid? GetCurrentUserId()
-    {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-
-        return Guid.TryParse(userId, out var parsedUserId)
-            ? parsedUserId
-            : null;
     }
 }

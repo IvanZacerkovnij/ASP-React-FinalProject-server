@@ -1,7 +1,6 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
+using Threads.Api.Extensions;
 using Threads.Application.DTOs.Likes;
-using Threads.Application.DTOs.Posts;
 using Threads.Application.DTOs.Posts.Responses;
 using Threads.Application.DTOs.Reposts;
 using Threads.Application.DTOs.Users;
@@ -34,7 +33,9 @@ public class UsersController : ControllerBase
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
     {
-        var user = await _userService.GetByIdAsync(id, cancellationToken, GetCurrentUserId());
+        var currentUserId = User.GetCurrentUserId();
+        
+        var user = await _userService.GetByIdAsync(id, cancellationToken, currentUserId);
 
         return user is null
             ? NotFound(new { message = "User was not found." })
@@ -45,7 +46,9 @@ public class UsersController : ControllerBase
         [FromRoute] string username,
         CancellationToken cancellationToken)
     {
-        var user = await _userService.GetByUsernameAsync(username, cancellationToken, GetCurrentUserId());
+        var currentUserId = User.GetCurrentUserId();
+        
+        var user = await _userService.GetByUsernameAsync(username, cancellationToken, currentUserId);
 
         return user is null
             ? NotFound(new { message = "User was not found." })
@@ -57,7 +60,10 @@ public class UsersController : ControllerBase
         [FromRoute] string username,
         CancellationToken cancellationToken)
     {
+        var currentUserId = User.GetCurrentUserId();
+        
         var user = await _userService.GetByUsernameAsync(username, cancellationToken);
+        
         if (user is null)
         {
             return NotFound(new { message = "User was not found." });
@@ -66,7 +72,7 @@ public class UsersController : ControllerBase
         var posts = await _postService.GetByAuthorIdAsync(
             user.Id,
             cancellationToken,
-            GetCurrentUserId());
+            currentUserId);
         return Ok(posts);
     }
 
@@ -82,7 +88,7 @@ public class UsersController : ControllerBase
             return NotFound(new { message = "User was not found." });
         }
 
-        var currentUserId = GetCurrentUserId();
+        var currentUserId = User.GetCurrentUserId();
         var posts = await _postService.GetLikedByUserIdAsync(user.Id, cancellationToken, currentUserId);
         var comments = await _commentService.GetLikedByUserIdAsync(user.Id, cancellationToken, currentUserId);
 
@@ -105,7 +111,7 @@ public class UsersController : ControllerBase
             return NotFound(new { message = "User was not found." });
         }
 
-        var currentUserId = GetCurrentUserId();
+        var currentUserId = User.GetCurrentUserId();
         var posts = await _postService.GetRepostedByUserIdAsync(user.Id, cancellationToken, currentUserId);
         var comments = await _commentService.GetRepostedByUserIdAsync(user.Id, cancellationToken, currentUserId);
 
@@ -114,14 +120,5 @@ public class UsersController : ControllerBase
             Posts = posts,
             Comments = comments
         });
-    }
-
-    private Guid? GetCurrentUserId()
-    {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-
-        return Guid.TryParse(userId, out var parsedUserId)
-            ? parsedUserId
-            : null;
     }
 }

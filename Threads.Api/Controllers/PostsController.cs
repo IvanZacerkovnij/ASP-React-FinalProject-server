@@ -1,6 +1,6 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Threads.Api.Extensions;
 using Threads.Application.DTOs.Polls;
 using Threads.Application.DTOs.Posts.Requests;
 using Threads.Application.DTOs.Posts.Responses;
@@ -43,7 +43,9 @@ public class PostsController : ControllerBase
     [HttpGet("feed")]
     public async Task<ActionResult<IReadOnlyCollection<PostResponse>>> GetFeed(CancellationToken cancellationToken)
     {
-        var posts = await _postService.GetFeedAsync(cancellationToken, GetCurrentUserId());
+        var currentUserId = User.GetCurrentUserId();
+        
+        var posts = await _postService.GetFeedAsync(cancellationToken, currentUserId);
         return Ok(posts);
     }
     
@@ -53,7 +55,9 @@ public class PostsController : ControllerBase
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
     {
-        var post = await _postService.GetByIdAsync(id, cancellationToken, GetCurrentUserId());
+        var currentUserId = User.GetCurrentUserId();
+        
+        var post = await _postService.GetByIdAsync(id, cancellationToken, currentUserId);
 
         return post is null
             ? NotFound(new { message = "Post was not found." })
@@ -66,7 +70,7 @@ public class PostsController : ControllerBase
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
     {
-        var currentUserId = GetCurrentUserId();
+        var currentUserId = User.GetCurrentUserId();
 
         if (currentUserId is null)
         {
@@ -86,7 +90,7 @@ public class PostsController : ControllerBase
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
     {
-        var currentUserId = GetCurrentUserId();
+        var currentUserId = User.GetCurrentUserId();
 
         if (currentUserId is null)
         {
@@ -114,7 +118,7 @@ public class PostsController : ControllerBase
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
     {
-        var currentUserId = GetCurrentUserId();
+        var currentUserId = User.GetCurrentUserId();
 
         if (currentUserId is null)
         {
@@ -152,7 +156,7 @@ public class PostsController : ControllerBase
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
     {
-        var currentUserId = GetCurrentUserId();
+        var currentUserId = User.GetCurrentUserId();
 
         if (currentUserId is null)
         {
@@ -190,7 +194,7 @@ public class PostsController : ControllerBase
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
     {
-        var currentUserId = GetCurrentUserId();
+        var currentUserId = User.GetCurrentUserId();
 
         if (currentUserId is null)
         {
@@ -218,7 +222,7 @@ public class PostsController : ControllerBase
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
     {
-        var currentUserId = GetCurrentUserId();
+        var currentUserId = User.GetCurrentUserId();
         
         if (currentUserId is null)
         {
@@ -255,7 +259,7 @@ public class PostsController : ControllerBase
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
     {
-        var currentUserId = GetCurrentUserId();
+        var currentUserId = User.GetCurrentUserId();
         
         if (currentUserId is null)
         {
@@ -293,7 +297,7 @@ public class PostsController : ControllerBase
         [FromBody] VotePollRequest request,
         CancellationToken cancellationToken)
     {
-        var currentUserId = GetCurrentUserId();
+        var currentUserId = User.GetCurrentUserId();
 
         if (currentUserId is null)
         {
@@ -320,7 +324,7 @@ public class PostsController : ControllerBase
         [FromBody] CreatePostRequest request,
         CancellationToken cancellationToken)
     {
-        var currentUserId = GetCurrentUserId();
+        var currentUserId = User.GetCurrentUserId();
 
         if (currentUserId is null)
         {
@@ -346,7 +350,7 @@ public class PostsController : ControllerBase
         [FromBody] UpdatePostRequest request,
         CancellationToken cancellationToken)
     {
-        var currentUserId = GetCurrentUserId();
+        var currentUserId = User.GetCurrentUserId();
 
         if (currentUserId is null)
         {
@@ -385,7 +389,7 @@ public class PostsController : ControllerBase
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
     {
-        var currentUserId = GetCurrentUserId();
+        var currentUserId = User.GetCurrentUserId();
 
         if (currentUserId is null)
         {
@@ -407,15 +411,6 @@ public class PostsController : ControllerBase
         await _postService.DeleteAsync(id, cancellationToken);
 
         return NoContent();
-    }
-
-    private Guid? GetCurrentUserId()
-    {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-
-        return Guid.TryParse(userId, out var parsedUserId)
-            ? parsedUserId
-            : null;
     }
 
     private static PostLikeStateResponse MapLikeStateResponse(PostResponse post)

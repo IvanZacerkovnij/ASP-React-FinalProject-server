@@ -1,6 +1,6 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Threads.Api.Extensions;
 using Threads.Application.DTOs.Comments;
 using Threads.Application.Interfaces.Comments;
 
@@ -22,10 +22,12 @@ public class CommentsController : ControllerBase
         [FromRoute] Guid postId,
         CancellationToken cancellationToken)
     {
+        var currentUserId = User.GetCurrentUserId();
+        
         var comments = await _commentService.GetByPostIdAsync(
             postId,
             cancellationToken,
-            GetCurrentUserId());
+            currentUserId);
         return Ok(comments);
     }
 
@@ -35,7 +37,7 @@ public class CommentsController : ControllerBase
         [FromBody] CreateCommentRequest request,
         CancellationToken cancellationToken)
     {
-        var currentUserId = GetCurrentUserId();
+        var currentUserId = User.GetCurrentUserId();
 
         if (currentUserId is null)
         {
@@ -58,10 +60,12 @@ public class CommentsController : ControllerBase
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
     {
+        var currentUserId = User.GetCurrentUserId();
+        
         var comment = await _commentService.GetByIdAsync(
             id,
             cancellationToken,
-            GetCurrentUserId());
+            currentUserId);
         if (comment is null)
         {
             return NotFound(new { message = "Comment was not found." });
@@ -76,7 +80,7 @@ public class CommentsController : ControllerBase
         [FromBody] UpdateCommentRequest request,
         CancellationToken cancellationToken)
     {
-        var currentUserId = GetCurrentUserId();
+        var currentUserId = User.GetCurrentUserId();
 
         if (currentUserId is null)
         {
@@ -116,7 +120,7 @@ public class CommentsController : ControllerBase
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
     {
-        var currentUserId = GetCurrentUserId();
+        var currentUserId = User.GetCurrentUserId();
 
         if (currentUserId is null)
         {
@@ -148,7 +152,7 @@ public class CommentsController : ControllerBase
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
     {
-        var currentUserId = GetCurrentUserId();
+        var currentUserId = User.GetCurrentUserId();
 
         if (currentUserId is null)
         {
@@ -168,7 +172,7 @@ public class CommentsController : ControllerBase
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
     {
-        var currentUserId = GetCurrentUserId();
+        var currentUserId = User.GetCurrentUserId();
 
         if (currentUserId is null)
         {
@@ -188,7 +192,7 @@ public class CommentsController : ControllerBase
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
     {
-        var currentUserId = GetCurrentUserId();
+        var currentUserId = User.GetCurrentUserId();
 
         if (currentUserId is null)
         {
@@ -208,7 +212,7 @@ public class CommentsController : ControllerBase
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
     {
-        var currentUserId = GetCurrentUserId();
+        var currentUserId = User.GetCurrentUserId();
 
         if (currentUserId is null)
         {
@@ -228,7 +232,7 @@ public class CommentsController : ControllerBase
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
     {
-        var currentUserId = GetCurrentUserId();
+        var currentUserId = User.GetCurrentUserId();
 
         if (currentUserId is null)
         {
@@ -248,7 +252,7 @@ public class CommentsController : ControllerBase
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
     {
-        var currentUserId = GetCurrentUserId();
+        var currentUserId = User.GetCurrentUserId();
 
         if (currentUserId is null)
         {
@@ -268,7 +272,7 @@ public class CommentsController : ControllerBase
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
     {
-        var currentUserId = GetCurrentUserId();
+        var currentUserId = User.GetCurrentUserId();
 
         if (currentUserId is null)
         {
@@ -280,14 +284,5 @@ public class CommentsController : ControllerBase
         return updatedComment is null
             ? NotFound(new { message = "Comment was not found." })
             : Ok(updatedComment);
-    }
-
-    private Guid? GetCurrentUserId()
-    {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-
-        return Guid.TryParse(userId, out var parsedUserId)
-            ? parsedUserId
-            : null;
     }
 }

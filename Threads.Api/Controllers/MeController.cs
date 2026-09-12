@@ -1,6 +1,6 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Threads.Api.Extensions;
 using Threads.Api.Requests.Users;
 using Threads.Application.DTOs.Auth.Requests;
 using Threads.Application.DTOs.Auth.Responses;
@@ -41,14 +41,14 @@ public class MeController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<UserResponse>> Me(CancellationToken cancellationToken)
     {
-        var userId = GetCurrentUserId();
+        var currentUserId = User.GetCurrentUserId();
 
-        if (userId is null)
+        if (currentUserId is null)
         {
             return Unauthorized(new { message = "Invalid token claims." });
         }
 
-        var user = await _userService.GetMeAsync(userId.Value, cancellationToken);
+        var user = await _userService.GetMeAsync(currentUserId.Value, cancellationToken);
 
         if (user is null)
         {
@@ -63,7 +63,7 @@ public class MeController : ControllerBase
         [FromForm] UpdateCurrentUserRequest request,
         CancellationToken cancellationToken)
     {
-        var currentUserId = GetCurrentUserId();
+        var currentUserId = User.GetCurrentUserId();
 
         if (currentUserId is null)
         {
@@ -122,7 +122,7 @@ public class MeController : ControllerBase
     [HttpDelete]
     public async Task<IActionResult> DeleteMe(CancellationToken cancellationToken)
     {
-        var currentUserId = GetCurrentUserId();
+        var currentUserId = User.GetCurrentUserId();
 
         if (currentUserId is null)
         {
@@ -139,7 +139,8 @@ public class MeController : ControllerBase
     [HttpGet("posts")]
     public async Task<ActionResult<IReadOnlyCollection<PostResponse>>> GetPosted(CancellationToken cancellationToken)
     {
-        var currentUserId = GetCurrentUserId();
+        var currentUserId = User.GetCurrentUserId();
+        
         if (currentUserId is null)
         {
             return Unauthorized(new { message = "Invalid token claims." });
@@ -155,7 +156,7 @@ public class MeController : ControllerBase
     [HttpGet("likes")]
     public async Task<ActionResult<UserLikesResponse>> GetLiked(CancellationToken cancellationToken)
     {
-        var currentUserId = GetCurrentUserId();
+        var currentUserId = User.GetCurrentUserId();
 
         if (currentUserId is null)
         {
@@ -183,7 +184,7 @@ public class MeController : ControllerBase
     public async Task<ActionResult<UserBookmarksResponse>> GetBookmarked(
         CancellationToken cancellationToken)
     {
-        var currentUserId = GetCurrentUserId();
+        var currentUserId = User.GetCurrentUserId();
 
         if (currentUserId is null)
         {
@@ -210,7 +211,7 @@ public class MeController : ControllerBase
     [HttpGet("reposts")]
     public async Task<ActionResult<UserRepostsResponse>> GetReposted(CancellationToken cancellationToken)
     {
-        var currentUserId = GetCurrentUserId();
+        var currentUserId = User.GetCurrentUserId();
 
         if (currentUserId is null)
         {
@@ -239,7 +240,7 @@ public class MeController : ControllerBase
         [FromBody] StartPasswordChangeRequest request,
         CancellationToken cancellationToken)
     {
-        var currentUserId = GetCurrentUserId();
+        var currentUserId = User.GetCurrentUserId();
         
         if (currentUserId is null)
         {
@@ -283,7 +284,7 @@ public class MeController : ControllerBase
         [FromBody] ConfirmPasswordChangeRequest request,
         CancellationToken cancellationToken)
     {
-        var currentUserId = GetCurrentUserId();
+        var currentUserId = User.GetCurrentUserId();
 
         if (currentUserId is null)
         {
@@ -317,14 +318,5 @@ public class MeController : ControllerBase
         {
             return BadRequest(new { message = exception.Message });
         }
-    }
-
-    private Guid? GetCurrentUserId()
-    {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-
-        return Guid.TryParse(userId, out var parsedUserId)
-            ? parsedUserId
-            : null;
     }
 }

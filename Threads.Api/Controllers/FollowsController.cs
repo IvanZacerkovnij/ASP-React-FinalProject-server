@@ -1,6 +1,6 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Threads.Api.Extensions;
 using Threads.Application.DTOs.Users;
 using Threads.Application.Interfaces.Follows;
 using Threads.Application.Interfaces.Users;
@@ -26,7 +26,7 @@ public class FollowsController : ControllerBase
         [FromRoute] Guid userId,
         CancellationToken cancellationToken)
     {
-        var currentUserId = GetCurrentUserId();
+        var currentUserId = User.GetCurrentUserId();
 
         if (currentUserId is null)
         {
@@ -53,7 +53,7 @@ public class FollowsController : ControllerBase
         [FromRoute] Guid userId,
         CancellationToken cancellationToken)
     {
-        var currentUserId = GetCurrentUserId();
+        var currentUserId = User.GetCurrentUserId();
 
         if (currentUserId is null)
         {
@@ -115,7 +115,7 @@ public class FollowsController : ControllerBase
         [FromRoute] Guid followId,
         CancellationToken cancellationToken)
     {
-        var currentUserId = GetCurrentUserId();
+        var currentUserId = User.GetCurrentUserId();
 
         if (currentUserId is null)
         {
@@ -146,14 +146,5 @@ public class FollowsController : ControllerBase
         return wasRemoved
             ? NoContent()
             : NotFound(new { message = "Follow was not found." });
-    }
-
-    private Guid? GetCurrentUserId()
-    {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-
-        return Guid.TryParse(userId, out var parsedUserId)
-            ? parsedUserId
-            : null;
     }
 }
