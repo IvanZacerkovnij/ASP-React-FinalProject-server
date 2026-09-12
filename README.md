@@ -12,6 +12,7 @@ Backend для соціального застосунку у стилі Threads
 - [Запуск через Docker](#запуск-через-docker)
 - [Конфігурація](#конфігурація)
 - [Рольова авторизація](#рольова-авторизація)
+- [Обробка помилок](#обробка-помилок)
 - [Огляд API](#огляд-api)
 - [Логіка CommentService](#логіка-commentservice)
 - [Кешування](#кешування)
@@ -48,6 +49,7 @@ BackEndForFinalProject
 │   │   ├── FollowsController.cs    # followers і following
 │   │   ├── SearchController.cs     # пошук користувачів, постів, GIF і локацій
 │   │   └── MediaController.cs      # upload і доступ до медіа
+│   ├── ExceptionHandling           # глобальне перетворення винятків у ProblemDetails
 │   ├── Requests                    # HTTP-моделі для multipart/form-data
 │   └── Program.cs                  # entrypoint і DI-конфігурація API
 ├── Threads.Application
@@ -69,6 +71,7 @@ BackEndForFinalProject
 │   ├── Data
 │   │   ├── Configurations          # EF Core і table configurations
 │   │   └── Repositories            # реалізації repository interfaces
+│   ├── Exceptions                  # технічні Infrastructure exceptions
 │   ├── Migrations                  # EF Core migrations і model snapshot
 │   ├── Security                    # JWT, password hashing, CORS і policies
 │   └── Services                    # S3, Redis, email, GIF, location і ffmpeg
@@ -84,7 +87,9 @@ BackEndForFinalProject
 2. Контролер дістає auth context і валідує route-level умови.
 3. Application service виконує бізнес-логіку.
 4. Репозиторії та зовнішні інтеграції працюють через `Threads.Infrastracture`.
-5. API повертає DTO у вигляді JSON-відповіді.
+5. Очікувані негативні результати повертаються через `null`, `bool` або status DTO.
+6. Необроблені винятки проходять через глобальний exception handler і перетворюються на `ProblemDetails`.
+7. API повертає DTO або стандартизовану помилку у вигляді JSON-відповіді.
 
 ## Технології
 
@@ -236,6 +241,37 @@ dotnet ef database update \
 - policy `Moderation` дозволяє доступ користувачам із роллю `Moderator`
 - майбутні moderation endpoints захищатимуться атрибутом `[Authorize(Policy = AuthorizationPolicies.Moderation)]`
 - moderation endpoints у поточній версії API ще не реалізовані
+
+## Обробка помилок
+
+API використовує `GlobalExceptionHandler` із `IExceptionHandler`, зареєстрований через `AddExceptionHandler<GlobalExceptionHandler>()` і `UseExceptionHandler()`. Контролери не дублюють однакові `try/catch`: вони викликають application services, а необроблені винятки централізовано перетворюються на `ProblemDetails`.
+
+| Виняток | HTTP status | Призначення |
+|---|---:|---|
+| `RequestValidationException` | `400 Bad Request` | Некоректні значення або порушення правил валідації запиту |
+| `NotFoundException` | `404 Not Found` | Потрібний ресурс не знайдено |
+| `ConflictException` | `409 Conflict` | Конфлікт із поточним станом або дублювання даних |
+| `ForbiddenException` | `403 Forbidden` | Користувач не має права використовувати ресурс |
+| `ExternalServiceException` | `502 Bad Gateway` | Giphy, Geoapify або інший зовнішній сервіс недоступний чи повернув некоректну відповідь |
+| `InfrastructureConfigurationException` | `500 Internal Server Error` | Відсутнє обов'язкове Infrastructure-налаштування |
+| `MediaProcessingException` | `500 Internal Server Error` | Помилка обробки зображення або відео |
+| Інший `Exception` | `500 Internal Server Error` | Непередбачена внутрішня помилка |
+
+Application exceptions розміщені в `Threads.Application/Exceptions`, а технічні винятки конфігурації — у `Threads.Infrastracture/Exceptions`. Giphy та Geoapify перетворюють мережеві помилки й некоректний JSON на `ExternalServiceException`, не передаючи клієнту внутрішні деталі інтеграції.
+
+Винятки використовуються лише для переривання сценарію. Очікувані результати, наприклад неправильні credentials, недійсний refresh token, прострочений verification code або повторне видалення interaction, залишаються `null`, `false` чи окремим status і обробляються контролером.
+
+Приклад відповіді глобального handler:
+
+```json
+{
+  "type": "about:blank",
+  "title": "Invalid request",
+  "status": 400,
+  "detail": "Post must contain content, media, poll, or embed.",
+  "instance": "/api/posts"
+}
+```
 
 ## Огляд API
 
@@ -399,7 +435,7 @@ dotnet ef database update \
 
 Метод створює звичайний коментар або відповідь на інший коментар:
 
-1. Відхиляє порожній текст або рядок лише з пробілів через `InvalidOperationException`.
+1. Відхиляє порожній текст або рядок лише з пробілів через `RequestValidationException`.
 2. Перевіряє існування поста з `request.PostId`.
 3. Якщо переданий `ParentCommentId`, перевіряє існування батьківського коментаря та належність до того самого поста.
 4. Створює `Comment` через AutoMapper, встановлює `AuthorId` із поточного користувача та обрізає зовнішні пробіли через `Trim()`.
@@ -530,4 +566,4 @@ URL аватара не зберігається безпосередньо в D
 - Swagger у поточному проєкті не підключений.
 - README описує фактичні контролери, маршрути й конфігурацію, які є в коді зараз.
 - Для `Like`, `Bookmark`, `Repost` і `View` тепер використовується єдина сутність на `post` або `comment` target.
-- Останні зміни від `2026-09-12`: зміна пароля розділена на start/confirm endpoint-и з окремими request DTO; реєстрації залежностей і конфігурація middleware згруповані в `Program.cs`; base URL для Giphy та Geoapify винесені в конфігурацію.
+- Останні зміни від `2026-09-12`: зміна пароля розділена на start/confirm endpoint-и з окремими request DTO; додано глобальний exception handler і типізовані Application/Infrastructure exceptions; контролери більше не дублюють `try/catch`; помилки Giphy та Geoapify перетворюються на безпечні `502 Bad Gateway` responses.

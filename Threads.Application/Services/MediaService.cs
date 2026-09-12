@@ -1,4 +1,5 @@
 using Threads.Application.DTOs.Media;
+using Threads.Application.Exceptions;
 using Threads.Application.Interfaces.Media;
 using Threads.Domain.Enums;
 using MediaEntity = Threads.Domain.Entities.Media;
@@ -71,22 +72,22 @@ public class MediaService : IMediaService
     {
         if (string.IsNullOrWhiteSpace(fileName))
         {
-            throw new ArgumentException("File name is required.", nameof(fileName));
+            throw new RequestValidationException("File name is required.");
         }
 
         if (string.IsNullOrWhiteSpace(contentType))
         {
-            throw new ArgumentException("Content type is required.", nameof(contentType));
+            throw new RequestValidationException("Content type is required.");
         }
 
         if (sizeInBytes <= 0)
         {
-            throw new ArgumentException("File must not be empty.", nameof(sizeInBytes));
+            throw new RequestValidationException("File must not be empty.");
         }
 
         if (!AllowedContentTypes.Contains(contentType))
         {
-            throw new InvalidOperationException("Unsupported media content type.");
+            throw new RequestValidationException("Unsupported media content type.");
         }
 
         var mediaType = ResolveMediaType(contentType);
@@ -215,7 +216,7 @@ public class MediaService : IMediaService
 
         if (sizeInBytes > maxSize)
         {
-            throw new InvalidOperationException("File is too large.");
+            throw new RequestValidationException("File is too large.");
         }
     }
 

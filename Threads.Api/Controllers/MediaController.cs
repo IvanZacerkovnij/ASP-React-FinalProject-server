@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Mvc;
 using Threads.Api.Extensions;
 using Threads.Api.Requests.Media;
 using Threads.Application.DTOs.Media;
-using Threads.Application.Exceptions;
 using Threads.Application.Interfaces.Media;
 
 namespace Threads.Api.Controllers;
@@ -53,31 +52,16 @@ public class MediaController : ControllerBase
             return BadRequest(new { message = "File is required." });
         }
 
-        try
-        {
-            await using var stream = request.File.OpenReadStream();
+        await using var stream = request.File.OpenReadStream();
 
-            var media = await _mediaService.UploadAsync(
-                currentUserId.Value,
-                stream,
-                request.File.FileName,
-                request.File.ContentType,
-                request.File.Length,
-                cancellationToken);
+        var media = await _mediaService.UploadAsync(
+            currentUserId.Value,
+            stream,
+            request.File.FileName,
+            request.File.ContentType,
+            request.File.Length,
+            cancellationToken);
 
-            return Ok(media);
-        }
-        catch (ArgumentException exception)
-        {
-            return BadRequest(new { message = exception.Message });
-        }
-        catch (MediaProcessingException exception)
-        {
-            return StatusCode(StatusCodes.Status500InternalServerError, new { message = exception.Message });
-        }
-        catch (InvalidOperationException exception)
-        {
-            return BadRequest(new { message = exception.Message });
-        }
+        return Ok(media);
     }
 }

@@ -1,9 +1,12 @@
 using System.Net.Http.Json;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Configuration;
 using Threads.Application.DTOs.Locations;
+using Threads.Application.Exceptions;
 using Threads.Application.Interfaces.Locations;
+using Threads.Infrastracture.Exceptions;
 
 namespace Threads.Infrastracture.Services;
 
@@ -39,9 +42,8 @@ public class GeoapifyLocationSearchService : ILocationSearchService
 
         if (normalizedQuery.Length > MaxQueryLength)
         {
-            throw new ArgumentException(
-                $"Location search query must be {MaxQueryLength} characters or less.",
-                nameof(query));
+            throw new RequestValidationException(
+                $"Location search query must be {MaxQueryLength} characters or less.");
         }
 
         var cacheKey = $"geoapify:search:{normalizedQuery.ToLowerInvariant()}";
@@ -54,7 +56,7 @@ public class GeoapifyLocationSearchService : ILocationSearchService
 
                 if (string.IsNullOrWhiteSpace(apiKey))
                 {
-                    throw new InvalidOperationException("GEOAPIFY_API_KEY is not configured.");
+                    throw new InfrastructureConfigurationException("GEOAPIFY_API_KEY");
                 }
 
                 var requestUri =
@@ -63,23 +65,32 @@ public class GeoapifyLocationSearchService : ILocationSearchService
                     $"&limit={DefaultLimit}" +
                     $"&apiKey={Uri.EscapeDataString(apiKey)}";
 
-                using var response = await _httpClient.GetAsync(requestUri, token);
-
-                if (!response.IsSuccessStatusCode)
+                try
                 {
-                    throw new HttpRequestException(
-                        $"Geoapify returned status code {(int)response.StatusCode}.",
-                        null,
-                        response.StatusCode);
+                    using var response = await _httpClient.GetAsync(requestUri, token);
+
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        throw new ExternalServiceException(
+                            $"Geoapify returned status code {(int)response.StatusCode}.");
+                    }
+
+                    var payload = await response.Content.ReadFromJsonAsync<GeoapifyAutocompleteResponse>(
+                        cancellationToken: token);
+
+                    return payload?.Results?
+                        .Where(item => item.Latitude.HasValue && item.Longitude.HasValue)
+                        .Select(MapLocationResponse)
+                        .ToList() ?? [];
                 }
-
-                var payload = await response.Content.ReadFromJsonAsync<GeoapifyAutocompleteResponse>(
-                    cancellationToken: token);
-
-                return payload?.Results?
-                    .Where(item => item.Latitude.HasValue && item.Longitude.HasValue)
-                    .Select(MapLocationResponse)
-                    .ToList() ?? [];
+                catch (HttpRequestException exception)
+                {
+                    throw new ExternalServiceException("Unable to communicate with Geoapify.", exception);
+                }
+                catch (JsonException exception)
+                {
+                    throw new ExternalServiceException("Geoapify returned an invalid response.", exception);
+                }
             },
             new HybridCacheEntryOptions
             {

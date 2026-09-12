@@ -6,6 +6,7 @@ using Threads.Application.DTOs.Posts.Models;
 using Threads.Application.DTOs.Posts.Requests;
 using Threads.Application.DTOs.Posts.Responses;
 using Threads.Application.DTOs.Users;
+using Threads.Application.Exceptions;
 using Threads.Application.Interfaces.Media;
 using Threads.Application.Interfaces.Posts;
 using Threads.Application.Interfaces.Users;
@@ -254,7 +255,7 @@ public class PostService : IPostService
         {
             if (post.Poll is not null)
             {
-                throw new InvalidOperationException("Updating an existing poll is not supported.");
+                throw new ConflictException("Updating an existing poll is not supported.");
             }
 
             post.Poll = MapPoll(request.Poll);
@@ -329,7 +330,7 @@ public class PostService : IPostService
 
         if (distinctMediaIds.Length != mediaIds.Count)
         {
-            throw new InvalidOperationException("Media ids must be unique.");
+            throw new RequestValidationException("Media ids must be unique.");
         }
 
         IReadOnlyCollection<Media> media = distinctMediaIds.Length == 0
@@ -338,17 +339,17 @@ public class PostService : IPostService
 
         if (media.Count != distinctMediaIds.Length)
         {
-            throw new InvalidOperationException("One or more media items were not found.");
+            throw new NotFoundException("One or more media items were not found.");
         }
 
         if (media.Any(item => item.UploadedByUserId != authorId))
         {
-            throw new InvalidOperationException("One or more media items do not belong to the current user.");
+            throw new ForbiddenException("One or more media items do not belong to the current user.");
         }
 
         if (media.Any(item => item.PostId.HasValue && item.PostId != post.Id))
         {
-            throw new InvalidOperationException("One or more media items are already attached to another post.");
+            throw new ConflictException("One or more media items are already attached to another post.");
         }
 
         foreach (var existingMedia in post.Media.Where(item => !distinctMediaIds.Contains(item.Id)).ToList())
@@ -377,7 +378,7 @@ public class PostService : IPostService
 
         if (!hasContent && !hasMedia && !hasPoll && !hasEmbed)
         {
-            throw new InvalidOperationException("Post must contain content, media, poll, or embed.");
+            throw new RequestValidationException("Post must contain content, media, poll, or embed.");
         }
     }
 
@@ -390,7 +391,7 @@ public class PostService : IPostService
 
         if (!hasContent && !hasMedia && !hasPoll && !hasEmbed)
         {
-            throw new InvalidOperationException("Post must contain content, media, poll, or embed.");
+            throw new RequestValidationException("Post must contain content, media, poll, or embed.");
         }
     }
 
@@ -405,7 +406,7 @@ public class PostService : IPostService
 
         if (normalizedContent.Length > MaxContentLength)
         {
-            throw new InvalidOperationException($"Post content must be {MaxContentLength} characters or less.");
+            throw new RequestValidationException($"Post content must be {MaxContentLength} characters or less.");
         }
 
         return normalizedContent;
@@ -420,14 +421,14 @@ public class PostService : IPostService
 
         if (string.IsNullOrWhiteSpace(location.Name))
         {
-            throw new InvalidOperationException("Location name is required.");
+            throw new RequestValidationException("Location name is required.");
         }
 
         var normalizedLocationName = location.Name.Trim();
 
         if (normalizedLocationName.Length > MaxLocationNameLength)
         {
-            throw new InvalidOperationException($"Location name must be {MaxLocationNameLength} characters or less.");
+            throw new RequestValidationException($"Location name must be {MaxLocationNameLength} characters or less.");
         }
 
         post.LocationName = normalizedLocationName;
@@ -455,14 +456,14 @@ public class PostService : IPostService
 
         if (string.IsNullOrWhiteSpace(embed.Url))
         {
-            throw new InvalidOperationException("Embed url is required.");
+            throw new RequestValidationException("Embed url is required.");
         }
 
         var normalizedUrl = embed.Url.Trim();
 
         if (normalizedUrl.Length > MaxEmbedUrlLength)
         {
-            throw new InvalidOperationException($"Embed url must be {MaxEmbedUrlLength} characters or less.");
+            throw new RequestValidationException($"Embed url must be {MaxEmbedUrlLength} characters or less.");
         }
 
         post.EmbedUrl = normalizedUrl;
@@ -490,7 +491,7 @@ public class PostService : IPostService
 
         if (normalizedValue.Length > maxLength)
         {
-            throw new InvalidOperationException($"{fieldName} must be {maxLength} characters or less.");
+            throw new RequestValidationException($"{fieldName} must be {maxLength} characters or less.");
         }
 
         return normalizedValue;
@@ -505,12 +506,12 @@ public class PostService : IPostService
 
         if (poll.Options is null)
         {
-            throw new InvalidOperationException("Poll options are required.");
+            throw new RequestValidationException("Poll options are required.");
         }
 
         if (poll.Options.Count < 2)
         {
-            throw new InvalidOperationException("Poll must contain at least 2 options.");
+            throw new RequestValidationException("Poll must contain at least 2 options.");
         }
 
         var normalizedOptions = poll.Options
@@ -519,17 +520,17 @@ public class PostService : IPostService
 
         if (normalizedOptions.Any(string.IsNullOrWhiteSpace))
         {
-            throw new InvalidOperationException("Poll options must not be empty.");
+            throw new RequestValidationException("Poll options must not be empty.");
         }
 
         if (normalizedOptions.Distinct(StringComparer.OrdinalIgnoreCase).Count() != normalizedOptions.Count)
         {
-            throw new InvalidOperationException("Poll options must be unique.");
+            throw new RequestValidationException("Poll options must be unique.");
         }
 
         if (poll.EndsAt.HasValue && poll.EndsAt.Value <= DateTime.UtcNow)
         {
-            throw new InvalidOperationException("Poll end date must be in the future.");
+            throw new RequestValidationException("Poll end date must be in the future.");
         }
 
         return new Poll

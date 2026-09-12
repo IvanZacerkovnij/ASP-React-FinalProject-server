@@ -2,6 +2,7 @@ using AutoMapper;
 using Microsoft.Extensions.Caching.Hybrid;
 using Threads.Application.DTOs.Locations;
 using Threads.Application.DTOs.Users;
+using Threads.Application.Exceptions;
 using Threads.Application.Interfaces.Follows;
 using Threads.Application.Interfaces.Media;
 using Threads.Application.Interfaces.Users;
@@ -168,7 +169,7 @@ public class UserService : IUserService
 
         if (request.DateOfBirth > DateOnly.FromDateTime(DateTime.UtcNow))
         {
-            throw new InvalidOperationException("Date of birth cannot be in the future.");
+            throw new RequestValidationException("Date of birth cannot be in the future.");
         }
 
         if (request.RemoveDateOfBirth)
@@ -345,17 +346,17 @@ public class UserService : IUserService
     {
         if (file.SizeInBytes <= 0)
         {
-            throw new InvalidOperationException($"{fieldName} file must not be empty.");
+            throw new RequestValidationException($"{fieldName} file must not be empty.");
         }
 
         if (file.SizeInBytes > MaxImageSizeInBytes)
         {
-            throw new InvalidOperationException($"{fieldName} file is too large.");
+            throw new RequestValidationException($"{fieldName} file is too large.");
         }
 
         if (string.IsNullOrWhiteSpace(file.ContentType) || !AllowedImageContentTypes.Contains(file.ContentType))
         {
-            throw new InvalidOperationException($"{fieldName} content type is not supported.");
+            throw new RequestValidationException($"{fieldName} content type is not supported.");
         }
     }
 
@@ -370,7 +371,7 @@ public class UserService : IUserService
 
         if (normalizedValue.Length > maxLength)
         {
-            throw new InvalidOperationException($"{fieldName} must be {maxLength} characters or less.");
+            throw new RequestValidationException($"{fieldName} must be {maxLength} characters or less.");
         }
 
         return normalizedValue;
@@ -380,7 +381,7 @@ public class UserService : IUserService
     {
         if (string.IsNullOrWhiteSpace(location.Name))
         {
-            throw new InvalidOperationException("Location name is required.");
+            throw new RequestValidationException("Location name is required.");
         }
 
         user.Location = NormalizeOptionalText(location.Name, MaxLocationLength, "Location");

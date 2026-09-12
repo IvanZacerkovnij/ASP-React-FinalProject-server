@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Threads.Application.DTOs.Auth.Requests;
 using Threads.Application.DTOs.Auth.Responses;
+using Threads.Application.Exceptions;
 using Threads.Application.Interfaces.Auth;
 using Threads.Application.Interfaces.Security;
 using Threads.Application.Interfaces.Users;
@@ -61,7 +62,6 @@ public class AuthService : IAuthService
     {
         var normalizedIdentity = NormalizeRequiredValue(
             request.EmailOrUsername,
-            nameof(request.EmailOrUsername),
             "Email or username is required.");
         var normalizedPassword = NormalizePassword(request.Password, nameof(request.Password));
         var user = await GetUserByEmailOrUsernameAsync(normalizedIdentity, cancellationToken);
@@ -260,7 +260,7 @@ public class AuthService : IAuthService
             pendingRegistrationByUsername is not null &&
             pendingRegistrationByEmail.Id != pendingRegistrationByUsername.Id)
         {
-            throw new InvalidOperationException("Email or username is already used in another pending registration.");
+            throw new ConflictException("Email or username is already used in another pending registration.");
         }
 
         var pendingRegistration = pendingRegistrationByEmail
@@ -279,7 +279,7 @@ public class AuthService : IAuthService
 
         if (Guid.TryParse(normalizedUsername, out _))
         {
-            throw new InvalidOperationException("Username must not be a GUID.");
+            throw new RequestValidationException("Username must not be a GUID.");
         }
 
         return new RegistrationData(
@@ -427,13 +427,13 @@ public class AuthService : IAuthService
         var existingUserByEmail = await _userRepository.GetByEmailAsync(normalizedEmail, cancellationToken);
         if (existingUserByEmail is not null)
         {
-            throw new InvalidOperationException("User with this email already exists.");
+            throw new ConflictException("User with this email already exists.");
         }
 
         var existingUserByUsername = await _userRepository.GetByUsernameAsync(normalizedUsername, cancellationToken);
         if (existingUserByUsername is not null)
         {
-            throw new InvalidOperationException("User with this username already exists.");
+            throw new ConflictException("User with this username already exists.");
         }
     }
 
@@ -509,7 +509,7 @@ public class AuthService : IAuthService
 
     private static string NormalizeEmail(string email)
     {
-        var normalizedEmail = NormalizeRequiredValue(email, nameof(email), "Email is required.")
+        var normalizedEmail = NormalizeRequiredValue(email, "Email is required.")
             .ToLowerInvariant();
 
         return normalizedEmail;
@@ -517,25 +517,25 @@ public class AuthService : IAuthService
 
     private static string NormalizeUsername(string username)
     {
-        return NormalizeRequiredValue(username, nameof(username), "Username is required.")
+        return NormalizeRequiredValue(username, "Username is required.")
             .ToLowerInvariant();
     }
 
     private static string NormalizePassword(string? password, string paramName)
     {
-        return NormalizeRequiredValue(password, paramName, "Password is required.");
+        return NormalizeRequiredValue(password, "Password is required.");
     }
 
     private static string NormalizeRefreshToken(string refreshToken)
     {
-        return NormalizeRequiredValue(refreshToken, nameof(refreshToken), "Refresh token is required.");
+        return NormalizeRequiredValue(refreshToken, "Refresh token is required.");
     }
 
-    private static string NormalizeRequiredValue(string? value, string paramName, string errorMessage)
+    private static string NormalizeRequiredValue(string? value, string errorMessage)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            throw new ArgumentException(errorMessage, paramName);
+            throw new RequestValidationException(errorMessage);
         }
 
         return value.Trim();
@@ -569,14 +569,14 @@ public class AuthService : IAuthService
     {
         if (string.IsNullOrWhiteSpace(code))
         {
-            throw new ArgumentException($"{codeName} is required.", nameof(code));
+            throw new RequestValidationException($"{codeName} is required.");
         }
 
         var normalizedCode = code.Trim();
 
         if (normalizedCode.Length != 6 || normalizedCode.Any(character => !char.IsDigit(character)))
         {
-            throw new ArgumentException($"{codeName} must contain exactly 6 digits.", nameof(code));
+            throw new RequestValidationException($"{codeName} must contain exactly 6 digits.");
         }
 
         return normalizedCode;

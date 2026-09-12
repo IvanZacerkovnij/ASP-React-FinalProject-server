@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Features;
 using Resend;
+using Threads.Api.ExceptionHandling;
 using Threads.Application.Interfaces.Auth;
 using Threads.Application.Interfaces.Bookmarks;
 using Threads.Application.Interfaces.Comments;
@@ -110,8 +111,16 @@ public class Program
         builder.Services.AddDbContext<ThreadsDbContext>(options => DbConfigurator.Configure(options, builder.Configuration));
     }
 
+    private static void AddGlobalExceptionHandler(WebApplicationBuilder builder)
+    {
+        builder.Services.AddProblemDetails();
+        builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+    }
+
     private static void ConfigureApplication(WebApplication app)
     {
+        app.UseExceptionHandler();
+        
         app.UseCors("AllowAll");
         
         app.UseHttpsRedirection();
@@ -136,6 +145,7 @@ public class Program
         AddExternalApi(builder);
 
         AddCache(builder);
+        AddGlobalExceptionHandler(builder);
 
         builder.Services.AddControllers();
 

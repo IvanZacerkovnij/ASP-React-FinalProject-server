@@ -59,23 +59,8 @@ public class SearchController : ControllerBase
         [FromQuery] string? q,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            var gifs = await _gifSearchService.SearchAsync(q ?? string.Empty, cancellationToken);
-            return Ok(gifs);
-        }
-        catch (ArgumentException exception)
-        {
-            return BadRequest(new { message = exception.Message });
-        }
-        catch (InvalidOperationException exception)
-        {
-            return StatusCode(StatusCodes.Status500InternalServerError, new { message = exception.Message });
-        }
-        catch (HttpRequestException exception)
-        {
-            return StatusCode(StatusCodes.Status502BadGateway, new { message = exception.Message });
-        }
+        var gifs = await _gifSearchService.SearchAsync(q ?? string.Empty, cancellationToken);
+        return Ok(gifs);
     }
 
     [HttpGet("locations")]
@@ -83,22 +68,7 @@ public class SearchController : ControllerBase
         [FromQuery] string? q,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            var locations = await _locationSearchService.SearchAsync(q ?? string.Empty, cancellationToken);
-            return Ok(locations);
-        }
-        catch (ArgumentException exception)
-        {
-            return BadRequest(new { message = exception.Message });
-        }
-        catch (InvalidOperationException exception)
-        {
-            return StatusCode(StatusCodes.Status500InternalServerError, new { message = exception.Message });
-        }
-        catch (HttpRequestException exception)
-        {
-            return StatusCode(StatusCodes.Status502BadGateway, new { message = exception.Message });
-        }
+        var locations = await _locationSearchService.SearchAsync(q ?? string.Empty, cancellationToken);
+        return Ok(locations);
     }
 }

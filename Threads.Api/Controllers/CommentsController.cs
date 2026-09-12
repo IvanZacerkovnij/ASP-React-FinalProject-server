@@ -44,15 +44,8 @@ public class CommentsController : ControllerBase
             return Unauthorized(new { message = "Invalid token claims." });
         }
 
-        try
-        {
-            var comment = await _commentService.CreateAsync(currentUserId.Value, request, cancellationToken);
-            return CreatedAtAction(nameof(GetById), new { id = comment.Id }, comment);
-        }
-        catch (InvalidOperationException exception)
-        {
-            return BadRequest(new { message = exception.Message });
-        }
+        var comment = await _commentService.CreateAsync(currentUserId.Value, request, cancellationToken);
+        return CreatedAtAction(nameof(GetById), new { id = comment.Id }, comment);
     }
 
     [HttpGet("{id:guid}")]
@@ -99,19 +92,15 @@ public class CommentsController : ControllerBase
             return Forbid();
         }
 
-        try
-        {
-            var updatedComment = await _commentService.UpdateAsync(
-                id,
-                request,
-                cancellationToken,
-                currentUserId.Value);
-            return Ok(updatedComment);
-        }
-        catch (InvalidOperationException exception)
-        {
-            return BadRequest(new { message = exception.Message });
-        }
+        var updatedComment = await _commentService.UpdateAsync(
+            id,
+            request,
+            cancellationToken,
+            currentUserId.Value);
+
+        return updatedComment is null
+            ? NotFound(new { message = "Comment was not found." })
+            : Ok(updatedComment);
     }
 
     [Authorize]

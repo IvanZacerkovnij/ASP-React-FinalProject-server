@@ -21,19 +21,8 @@ public class AuthController : ControllerBase
         [FromBody] RegisterRequest request,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            await _authService.RegisterAsync(request, cancellationToken);
-            return Ok(new { message = "Verification code has been sent to your email." });
-        }
-        catch (ArgumentException exception)
-        {
-            return BadRequest(new { message = exception.Message });
-        }
-        catch (InvalidOperationException exception)
-        {
-            return BadRequest(new { message = exception.Message });
-        }
+        await _authService.RegisterAsync(request, cancellationToken);
+        return Ok(new { message = "Verification code has been sent to your email." });
     }
 
     [HttpPost("login")]
@@ -77,15 +66,8 @@ public class AuthController : ControllerBase
         [FromBody] ForgotPasswordRequest request,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            await _authService.ForgotPasswordAsync(request, cancellationToken);
-            return Ok(new { message = "If the email exists, a reset code has been sent." });
-        }
-        catch (ArgumentException exception)
-        {
-            return BadRequest(new { message = exception.Message });
-        }
+        await _authService.ForgotPasswordAsync(request, cancellationToken);
+        return Ok(new { message = "If the email exists, a reset code has been sent." });
     }
 
     [HttpPost("verify-reset-code")]
@@ -93,18 +75,11 @@ public class AuthController : ControllerBase
         [FromBody] VerifyResetCodeRequest request,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            var isValid = await _authService.VerifyResetCodeAsync(request, cancellationToken);
+        var isValid = await _authService.VerifyResetCodeAsync(request, cancellationToken);
 
-            return isValid
-                ? Ok(new { message = "Reset code is valid." })
-                : BadRequest(new { message = "Reset code is invalid or expired." });
-        }
-        catch (ArgumentException exception)
-        {
-            return BadRequest(new { message = exception.Message });
-        }
+        return isValid
+            ? Ok(new { message = "Reset code is valid." })
+            : BadRequest(new { message = "Reset code is invalid or expired." });
     }
 
     [HttpPost("reset-password")]
@@ -112,18 +87,11 @@ public class AuthController : ControllerBase
         [FromBody] ResetPasswordRequest request,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            var wasReset = await _authService.ResetPasswordAsync(request, cancellationToken);
+        var wasReset = await _authService.ResetPasswordAsync(request, cancellationToken);
 
-            return wasReset
-                ? Ok(new { message = "Password reset successfully." })
-                : BadRequest(new { message = "Reset code is invalid or expired." });
-        }
-        catch (ArgumentException exception)
-        {
-            return BadRequest(new { message = exception.Message });
-        }
+        return wasReset
+            ? Ok(new { message = "Password reset successfully." })
+            : BadRequest(new { message = "Reset code is invalid or expired." });
     }
 
     [HttpPost("verify-email")]
@@ -131,22 +99,11 @@ public class AuthController : ControllerBase
         [FromBody] VerifyEmailRequest request,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            var response = await _authService.VerifyEmailAsync(request, cancellationToken);
+        var response = await _authService.VerifyEmailAsync(request, cancellationToken);
 
-            return response is null
-                ? BadRequest(new { message = "Verification code is invalid or expired." })
-                : Ok(response);
-        }
-        catch (ArgumentException exception)
-        {
-            return BadRequest(new { message = exception.Message });
-        }
-        catch (InvalidOperationException exception)
-        {
-            return BadRequest(new { message = exception.Message });
-        }
+        return response is null
+            ? BadRequest(new { message = "Verification code is invalid or expired." })
+            : Ok(response);
     }
     
     [HttpPost("resend-verification-code")]
@@ -154,21 +111,10 @@ public class AuthController : ControllerBase
         [FromBody] ResendVerificationCodeRequest request,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            var wasSent = await _authService.ResendVerificationCodeAsync(request, cancellationToken);
+        var wasSent = await _authService.ResendVerificationCodeAsync(request, cancellationToken);
 
-            return wasSent
-                ? Ok(new { message = "Verification code has been sent to your email." })
-                : NotFound(new { message = "Pending registration was not found or expired." });
-        }
-        catch (ArgumentException exception)
-        {
-            return BadRequest(new { message = exception.Message });
-        }
-        catch (InvalidOperationException exception)
-        {
-            return BadRequest(new { message = exception.Message });
-        }
+        return wasSent
+            ? Ok(new { message = "Verification code has been sent to your email." })
+            : NotFound(new { message = "Pending registration was not found or expired." });
     }
 }

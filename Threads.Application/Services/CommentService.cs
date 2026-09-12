@@ -2,6 +2,7 @@ using AutoMapper;
 using Threads.Application.DTOs.Comments;
 using Threads.Application.DTOs.Locations;
 using Threads.Application.DTOs.Users;
+using Threads.Application.Exceptions;
 using Threads.Application.Interfaces.Bookmarks;
 using Threads.Application.Interfaces.Media;
 using Threads.Application.Interfaces.Comments;
@@ -116,14 +117,14 @@ public class CommentService : ICommentService
     {
         if (string.IsNullOrWhiteSpace(request.Content))
         {
-            throw new InvalidOperationException("Comment content is required.");
+            throw new RequestValidationException("Comment content is required.");
         }
 
         var post = await _postRepository.GetByIdAsync(request.PostId, cancellationToken);
 
         if (post is null)
         {
-            throw new InvalidOperationException("Post was not found.");
+            throw new NotFoundException("Post was not found.");
         }
 
         Comment? parentComment = null;
@@ -134,12 +135,12 @@ public class CommentService : ICommentService
 
             if (parentComment is null)
             {
-                throw new InvalidOperationException("Parent comment was not found.");
+                throw new NotFoundException("Parent comment was not found.");
             }
 
             if (parentComment.PostId != request.PostId)
             {
-                throw new InvalidOperationException("Parent comment does not belong to the specified post.");
+                throw new RequestValidationException("Parent comment does not belong to the specified post.");
             }
         }
 
@@ -163,7 +164,7 @@ public class CommentService : ICommentService
     {
         if (string.IsNullOrWhiteSpace(request.Content))
         {
-            throw new InvalidOperationException("Comment content is required.");
+            throw new RequestValidationException("Comment content is required.");
         }
 
         var comment = await _commentRepository.GetByIdAsync(id, cancellationToken);

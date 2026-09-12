@@ -105,18 +105,11 @@ public class MeController : ControllerBase
                 SizeInBytes = request.Banner.Length
             };
 
-        try
-        {
-            var user = await _userService.UpdateAsync(currentUserId.Value, updateRequest, avatar, banner, cancellationToken);
+        var user = await _userService.UpdateAsync(currentUserId.Value, updateRequest, avatar, banner, cancellationToken);
 
-            return user is null
-                ? NotFound(new { message = "User was not found." })
-                : Ok(user);
-        }
-        catch (InvalidOperationException exception)
-        {
-            return BadRequest(new { message = exception.Message });
-        }
+        return user is null
+            ? NotFound(new { message = "User was not found." })
+            : Ok(user);
     }
     
     [HttpDelete]
@@ -247,36 +240,25 @@ public class MeController : ControllerBase
             return Unauthorized(new { message = "Invalid token claims." });
         }
         
-        try
-        {
-            var result = await _authService.StartPasswordChangeAsync(currentUserId.Value, request, cancellationToken);
+        var result = await _authService.StartPasswordChangeAsync(currentUserId.Value, request, cancellationToken);
 
-            return result.Status switch
+        return result.Status switch
+        {
+            ChangePasswordStatus.ConfirmationCodeSent => Ok(new
             {
-                ChangePasswordStatus.ConfirmationCodeSent => Ok(new
-                {
-                    message = "Password change confirmation code has been sent to your email."
-                }),
-                ChangePasswordStatus.UserNotFound => NotFound(new { message = "User was not found." }),
-                ChangePasswordStatus.InvalidNewPassword => BadRequest(new
-                {
-                    message = "New password must be different from the current password."
-                }),
-                ChangePasswordStatus.InvalidCurrentPassword => BadRequest(new
-                {
-                    message = "Current password is invalid."
-                }),
-                _ => BadRequest(new { message = "Unable to change password." })
-            };
-        }
-        catch (ArgumentException exception)
-        {
-            return BadRequest(new { message = exception.Message });
-        }
-        catch (InvalidOperationException exception)
-        {
-            return BadRequest(new { message = exception.Message });
-        }
+                message = "Password change confirmation code has been sent to your email."
+            }),
+            ChangePasswordStatus.UserNotFound => NotFound(new { message = "User was not found." }),
+            ChangePasswordStatus.InvalidNewPassword => BadRequest(new
+            {
+                message = "New password must be different from the current password."
+            }),
+            ChangePasswordStatus.InvalidCurrentPassword => BadRequest(new
+            {
+                message = "Current password is invalid."
+            }),
+            _ => BadRequest(new { message = "Unable to change password." })
+        };
     }
 
     [HttpPost("change-password/confirm")]
@@ -291,32 +273,21 @@ public class MeController : ControllerBase
             return Unauthorized(new { message = "Invalid token claims." });
         }
 
-        try
-        {
-            var result = await _authService.ConfirmPasswordChangeAsync(currentUserId.Value, request, cancellationToken);
+        var result = await _authService.ConfirmPasswordChangeAsync(currentUserId.Value, request, cancellationToken);
 
-            return result.Status switch
+        return result.Status switch
+        {
+            ChangePasswordStatus.PasswordChanged => Ok(new
             {
-                ChangePasswordStatus.PasswordChanged => Ok(new
-                {
-                    message = "Password changed successfully."
-                }),
-                ChangePasswordStatus.UserNotFound => NotFound(new { message = "User was not found." }),
-                ChangePasswordStatus.InvalidConfirmationCode => BadRequest(new { message = "Invalid confirmation code." }),
-                ChangePasswordStatus.NoPendingPasswordChange => Conflict(new
-                {
-                    message = "There is no pending password change request."
-                }),
-                _ => BadRequest(new { message = "Unable to change password." })
-            };
-        }
-        catch (ArgumentException exception)
-        {
-            return BadRequest(new { message = exception.Message });
-        }
-        catch (InvalidOperationException exception)
-        {
-            return BadRequest(new { message = exception.Message });
-        }
+                message = "Password changed successfully."
+            }),
+            ChangePasswordStatus.UserNotFound => NotFound(new { message = "User was not found." }),
+            ChangePasswordStatus.InvalidConfirmationCode => BadRequest(new { message = "Invalid confirmation code." }),
+            ChangePasswordStatus.NoPendingPasswordChange => Conflict(new
+            {
+                message = "There is no pending password change request."
+            }),
+            _ => BadRequest(new { message = "Unable to change password." })
+        };
     }
 }

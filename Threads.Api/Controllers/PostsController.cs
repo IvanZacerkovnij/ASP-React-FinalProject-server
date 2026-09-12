@@ -331,16 +331,9 @@ public class PostsController : ControllerBase
             return Unauthorized(new { message = "Invalid token claims." });
         }
 
-        try
-        {
-            var post = await _postService.CreateAsync(currentUserId.Value, request, cancellationToken);
+        var post = await _postService.CreateAsync(currentUserId.Value, request, cancellationToken);
 
-            return CreatedAtAction(nameof(GetById), new { id = post.Id }, post);
-        }
-        catch (InvalidOperationException exception)
-        {
-            return BadRequest(new { message = exception.Message });
-        }
+        return CreatedAtAction(nameof(GetById), new { id = post.Id }, post);
     }
 
     [Authorize]
@@ -369,18 +362,11 @@ public class PostsController : ControllerBase
             return Forbid();
         }
 
-        try
-        {
-            var updatedPost = await _postService.UpdateAsync(id, request, cancellationToken);
+        var updatedPost = await _postService.UpdateAsync(id, request, cancellationToken);
 
-            return updatedPost is null
-                ? NotFound(new { message = "Post was not found." })
-                : Ok(updatedPost);
-        }
-        catch (InvalidOperationException exception)
-        {
-            return BadRequest(new { message = exception.Message });
-        }
+        return updatedPost is null
+            ? NotFound(new { message = "Post was not found." })
+            : Ok(updatedPost);
     }
 
     [Authorize]

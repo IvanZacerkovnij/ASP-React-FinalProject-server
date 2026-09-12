@@ -1,9 +1,12 @@
 using System.Net.Http.Json;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Configuration;
 using Threads.Application.DTOs.Gifs;
+using Threads.Application.Exceptions;
 using Threads.Application.Interfaces.Gifs;
+using Threads.Infrastracture.Exceptions;
 
 namespace Threads.Infrastracture.Services;
 
@@ -40,9 +43,8 @@ public class GiphyGifSearchService : IGifSearchService
 
         if (normalizedQuery.Length > MaxQueryLength)
         {
-            throw new ArgumentException(
-                $"GIF search query must be {MaxQueryLength} characters or less.",
-                nameof(query));
+            throw new RequestValidationException(
+                $"GIF search query must be {MaxQueryLength} characters or less.");
         }
 
         var rating = _configuration["GIPHY_RATING"];
@@ -57,7 +59,7 @@ public class GiphyGifSearchService : IGifSearchService
 
                 if (string.IsNullOrWhiteSpace(apiKey))
                 {
-                    throw new InvalidOperationException("GIPHY_API_KEY is not configured.");
+                    throw new InfrastructureConfigurationException("GIPHY_API_KEY");
                 }
 
                 var requestUri =
@@ -66,25 +68,34 @@ public class GiphyGifSearchService : IGifSearchService
                     $"&limit={DefaultLimit}" +
                     $"&rating={Uri.EscapeDataString(effectiveRating)}";
 
-                using var response = await _httpClient.GetAsync(requestUri, token);
-
-                if (!response.IsSuccessStatusCode)
+                try
                 {
-                    throw new HttpRequestException(
-                        $"GIPHY returned status code {(int)response.StatusCode}.",
-                        null,
-                        response.StatusCode);
+                    using var response = await _httpClient.GetAsync(requestUri, token);
+
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        throw new ExternalServiceException(
+                            $"GIPHY returned status code {(int)response.StatusCode}.");
+                    }
+
+                    var payload = await response.Content.ReadFromJsonAsync<GiphySearchResponse>(
+                        cancellationToken: token);
+
+                    return payload?.Data?
+                        .Where(item =>
+                            !string.IsNullOrWhiteSpace(item.Id) &&
+                            !string.IsNullOrWhiteSpace(item.Images?.Original?.Url))
+                        .Select(MapGifResponse)
+                        .ToList() ?? [];
                 }
-
-                var payload = await response.Content.ReadFromJsonAsync<GiphySearchResponse>(
-                    cancellationToken: token);
-
-                return payload?.Data?
-                    .Where(item =>
-                        !string.IsNullOrWhiteSpace(item.Id) &&
-                        !string.IsNullOrWhiteSpace(item.Images?.Original?.Url))
-                    .Select(MapGifResponse)
-                    .ToList() ?? [];
+                catch (HttpRequestException exception)
+                {
+                    throw new ExternalServiceException("Unable to communicate with GIPHY.", exception);
+                }
+                catch (JsonException exception)
+                {
+                    throw new ExternalServiceException("GIPHY returned an invalid response.", exception);
+                }
             },
             new HybridCacheEntryOptions
             {
