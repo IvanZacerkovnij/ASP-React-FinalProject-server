@@ -52,12 +52,8 @@ public class GeoapifyLocationSearchService : ILocationSearchService
             cacheKey,
             async token =>
             {
-                var apiKey = _configuration["GEOAPIFY_API_KEY"];
-
-                if (string.IsNullOrWhiteSpace(apiKey))
-                {
-                    throw new InfrastructureConfigurationException("GEOAPIFY_API_KEY");
-                }
+                var apiKey = _configuration["GEOAPIFY_API_KEY"] ??
+                             throw new InfrastructureConfigurationException("GEOAPIFY_API_KEY");
 
                 var requestUri =
                     $"v1/geocode/autocomplete?text={Uri.EscapeDataString(normalizedQuery)}" +

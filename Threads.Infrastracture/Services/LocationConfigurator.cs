@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Configuration;
+using Threads.Infrastracture.Exceptions;
 
 namespace Threads.Infrastracture.Services;
 
@@ -8,8 +9,9 @@ public static class LocationConfigurator
         HttpClient client,
         IConfiguration configuration)
     {
-        string url = configuration["LocationApi:BaseURL"] ??
-                     throw new InvalidOperationException("You must set LocationUrl in appsettings.json");
+        var url = configuration["LocationApi:BaseURL"] ??
+                  throw new InfrastructureConfigurationException("LocationApi:BaseURL");
+
         client.BaseAddress = new Uri(url);
     }
 }

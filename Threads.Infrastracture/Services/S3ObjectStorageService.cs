@@ -1,8 +1,11 @@
 using Amazon;
+using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.S3.Model;
 using Microsoft.Extensions.Configuration;
+using Threads.Application.Exceptions;
 using Threads.Application.Interfaces.Media;
+using Threads.Infrastracture.Exceptions;
 
 namespace Threads.Infrastracture.Services;
 
@@ -14,8 +17,11 @@ public class S3ObjectStorageService : IObjectStorageService
 
     public S3ObjectStorageService(IConfiguration configuration)
     {
-        var regionName = configuration["AWS:S3:Region"];
-        _bucketName = configuration["AWS:S3:BucketName"]!;
+        var regionName = configuration["AWS:S3:Region"] ??
+                         throw new InfrastructureConfigurationException("AWS:S3:Region");
+        _bucketName = configuration["AWS:S3:BucketName"] ??
+                      throw new InfrastructureConfigurationException("AWS:S3:BucketName");
+
         _readUrlExpirationMinutes = int.TryParse(
             configuration["AWS:S3:ReadUrlExpirationMinutes"],
             out var expirationMinutes)
@@ -47,7 +53,14 @@ public class S3ObjectStorageService : IObjectStorageService
             ContentType = contentType
         };
 
-        await _s3Client.PutObjectAsync(request, cancellationToken);
+        try
+        {
+            await _s3Client.PutObjectAsync(request, cancellationToken);
+        }
+        catch (AmazonClientException exception)
+        {
+            throw new ExternalServiceException("Unable to upload object to S3.", exception);
+        }
     }
 
     public async Task DeleteAsync(string objectKey, CancellationToken cancellationToken = default)
@@ -57,7 +70,14 @@ public class S3ObjectStorageService : IObjectStorageService
             return;
         }
 
-        await _s3Client.DeleteObjectAsync(_bucketName, objectKey, cancellationToken);
+        try
+        {
+            await _s3Client.DeleteObjectAsync(_bucketName, objectKey, cancellationToken);
+        }
+        catch (AmazonClientException exception)
+        {
+            throw new ExternalServiceException("Unable to delete object from S3.", exception);
+        }
     }
 
     public string GetReadUrl(string objectKey)
@@ -69,6 +89,13 @@ public class S3ObjectStorageService : IObjectStorageService
             Expires = DateTime.UtcNow.AddMinutes(_readUrlExpirationMinutes)
         };
 
-        return _s3Client.GetPreSignedURL(request);
+        try
+        {
+            return _s3Client.GetPreSignedURL(request);
+        }
+        catch (AmazonClientException exception)
+        {
+            throw new ExternalServiceException("Unable to generate an S3 read URL.", exception);
+        }
     }
 }

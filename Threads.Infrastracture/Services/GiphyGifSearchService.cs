@@ -55,12 +55,8 @@ public class GiphyGifSearchService : IGifSearchService
             cacheKey,
             async token =>
             {
-                var apiKey = _configuration["GIPHY_API_KEY"];
-
-                if (string.IsNullOrWhiteSpace(apiKey))
-                {
-                    throw new InfrastructureConfigurationException("GIPHY_API_KEY");
-                }
+                var apiKey = _configuration["GIPHY_API_KEY"] ??
+                             throw new InfrastructureConfigurationException("GIPHY_API_KEY");
 
                 var requestUri =
                     $"v1/gifs/search?api_key={Uri.EscapeDataString(apiKey)}" +

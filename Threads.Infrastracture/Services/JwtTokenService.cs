@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using Threads.Application.Interfaces.Security;
 using Threads.Domain.Entities;
+using Threads.Infrastracture.Exceptions;
 
 namespace Threads.Infrastracture.Services;
 
@@ -18,19 +19,12 @@ public class JwtTokenService : ITokenService
 
     public JwtTokenService(IConfiguration configuration)
     {
-        var jwtSection = configuration.GetSection("Jwt");
-
-        _issuer = jwtSection["Issuer"] ??
-            throw new InvalidOperationException("Jwt:Issuer is not configured.");
-
-        _audience = jwtSection["Audience"] ??
-            throw new InvalidOperationException("Jwt:Audience is not configured.");
-
-        _key = jwtSection["Key"] ??
-            throw new InvalidOperationException("Jwt:Key is not configured.");
+        _issuer = GetRequiredConfigurationValue(configuration, "Jwt:Issuer");
+        _audience = GetRequiredConfigurationValue(configuration, "Jwt:Audience");
+        _key = GetRequiredConfigurationValue(configuration, "Jwt:Key");
 
         _accessTokenLifetimeMinutes =
-            jwtSection.GetValue<int?>("AccessTokenLifetimeMinutes") ?? 60;
+            configuration.GetValue<int?>("Jwt:AccessTokenLifetimeMinutes") ?? 60;
     }
 
     public string GenerateAccessToken(User user)
@@ -71,5 +65,19 @@ public class JwtTokenService : ITokenService
     public DateTime GetAccessTokenExpiresAtUtc()
     {
         return DateTime.UtcNow.AddMinutes(_accessTokenLifetimeMinutes);
+    }
+
+    private static string GetRequiredConfigurationValue(
+        IConfiguration configuration,
+        string configurationKey)
+    {
+        var value = configuration[configurationKey];
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new InfrastructureConfigurationException(configurationKey);
+        }
+
+        return value;
     }
 }

@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Configuration;
 using Resend;
+using Threads.Application.Exceptions;
 using Threads.Application.Interfaces.Auth;
+using Threads.Infrastracture.Exceptions;
 
 namespace Threads.Infrastracture.Services;
 
@@ -31,7 +33,14 @@ public class AuthEmailService : IAuthEmailService
              """,
             $"Your email verification code is {code}. This code expires in 15 minutes.");
 
-        await _resend.EmailSendAsync(message, cancellationToken);
+        try
+        {
+            await _resend.EmailSendAsync(message, cancellationToken);
+        }
+        catch (ResendException exception)
+        {
+            throw new ExternalServiceException("Unable to send verification email.", exception);
+        }
     }
 
     public async Task SendPasswordResetCodeAsync(
@@ -50,7 +59,14 @@ public class AuthEmailService : IAuthEmailService
              """,
             $"Your password reset code is {code}. This code expires in 15 minutes.");
 
-        await _resend.EmailSendAsync(message, cancellationToken);
+        try
+        {
+            await _resend.EmailSendAsync(message, cancellationToken);
+        }
+        catch (ResendException exception)
+        {
+            throw new ExternalServiceException("Unable to send password reset email.", exception);
+        }
     }
 
     public async Task SendPasswordChangeCodeAsync(
@@ -69,7 +85,14 @@ public class AuthEmailService : IAuthEmailService
              """,
             $"Your password change confirmation code is {code}. This code expires in 15 minutes.");
 
-        await _resend.EmailSendAsync(message, cancellationToken);
+        try
+        {
+            await _resend.EmailSendAsync(message, cancellationToken);
+        }
+        catch (ResendException exception)
+        {
+            throw new ExternalServiceException("Unable to send password change email.", exception);
+        }
     }
 
     private EmailMessage CreateMessage(
@@ -78,12 +101,8 @@ public class AuthEmailService : IAuthEmailService
         string htmlBody,
         string textBody)
     {
-        var fromEmail = _configuration["RESEND_FROM_EMAIL"];
-
-        if (string.IsNullOrWhiteSpace(fromEmail))
-        {
-            throw new InvalidOperationException("RESEND_FROM_EMAIL is not configured.");
-        }
+        var fromEmail = _configuration["RESEND_FROM_EMAIL"] ??
+                        throw new InfrastructureConfigurationException("RESEND_FROM_EMAIL");
 
         var fromName = _configuration["RESEND_FROM_NAME"];
         var message = new EmailMessage

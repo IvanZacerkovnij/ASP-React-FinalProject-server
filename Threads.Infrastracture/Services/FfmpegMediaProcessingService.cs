@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Threads.Application.DTOs.Media;
+using Threads.Application.Exceptions;
 using Threads.Application.Interfaces.Media;
 
 namespace Threads.Infrastracture.Services;
@@ -34,22 +35,42 @@ public class FfmpegMediaProcessingService : IMediaProcessingService
         string contentType,
         CancellationToken cancellationToken = default)
     {
-        if (!contentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase))
+        try
         {
-            return await ExtractMetadataAsync(sourceFilePath, cancellationToken);
+            if (!contentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase))
+            {
+                return await ExtractMetadataAsync(sourceFilePath, cancellationToken);
+            }
+
+            var compressedFilePath = await CompressVideoAsync(sourceFilePath, cancellationToken);
+            var metadata = await ExtractMetadataAsync(compressedFilePath, cancellationToken);
+            var thumbnailFilePath = await TryGenerateThumbnailAsync(compressedFilePath, cancellationToken);
+
+            return metadata with
+            {
+                ProcessedFilePath = compressedFilePath,
+                OutputContentType = CompressedVideoContentType,
+                OutputSizeInBytes = GetFileSizeInBytes(compressedFilePath),
+                ThumbnailFilePath = thumbnailFilePath
+            };
         }
-
-        var compressedFilePath = await CompressVideoAsync(sourceFilePath, cancellationToken);
-        var metadata = await ExtractMetadataAsync(compressedFilePath, cancellationToken);
-        var thumbnailFilePath = await TryGenerateThumbnailAsync(compressedFilePath, cancellationToken);
-
-        return metadata with
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            ProcessedFilePath = compressedFilePath,
-            OutputContentType = CompressedVideoContentType,
-            OutputSizeInBytes = GetFileSizeInBytes(compressedFilePath),
-            ThumbnailFilePath = thumbnailFilePath
-        };
+            throw;
+        }
+        catch (MediaProcessingException)
+        {
+            throw;
+        }
+        catch (Exception exception) when (
+            exception is IOException or
+            UnauthorizedAccessException or
+            System.ComponentModel.Win32Exception or
+            InvalidOperationException or
+            JsonException)
+        {
+            throw new MediaProcessingException("Unable to process media.", exception);
+        }
     }
 
     private async Task<string> CompressVideoAsync(
@@ -94,7 +115,7 @@ public class FfmpegMediaProcessingService : IMediaProcessingService
 
             if (!compressedFile.Exists || compressedFile.Length == 0)
             {
-                throw new InvalidOperationException("Unable to compress video.");
+                throw new MediaProcessingException("Unable to compress video.");
             }
 
             return compressedFilePath;
@@ -140,7 +161,7 @@ public class FfmpegMediaProcessingService : IMediaProcessingService
 
         if (stream is null)
         {
-            throw new InvalidOperationException("Unable to extract media metadata.");
+            throw new MediaProcessingException("Unable to extract media metadata.");
         }
 
         return new MediaProcessingResult
@@ -179,7 +200,7 @@ public class FfmpegMediaProcessingService : IMediaProcessingService
 
             if (process is null)
             {
-                throw new InvalidOperationException("Unable to start ffmpeg.");
+                throw new MediaProcessingException("Unable to start ffmpeg.");
             }
 
             await process.WaitForExitAsync(cancellationToken);
@@ -200,7 +221,17 @@ public class FfmpegMediaProcessingService : IMediaProcessingService
 
             return thumbnailFilePath;
         }
-        catch
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            TryDeleteLocalFile(thumbnailFilePath);
+            throw;
+        }
+        catch (Exception exception) when (
+            exception is MediaProcessingException or
+            IOException or
+            UnauthorizedAccessException or
+            System.ComponentModel.Win32Exception or
+            InvalidOperationException)
         {
             TryDeleteLocalFile(thumbnailFilePath);
             return null;
@@ -231,7 +262,7 @@ public class FfmpegMediaProcessingService : IMediaProcessingService
 
         if (process is null)
         {
-            throw new InvalidOperationException($"Unable to start process '{fileName}'.");
+            throw new MediaProcessingException($"Unable to start process '{fileName}'.");
         }
 
         var standardOutputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
@@ -248,7 +279,7 @@ public class FfmpegMediaProcessingService : IMediaProcessingService
                 ? failureMessage
                 : $"{failureMessage} {standardError.Trim()}";
 
-            throw new InvalidOperationException(message);
+            throw new MediaProcessingException(message);
         }
 
         return standardOutput;
