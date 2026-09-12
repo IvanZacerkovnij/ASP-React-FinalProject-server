@@ -19,6 +19,8 @@ jobs:
           host: ${{ vars.DEPLOY_HOST }}
           username: ${{ vars.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
+          debug: true
+          request_pty: true
 
           script: |
             set -e
