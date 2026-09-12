@@ -23,7 +23,9 @@ jobs:
           request_pty: true
 
           script: |
-            set -e
+            exec > "$HOME/threads-deploy.log" 2>&1
+            set -Ee
+            trap 'exit_code=$?; echo "FAILED at line $LINENO with exit code $exit_code"' ERR
 
             echo "STEP 1: remote shell started"
             id
