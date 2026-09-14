@@ -2,7 +2,7 @@
 
 Backend для соціального застосунку у стилі Threads, побудований на `ASP.NET Core Web API` з `PostgreSQL`, `EF Core`, `JWT`, `AWS S3` і обробкою медіа через `ffmpeg`.
 
-> Останнє оновлення документації: `2026-09-12`
+> Останнє оновлення документації: `2026-09-14`
 
 ## Зміст
 
@@ -57,9 +57,10 @@ BackEndForFinalProject
 ├── Threads.Application
 │   ├── DTOs
 │   │   ├── Posts / Comments        # DTO публікацій і коментарів
-│   │   ├── Likes                   # combined response для лайкнутих targets
-│   │   ├── Bookmarks               # combined response для збережених targets
-│   │   ├── Reposts                 # combined response для repost targets
+│   │   ├── Likes                   # cursor-paged response для лайкнутих targets
+│   │   ├── Bookmarks               # cursor-paged response для збережених targets
+│   │   ├── Reposts                 # cursor-paged response для repost targets
+│   │   ├── Pagination              # спільні cursor request/response DTO
 │   │   └── Auth / Users / Media    # інші request/response DTO
 │   ├── Interfaces                  # контракти сервісів і репозиторіїв
 │   ├── Mapping                     # AutoMapper profiles
@@ -236,7 +237,7 @@ API стартує після успішного healthcheck Redis. Для Redis
 
 ### База даних
 
-У репозиторії є початкова EF Core migration `20260909111719_Initial` від `2026-09-09`. Застосувати її можна командою:
+EF Core migrations і model snapshot зберігаються в `Threads.Infrastructure/Migrations`. Застосувати актуальні migrations можна командою:
 
 ```bash
 dotnet ef database update \
@@ -351,7 +352,7 @@ Endpoint-и з однаковою named policy використовують сп
 |---|---|---|---|
 | `GET` | `/api/users/by-id/{id}` | Ні | Отримати профіль за `Guid` |
 | `GET` | `/api/users/by-username/{username}` | Ні | Отримати профіль за username |
-| `GET` | `/api/users/{username}/posts` | Ні | Отримати пости користувача |
+| `GET` | `/api/users/{username}/posts?limit=20&cursor=...` | Ні | Отримати сторінку постів користувача |
 | `GET` | `/api/users/{username}/likes?limit=20&cursor=...` | Ні | Отримати сторінку лайкнутих користувачем постів та коментарів |
 | `GET` | `/api/users/{username}/reposts?limit=20&cursor=...` | Ні | Отримати сторінку reposts постів і коментарів користувача |
 
@@ -364,7 +365,7 @@ Endpoint-и з однаковою named policy використовують сп
 | `GET` | `/api/me` | Так | Отримати профіль поточного користувача |
 | `PUT` | `/api/me` | Так | Оновити профіль, avatar і banner через `multipart/form-data` |
 | `DELETE` | `/api/me` | Так | Видалити акаунт поточного користувача |
-| `GET` | `/api/me/posts` | Так | Отримати власні пости поточного користувача |
+| `GET` | `/api/me/posts?limit=20&cursor=...` | Так | Отримати сторінку власних постів поточного користувача |
 | `GET` | `/api/me/likes?limit=20&cursor=...` | Так | Отримати сторінку лайкнутих постів та коментарів поточного користувача |
 | `GET` | `/api/me/bookmarks?limit=20&cursor=...` | Так | Отримати сторінку збережених постів та коментарів поточного користувача |
 | `GET` | `/api/me/reposts?limit=20&cursor=...` | Так | Отримати сторінку репостів постів і коментарів поточного користувача |
@@ -394,6 +395,27 @@ Endpoint-и з однаковою named policy використовують сп
 
 `UserResponse` використовується і для публічного профілю, і для `/api/me`. Поле `email` є nullable: у відповідях `/api/users/...` воно завжди дорівнює `null`, а `GET /api/me` і успішний `PUT /api/me` повертають email поточного користувача. Приватний профіль завантажується окремо від кешованого публічного профілю, щоб email не потрапляв у public profile cache.
 
+#### Cursor pagination
+
+Для paginated endpoints використовується `CursorPageRequest`:
+
+- `limit` — розмір сторінки від `1` до `50`, значення за замовчуванням — `20`;
+- `cursor` — необов'язковий opaque cursor із попередньої відповіді;
+- для першої сторінки `cursor` не передається;
+- некоректний cursor перетворюється на `400 Bad Request`.
+
+Звичайний формат `CursorPageResponse<T>` використовують пости профілю, коментарі поста, followers і following:
+
+```json
+{
+  "items": [],
+  "nextCursor": "opaque-cursor",
+  "hasMore": true
+}
+```
+
+`nextCursor` повертається лише тоді, коли `hasMore` дорівнює `true`. Для наступної сторінки його потрібно передати в query-параметрі `cursor`.
+
 #### Формат interaction collections
 
 Публічні profile collections `/api/users/{username}/likes` і `/api/users/{username}/reposts`, а також `/api/me/likes`, `/api/me/bookmarks` і `/api/me/reposts` повертають один об'єкт із двома типізованими колекціями:
@@ -411,7 +433,9 @@ Endpoint-и з однаковою named policy використовують сп
       "id": "00000000-0000-0000-0000-000000000000",
       "actionAt": "2026-09-09T11:30:00+00:00"
     }
-  ]
+  ],
+  "nextCursor": "opaque-cursor",
+  "hasMore": true
 }
 ```
 
@@ -421,16 +445,13 @@ Endpoint-и з однаковою named policy використовують сп
 - `/likes` використовує `UserLikesPageResponse`;
 - `/bookmarks` використовує `UserBookmarksPageResponse`;
 - `/reposts` використовує `UserRepostsPageResponse`;
-- кожна колекція окремо відсортована від найновішої взаємодії до найстарішої; спільного сортування між posts і comments немає;
-- клієнт може об'єднати `posts` і `comments` та відсортувати спільний список за `actionAt` у спадному порядку;
+- одна сторінка містить сумарно не більше `limit` елементів у `posts` і `comments`;
+- сторінка формується за спільним сортуванням `actionAt + id` від новіших взаємодій до старіших, після чого елементи розділяються на два масиви;
+- клієнт може об'єднати `posts` і `comments` та відновити спільний порядок сортування за `actionAt`, а при однаковому часі — за `id`, у спадному порядку;
 - публічні endpoints не вимагають авторизації, але за наявності Bearer token персоналізовані поля формуються відносно поточного viewer-а;
 - bookmarks доступні лише власнику через `/api/me/bookmarks`.
 
-`GET /api/users/{username}/likes` і `GET /api/me/likes` використовують cursor pagination. `limit` має бути від `1` до `50` і за замовчуванням дорівнює `20`. Одна сторінка містить сумарно не більше `limit` елементів у `posts` і `comments`, упорядкованих за `actionAt` від новіших до старіших. Відповідь додатково містить `nextCursor` і `hasMore`; для наступної сторінки потрібно передати отриманий `nextCursor` у query-параметрі `cursor`.
-
-`GET /api/users/{username}/reposts` і `GET /api/me/reposts` використовують такий самий формат cursor pagination для репостів.
-
-`GET /api/me/bookmarks` використовує такий самий формат cursor pagination для bookmarks.
+Цей формат використовують `/api/users/{username}/likes`, `/api/users/{username}/reposts`, `/api/me/likes`, `/api/me/bookmarks` і `/api/me/reposts`.
 
 ### Posts
 
@@ -454,7 +475,7 @@ Endpoint-и з однаковою named policy використовують сп
 
 | Method | Route | Auth | Призначення |
 |---|---|---|---|
-| `GET` | `/api/comments/post/{postId}` | Ні | Отримати коментарі поста |
+| `GET` | `/api/comments/post/{postId}?limit=20&cursor=...` | Ні | Отримати сторінку коментарів поста |
 | `GET` | `/api/comments/{id}` | Ні | Отримати коментар за `Guid` |
 | `POST` | `/api/comments` | Так | Створити коментар або відповідь |
 | `PUT` | `/api/comments/{id}` | Так | Оновити власний коментар |
@@ -477,13 +498,13 @@ Endpoint-и з однаковою named policy використовують сп
 
 | Метод | Що робить |
 |---|---|
-| `GetByPostIdAsync(postId, cancellationToken, currentUserId)` | Завантажує всі коментарі поста разом з авторами, replies, likes, bookmarks, reposts і views. Результат сортується за `CreatedAt` від старих коментарів до нових. Запит фільтрує лише за `PostId`, тому повертає і кореневі коментарі, і відповіді з `ParentCommentId`. |
+| `GetByPostIdAsync(postId, pagination, cancellationToken, currentUserId)` | Повертає `CursorPageResponse<CommentResponse>` із максимум `pagination.limit` коментарів. Результат сортується за `CreatedAt + Id` від старих коментарів до нових і містить як кореневі коментарі, так і відповіді з `ParentCommentId`. |
 | `GetByIdAsync(id, cancellationToken, currentUserId)` | Повертає один коментар за `Guid`. Якщо коментар не існує, повертає `null`, який контролер перетворює на `404 Not Found`. |
-| `GetLikedByUserIdAsync(userId, cancellationToken, currentUserId)` | Повертає коментарі, які лайкнув користувач `userId`, від найновішого лайка до найстарішого. У `ActionAt` записується час створення лайка. |
-| `GetBookmarkedByUserIdAsync(userId, cancellationToken, currentUserId)` | Повертає збережені користувачем коментарі, від найновішої закладки до найстарішої. У `ActionAt` записується час створення bookmark. |
-| `GetRepostedByUserIdAsync(userId, cancellationToken, currentUserId)` | Повертає репостнуті користувачем коментарі, від найновішого репосту до найстарішого. У `ActionAt` записується час репосту. |
+| `GetLikedByUserIdAsync(userId, limit, cursor, cancellationToken, currentUserId)` | Повертає до `limit + 1` кандидатів-коментарів для спільної сторінки likes. У `ActionAt` записується час створення лайка. |
+| `GetBookmarkedByUserIdAsync(userId, limit, cursor, cancellationToken, currentUserId)` | Повертає до `limit + 1` кандидатів-коментарів для спільної сторінки bookmarks. У `ActionAt` записується час створення bookmark. |
+| `GetRepostedByUserIdAsync(userId, limit, cursor, cancellationToken, currentUserId)` | Повертає до `limit + 1` кандидатів-коментарів для спільної сторінки reposts. У `ActionAt` записується час створення repost. |
 
-У collection-методах `userId` визначає, чию колекцію потрібно отримати, а `currentUserId` — відносно якого viewer-а потрібно обчислити персональні поля `IsLikedByCurrentUser`, `IsBookmarkedByCurrentUser` та `IsRepostedByCurrentUser`. Якщо `currentUserId` не переданий, усі ці поля мають значення `false`.
+У collection-методах `userId` визначає власника колекції, `limit` і `cursor` — межі вибірки, а `currentUserId` — viewer-а для персональних полів `IsLikedByCurrentUser`, `IsBookmarkedByCurrentUser` та `IsRepostedByCurrentUser`. Фінальну спільну сторінку posts/comments формують відповідно `LikeService`, `BookmarkService` або `RepostService`.
 
 #### Створення, оновлення і видалення
 
@@ -519,20 +540,11 @@ Endpoint-и з однаковою named policy використовують сп
 4. Remove-метод видаляє interaction тільки тоді, коли він існує.
 5. Повторно завантажують коментар та повертають актуальні counters і персональні flags.
 
-Операції є ідемпотентними: повторний like/bookmark/repost не створює логічний дублікат, а повторне видалення відсутньої взаємодії не завершується помилкою. На рівні БД також є унікальні індекси для пари користувач-коментар. Якщо два однакові add-запити виконуються одночасно, сервіс перехоплює `DbUpdateException`, після чого повертає актуальний стан коментаря.
-
-Для interaction коментаря завжди встановлюється `CommentId`, а `PostId` залишається `null`, оскільки одна interaction entity може посилатися або на пост, або на коментар.
+Операції є ідемпотентними: повторний like/bookmark/repost не створює логічний дублікат, а повторне видалення відсутньої взаємодії не завершується помилкою. Коментарі використовують окремі сутності `CommentLike`, `CommentBookmark` і `CommentRepost` зі складеним primary key `CommentId + UserId`. Якщо два однакові add-запити виконуються одночасно, сервіс перехоплює `DbUpdateException`, після чого повертає актуальний стан коментаря.
 
 #### `ViewAsync`
 
-Метод реєструє унікальний перегляд коментаря авторизованим користувачем:
-
-1. Завантажує коментар разом із його `Views`.
-2. Перевіряє, чи вже існує перегляд від `userId`.
-3. Якщо перегляду немає, додає `View` із `CommentId` і `ViewerId`.
-4. Повторно завантажує коментар і повертає актуальний `ViewsCount`.
-
-Один користувач збільшує лічильник конкретного коментаря лише один раз. Повторні та одночасні запити додатково захищені унікальним індексом у БД.
+Метод реєструє унікальний перегляд коментаря авторизованим користувачем через атомарний `INSERT ... ON CONFLICT DO NOTHING`, після чого отримує актуальний `ViewsCount` і формує оновлений `CommentResponse`. Один користувач збільшує лічильник конкретного коментаря лише один раз завдяки складеному primary key `CommentId + UserId`.
 
 #### Формування CommentResponse
 
@@ -550,7 +562,7 @@ URL аватара не зберігається безпосередньо в D
 
 | Service method | HTTP endpoint |
 |---|---|
-| `GetByPostIdAsync` | `GET /api/comments/post/{postId}` |
+| `GetByPostIdAsync` | `GET /api/comments/post/{postId}?limit=20&cursor=...` |
 | `GetByIdAsync` | `GET /api/comments/{id}` |
 | `CreateAsync` | `POST /api/comments` |
 | `UpdateAsync` | `PUT /api/comments/{id}` |
@@ -559,9 +571,9 @@ URL аватара не зберігається безпосередньо в D
 | `LikeAsync` / `UnlikeAsync` | `POST` / `DELETE /api/comments/{id}/like` |
 | `BookmarkAsync` / `UnbookmarkAsync` | `POST` / `DELETE /api/comments/{id}/bookmark` |
 | `RepostAsync` / `UnrepostAsync` | `POST` / `DELETE /api/comments/{id}/repost` |
-| `GetLikedByUserIdAsync` | `/api/users/{username}/likes`, `/api/me/likes` |
-| `GetBookmarkedByUserIdAsync` | `/api/me/bookmarks` |
-| `GetRepostedByUserIdAsync` | `/api/users/{username}/reposts`, `/api/me/reposts` |
+| `GetLikedByUserIdAsync` через `LikeService` | `GET /api/users/{username}/likes`, `GET /api/me/likes` |
+| `GetBookmarkedByUserIdAsync` через `BookmarkService` | `GET /api/me/bookmarks` |
+| `GetRepostedByUserIdAsync` через `RepostService` | `GET /api/users/{username}/reposts`, `GET /api/me/reposts` |
 
 ### Follows
 
@@ -569,8 +581,8 @@ URL аватара не зберігається безпосередньо в D
 |---|---|---|---|
 | `POST` | `/api/follows/{userId}` | Так | Підписатися на користувача |
 | `DELETE` | `/api/follows/{userId}` | Так | Відписатися від користувача |
-| `GET` | `/api/follows/{userId}/followers` | Ні | Отримати followers користувача |
-| `GET` | `/api/follows/{userId}/following` | Ні | Отримати користувачів, на яких оформлена підписка |
+| `GET` | `/api/follows/{userId}/followers?limit=20&cursor=...` | Ні | Отримати сторінку followers користувача |
+| `GET` | `/api/follows/{userId}/following?limit=20&cursor=...` | Ні | Отримати сторінку користувачів, на яких оформлена підписка |
 | `DELETE` | `/api/follows/{userId}/followers/{followId}` | Так | Видалити follower зі свого профілю |
 
 ### Search
@@ -624,4 +636,4 @@ URL аватара не зберігається безпосередньо в D
 - Swagger у поточному проєкті не підключений.
 - README описує фактичні контролери, маршрути й конфігурацію, які є в коді зараз.
 - `Like`, `Bookmark`, `Repost` і `View` розділені на окремі сутності для дописів і коментарів.
-- Останні зміни від `2026-09-12`: зміна пароля розділена на start/confirm endpoint-и з окремими request DTO; додано глобальний exception handler і типізовані Application/Infrastructure exceptions; контролери більше не дублюють `try/catch`; помилки Giphy та Geoapify перетворюються на безпечні `502 Bad Gateway` responses; додано endpoint-specific rate limiting і trusted forwarded headers для Nginx.
+- Останні зміни від `2026-09-14`: posts профілю, comments, followers/following, likes, bookmarks і reposts переведені на cursor pagination; interaction entities розділені на окремі post/comment таблиці зі складеними ключами та індексами для paginated вибірок.
