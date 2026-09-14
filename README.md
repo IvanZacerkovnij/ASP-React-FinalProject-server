@@ -404,7 +404,7 @@ Endpoint-и з однаковою named policy використовують сп
 - для першої сторінки `cursor` не передається;
 - некоректний cursor перетворюється на `400 Bad Request`.
 
-Звичайний формат `CursorPageResponse<T>` використовують пости профілю, коментарі поста, followers і following:
+Звичайний формат `CursorPageResponse<T>` використовують пости профілю, коментарі поста, followers/following і пошук users/posts:
 
 ```json
 {
@@ -589,10 +589,12 @@ URL аватара не зберігається безпосередньо в D
 
 | Method | Route | Auth | Призначення |
 |---|---|---|---|
-| `GET` | `/api/search/users?q=...` | Ні | Знайти користувачів |
-| `GET` | `/api/search/posts?q=...` | Ні | Знайти пости |
+| `GET` | `/api/search/users?q=...&limit=20&cursor=...` | Ні | Знайти сторінку користувачів |
+| `GET` | `/api/search/posts?q=...&limit=20&cursor=...` | Ні | Знайти сторінку постів |
 | `GET` | `/api/search/gifs?q=...` | Ні | Знайти GIF через Giphy |
 | `GET` | `/api/search/locations?q=...` | Ні | Знайти локації через Geoapify |
+
+Search users сортується за `Username + Id` у зростаючому порядку, а search posts — за `CreatedAt + Id` у спадному. Для наступної сторінки потрібно повторити той самий `q` і передати `nextCursor` як `cursor`.
 
 ### Media
 

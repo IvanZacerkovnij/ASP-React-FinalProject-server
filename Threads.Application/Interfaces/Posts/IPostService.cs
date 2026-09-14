@@ -30,7 +30,11 @@ public interface IPostService
         CursorPosition? cursor = null,
         CancellationToken cancellationToken = default,
         Guid? currentUserId = null);
-    Task<IReadOnlyCollection<PostResponse>> SearchAsync(string query, CancellationToken cancellationToken = default, Guid? currentUserId = null);
+    Task<CursorPageResponse<PostResponse>> SearchAsync(
+        string query,
+        CursorPageRequest pagination,
+        CancellationToken cancellationToken = default,
+        Guid? currentUserId = null);
     Task<PostResponse?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default, Guid? currentUserId = null);
     Task<PostResponse> CreateAsync(Guid authorId, CreatePostRequest request, CancellationToken cancellationToken = default);
     Task<PostResponse?> UpdateAsync(Guid id, UpdatePostRequest request, CancellationToken cancellationToken = default);

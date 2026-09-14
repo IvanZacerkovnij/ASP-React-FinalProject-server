@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Threads.Application.DTOs.Pagination;
 using Threads.Application.DTOs.Users;
 using Threads.Application.Interfaces.Users;
 using Threads.Domain.Entities;
@@ -16,17 +17,28 @@ public class UserRepository : IUserRepository
 
     public async Task<IReadOnlyCollection<User>> SearchAsync(
         string query,
-        int take = 20,
+        int limit,
+        TextCursorPosition? cursor = null,
         CancellationToken cancellationToken = default)
     {
-        return await BuildUserQuery(trackChanges: false)
+        var users = BuildUserQuery(trackChanges: false)
             .Where(user =>
                 EF.Functions.ILike(user.Username, $"%{query}%") ||
                 (user.DisplayName != null && EF.Functions.ILike(user.DisplayName, $"%{query}%")) ||
                 (user.Location != null && EF.Functions.ILike(user.Location, $"%{query}%")) ||
-                (user.LocationCountry != null && EF.Functions.ILike(user.LocationCountry, $"%{query}%")))
+                (user.LocationCountry != null && EF.Functions.ILike(user.LocationCountry, $"%{query}%")));
+
+        if (cursor is not null)
+        {
+            users = users.Where(user => EF.Functions.GreaterThan(
+                ValueTuple.Create(user.Username, user.Id),
+                ValueTuple.Create(cursor.Value, cursor.Id)));
+        }
+
+        return await users
             .OrderBy(user => user.Username)
-            .Take(take)
+            .ThenBy(user => user.Id)
+            .Take(limit + 1)
             .ToListAsync(cancellationToken);
     }
 

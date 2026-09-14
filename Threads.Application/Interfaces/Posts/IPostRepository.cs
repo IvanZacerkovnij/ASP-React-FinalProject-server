@@ -28,7 +28,11 @@ public interface IPostRepository
         int limit,
         CursorPosition? cursor = null,
         CancellationToken cancellationToken = default);
-    Task<IReadOnlyCollection<Post>> SearchAsync(string query, int take = 20, CancellationToken cancellationToken = default);
+    Task<IReadOnlyCollection<Post>> SearchAsync(
+        string query,
+        int limit,
+        CursorPosition? cursor = null,
+        CancellationToken cancellationToken = default);
     Task<Post?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<PostReadModel?> GetReadModelByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<PostStateReadModel?> GetStateByIdAsync(

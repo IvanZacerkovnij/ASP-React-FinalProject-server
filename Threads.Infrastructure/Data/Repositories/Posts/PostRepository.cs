@@ -170,18 +170,29 @@ public class PostRepository : IPostRepository
 
     public async Task<IReadOnlyCollection<Post>> SearchAsync(
         string query,
-        int take = 20,
+        int limit,
+        CursorPosition? cursor = null,
         CancellationToken cancellationToken = default)
     {
-        return await BuildPostQuery(trackChanges: false)
+        var posts = BuildPostQuery(trackChanges: false)
             .Where(post =>
                 (post.Content != null && EF.Functions.ILike(post.Content, $"%{query}%")) ||
                 (post.LocationName != null && EF.Functions.ILike(post.LocationName, $"%{query}%")) ||
                 (post.EmbedTitle != null && EF.Functions.ILike(post.EmbedTitle, $"%{query}%")) ||
                 (post.Author.Username != null && EF.Functions.ILike(post.Author.Username, $"%{query}%")) ||
-                (post.Author.DisplayName != null && EF.Functions.ILike(post.Author.DisplayName, $"%{query}%")))
+                (post.Author.DisplayName != null && EF.Functions.ILike(post.Author.DisplayName, $"%{query}%")));
+
+        if (cursor is not null)
+        {
+            posts = posts.Where(post => EF.Functions.LessThan(
+                ValueTuple.Create(post.CreatedAt, post.Id),
+                ValueTuple.Create(cursor.CreatedAt, cursor.Id)));
+        }
+
+        return await posts
             .OrderByDescending(post => post.CreatedAt)
-            .Take(take)
+            .ThenByDescending(post => post.Id)
+            .Take(limit + 1)
             .ToListAsync(cancellationToken);
     }
 

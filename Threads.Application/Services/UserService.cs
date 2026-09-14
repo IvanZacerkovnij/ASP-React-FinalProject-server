@@ -1,6 +1,7 @@
 using AutoMapper;
 using Microsoft.Extensions.Caching.Hybrid;
 using Threads.Application.DTOs.Locations;
+using Threads.Application.DTOs.Pagination;
 using Threads.Application.DTOs.Users;
 using Threads.Application.Exceptions;
 using Threads.Application.Interfaces.Follows;
@@ -49,21 +50,41 @@ public class UserService : IUserService
         _cache = cache;
     }
 
-    public async Task<IReadOnlyCollection<UserShortResponse>> SearchAsync(
+    public async Task<CursorPageResponse<UserShortResponse>> SearchAsync(
         string query,
+        CursorPageRequest pagination,
         CancellationToken cancellationToken = default,
         Guid? currentUserId = null)
     {
         if (string.IsNullOrWhiteSpace(query))
         {
-            return [];
+            return new CursorPageResponse<UserShortResponse>
+            {
+                Items = [],
+                HasMore = false,
+                NextCursor = null
+            };
         }
 
-        var users = await _userRepository.SearchAsync(query.Trim(), cancellationToken: cancellationToken);
+        var cursor = CursorCodec.DecodeText(pagination.Cursor);
+        var users = await _userRepository.SearchAsync(
+            query.Trim(),
+            pagination.Limit,
+            cursor,
+            cancellationToken);
+        var hasMore = users.Count > pagination.Limit;
+        var pageUsers = users.Take(pagination.Limit).ToList();
 
-        return users
-            .Select(MapUserShortResponse)
-            .ToList();
+        return new CursorPageResponse<UserShortResponse>
+        {
+            Items = pageUsers
+                .Select(MapUserShortResponse)
+                .ToList(),
+            HasMore = hasMore,
+            NextCursor = hasMore
+                ? CursorCodec.EncodeText(pageUsers[^1].Username, pageUsers[^1].Id)
+                : null
+        };
     }
 
     public async Task<UserResponse?> GetByIdAsync(

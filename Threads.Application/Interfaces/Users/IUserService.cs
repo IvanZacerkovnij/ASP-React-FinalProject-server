@@ -1,10 +1,15 @@
+using Threads.Application.DTOs.Pagination;
 using Threads.Application.DTOs.Users;
 
 namespace Threads.Application.Interfaces.Users;
 
 public interface IUserService
 {
-    Task<IReadOnlyCollection<UserShortResponse>> SearchAsync(string query, CancellationToken cancellationToken = default, Guid? currentUserId = null);
+    Task<CursorPageResponse<UserShortResponse>> SearchAsync(
+        string query,
+        CursorPageRequest pagination,
+        CancellationToken cancellationToken = default,
+        Guid? currentUserId = null);
     Task<UserResponse?> GetMeAsync(Guid id, CancellationToken cancellationToken = default);
     Task<UserResponse?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default, Guid? currentUserId = null); 
     Task<UserResponse?> GetByUsernameAsync(string username, CancellationToken cancellationToken = default, Guid? currentUserId = null);

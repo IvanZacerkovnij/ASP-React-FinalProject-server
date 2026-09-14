@@ -158,22 +158,45 @@ public class PostService : IPostService
             .ToList();
     }
 
-    public async Task<IReadOnlyCollection<PostResponse>> SearchAsync(
+    public async Task<CursorPageResponse<PostResponse>> SearchAsync(
         string query,
+        CursorPageRequest pagination,
         CancellationToken cancellationToken = default,
         Guid? currentUserId = null)
     {
         if (string.IsNullOrWhiteSpace(query))
         {
-            return [];
+            return new CursorPageResponse<PostResponse>
+            {
+                Items = [],
+                HasMore = false,
+                NextCursor = null
+            };
         }
 
-        var posts = await _postRepository.SearchAsync(query.Trim(), cancellationToken: cancellationToken);
-        var viewCounts = await GetViewCountsAsync(posts, cancellationToken);
+        var cursor = CursorCodec.Decode(pagination.Cursor);
+        var posts = await _postRepository.SearchAsync(
+            query.Trim(),
+            pagination.Limit,
+            cursor,
+            cancellationToken);
+        var hasMore = posts.Count > pagination.Limit;
+        var pagePosts = posts.Take(pagination.Limit).ToList();
+        var viewCounts = await GetViewCountsAsync(pagePosts, cancellationToken);
 
-        return posts
-            .Select(post => MapPostResponse(post, currentUserId, viewCounts.GetValueOrDefault(post.Id)))
-            .ToList();
+        return new CursorPageResponse<PostResponse>
+        {
+            Items = pagePosts
+                .Select(post => MapPostResponse(
+                    post,
+                    currentUserId,
+                    viewCounts.GetValueOrDefault(post.Id)))
+                .ToList(),
+            HasMore = hasMore,
+            NextCursor = hasMore
+                ? CursorCodec.Encode(pagePosts[^1].CreatedAt, pagePosts[^1].Id)
+                : null
+        };
     }
 
     public async Task<PostResponse?> GetByIdAsync(

@@ -15,10 +15,13 @@ internal static class CursorCodec
             CultureInfo.InvariantCulture,
             $"{createdAt:O}{Separator}{id:N}");
 
-        return Convert.ToBase64String(Encoding.UTF8.GetBytes(value))
-            .TrimEnd('=')
-            .Replace('+', '-')
-            .Replace('/', '_');
+        return EncodeValue(value);
+    }
+
+    public static string EncodeText(string value, Guid id)
+    {
+        var encodedText = Convert.ToBase64String(Encoding.UTF8.GetBytes(value));
+        return EncodeValue($"{encodedText}{Separator}{id:N}");
     }
 
     public static CursorPosition? Decode(string? cursor)
@@ -30,10 +33,7 @@ internal static class CursorCodec
 
         try
         {
-            var base64 = cursor.Replace('-', '+').Replace('_', '/');
-            base64 = base64.PadRight(base64.Length + (4 - base64.Length % 4) % 4, '=');
-
-            var value = Encoding.UTF8.GetString(Convert.FromBase64String(base64));
+            var value = DecodeValue(cursor);
             var parts = value.Split(Separator, StringSplitOptions.None);
 
             if (parts.Length != 2 ||
@@ -54,5 +54,54 @@ internal static class CursorCodec
         {
             throw new RequestValidationException("Cursor is invalid.");
         }
+    }
+
+    public static TextCursorPosition? DecodeText(string? cursor)
+    {
+        if (string.IsNullOrWhiteSpace(cursor))
+        {
+            return null;
+        }
+
+        try
+        {
+            var value = DecodeValue(cursor);
+            var parts = value.Split(Separator, StringSplitOptions.None);
+
+            if (parts.Length != 2 ||
+                !Guid.TryParseExact(parts[1], "N", out var id))
+            {
+                throw new FormatException();
+            }
+
+            var text = Encoding.UTF8.GetString(Convert.FromBase64String(parts[0]));
+
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                throw new FormatException();
+            }
+
+            return new TextCursorPosition(text, id);
+        }
+        catch (FormatException)
+        {
+            throw new RequestValidationException("Cursor is invalid.");
+        }
+    }
+
+    private static string EncodeValue(string value)
+    {
+        return Convert.ToBase64String(Encoding.UTF8.GetBytes(value))
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
+    }
+
+    private static string DecodeValue(string cursor)
+    {
+        var base64 = cursor.Replace('-', '+').Replace('_', '/');
+        base64 = base64.PadRight(base64.Length + (4 - base64.Length % 4) % 4, '=');
+
+        return Encoding.UTF8.GetString(Convert.FromBase64String(base64));
     }
 }

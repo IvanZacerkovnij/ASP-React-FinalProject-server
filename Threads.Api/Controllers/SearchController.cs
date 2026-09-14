@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using Threads.Api.Extensions;
 using Threads.Application.DTOs.Gifs;
 using Threads.Application.DTOs.Locations;
+using Threads.Application.DTOs.Pagination;
 using Threads.Application.DTOs.Posts.Responses;
 using Threads.Application.DTOs.Users;
 using Threads.Application.Interfaces.Gifs;
@@ -35,24 +36,34 @@ public class SearchController : ControllerBase
     }
 
     [HttpGet("users")]
-    public async Task<ActionResult<IReadOnlyCollection<UserShortResponse>>> SearchUsers(
+    public async Task<ActionResult<CursorPageResponse<UserShortResponse>>> SearchUsers(
         [FromQuery] string? q,
+        [FromQuery] CursorPageRequest pagination,
         CancellationToken cancellationToken)
     {
         var currentUserId = User.GetCurrentUserId();
         
-        var users = await _userService.SearchAsync(q ?? string.Empty, cancellationToken, currentUserId);
+        var users = await _userService.SearchAsync(
+            q ?? string.Empty,
+            pagination,
+            cancellationToken,
+            currentUserId);
         return Ok(users);
     }
 
     [HttpGet("posts")]
-    public async Task<ActionResult<IReadOnlyCollection<PostResponse>>> SearchPosts(
+    public async Task<ActionResult<CursorPageResponse<PostResponse>>> SearchPosts(
         [FromQuery] string? q,
+        [FromQuery] CursorPageRequest pagination,
         CancellationToken cancellationToken)
     {
         var currentUserId = User.GetCurrentUserId();
         
-        var posts = await _postService.SearchAsync(q ?? string.Empty, cancellationToken, currentUserId);
+        var posts = await _postService.SearchAsync(
+            q ?? string.Empty,
+            pagination,
+            cancellationToken,
+            currentUserId);
         return Ok(posts);
     }
 

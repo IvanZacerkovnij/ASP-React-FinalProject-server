@@ -1,3 +1,4 @@
+using Threads.Application.DTOs.Pagination;
 using Threads.Application.DTOs.Users;
 using Threads.Domain.Entities;
 
@@ -5,7 +6,11 @@ namespace Threads.Application.Interfaces.Users;
 
 public interface IUserRepository
 {
-    Task<IReadOnlyCollection<User>> SearchAsync(string query, int take = 20, CancellationToken cancellationToken = default);
+    Task<IReadOnlyCollection<User>> SearchAsync(
+        string query,
+        int limit,
+        TextCursorPosition? cursor = null,
+        CancellationToken cancellationToken = default);
     Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<UserProfileReadModel?> GetProfileByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default);
