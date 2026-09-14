@@ -352,8 +352,8 @@ Endpoint-и з однаковою named policy використовують сп
 | `GET` | `/api/users/by-id/{id}` | Ні | Отримати профіль за `Guid` |
 | `GET` | `/api/users/by-username/{username}` | Ні | Отримати профіль за username |
 | `GET` | `/api/users/{username}/posts` | Ні | Отримати пости користувача |
-| `GET` | `/api/users/{username}/likes` | Ні | Отримати лайкнуті користувачем пости та коментарі |
-| `GET` | `/api/users/{username}/reposts` | Ні | Отримати reposts постів і коментарів користувача |
+| `GET` | `/api/users/{username}/likes?limit=20&cursor=...` | Ні | Отримати сторінку лайкнутих користувачем постів та коментарів |
+| `GET` | `/api/users/{username}/reposts?limit=20&cursor=...` | Ні | Отримати сторінку reposts постів і коментарів користувача |
 
 ### Me
 
@@ -365,9 +365,9 @@ Endpoint-и з однаковою named policy використовують сп
 | `PUT` | `/api/me` | Так | Оновити профіль, avatar і banner через `multipart/form-data` |
 | `DELETE` | `/api/me` | Так | Видалити акаунт поточного користувача |
 | `GET` | `/api/me/posts` | Так | Отримати власні пости поточного користувача |
-| `GET` | `/api/me/likes` | Так | Отримати лайкнуті пости та коментарі поточного користувача |
-| `GET` | `/api/me/bookmarks` | Так | Отримати збережені пости та коментарі поточного користувача |
-| `GET` | `/api/me/reposts` | Так | Отримати репости постів і коментарів поточного користувача |
+| `GET` | `/api/me/likes?limit=20&cursor=...` | Так | Отримати сторінку лайкнутих постів та коментарів поточного користувача |
+| `GET` | `/api/me/bookmarks?limit=20&cursor=...` | Так | Отримати сторінку збережених постів та коментарів поточного користувача |
+| `GET` | `/api/me/reposts?limit=20&cursor=...` | Так | Отримати сторінку репостів постів і коментарів поточного користувача |
 | `POST` | `/api/me/change-password/start` | Так | Перевірити поточний пароль, зберегти pending password hash і надіслати email code |
 | `POST` | `/api/me/change-password/confirm` | Так | Підтвердити зміну пароля шестизначним email code |
 
@@ -418,13 +418,19 @@ Endpoint-и з однаковою named policy використовують сп
 - `posts` містить об'єкти `PostResponse`;
 - `comments` містить об'єкти `CommentResponse`;
 - `actionAt` містить UTC-час створення відповідного `Like`, `Bookmark` або `Repost`; у звичайних content endpoints це поле дорівнює `null`;
-- `/likes` використовує `UserLikesResponse`;
-- `/bookmarks` використовує `UserBookmarksResponse`;
-- `/reposts` використовує `UserRepostsResponse`;
+- `/likes` використовує `UserLikesPageResponse`;
+- `/bookmarks` використовує `UserBookmarksPageResponse`;
+- `/reposts` використовує `UserRepostsPageResponse`;
 - кожна колекція окремо відсортована від найновішої взаємодії до найстарішої; спільного сортування між posts і comments немає;
 - клієнт може об'єднати `posts` і `comments` та відсортувати спільний список за `actionAt` у спадному порядку;
 - публічні endpoints не вимагають авторизації, але за наявності Bearer token персоналізовані поля формуються відносно поточного viewer-а;
 - bookmarks доступні лише власнику через `/api/me/bookmarks`.
+
+`GET /api/users/{username}/likes` і `GET /api/me/likes` використовують cursor pagination. `limit` має бути від `1` до `50` і за замовчуванням дорівнює `20`. Одна сторінка містить сумарно не більше `limit` елементів у `posts` і `comments`, упорядкованих за `actionAt` від новіших до старіших. Відповідь додатково містить `nextCursor` і `hasMore`; для наступної сторінки потрібно передати отриманий `nextCursor` у query-параметрі `cursor`.
+
+`GET /api/users/{username}/reposts` і `GET /api/me/reposts` використовують такий самий формат cursor pagination для репостів.
+
+`GET /api/me/bookmarks` використовує такий самий формат cursor pagination для bookmarks.
 
 ### Posts
 
@@ -617,5 +623,5 @@ URL аватара не зберігається безпосередньо в D
 
 - Swagger у поточному проєкті не підключений.
 - README описує фактичні контролери, маршрути й конфігурацію, які є в коді зараз.
-- Для `Like`, `Bookmark`, `Repost` і `View` тепер використовується єдина сутність на `post` або `comment` target.
+- `Like`, `Bookmark`, `Repost` і `View` розділені на окремі сутності для дописів і коментарів.
 - Останні зміни від `2026-09-12`: зміна пароля розділена на start/confirm endpoint-и з окремими request DTO; додано глобальний exception handler і типізовані Application/Infrastructure exceptions; контролери більше не дублюють `try/catch`; помилки Giphy та Geoapify перетворюються на безпечні `502 Bad Gateway` responses; додано endpoint-specific rate limiting і trusted forwarded headers для Nginx.

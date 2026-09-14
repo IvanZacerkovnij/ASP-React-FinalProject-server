@@ -1,6 +1,7 @@
 using AutoMapper;
 using Threads.Application.DTOs.Comments;
 using Threads.Application.DTOs.Locations;
+using Threads.Application.DTOs.Pagination;
 using Threads.Application.DTOs.Users;
 using Threads.Application.Exceptions;
 using Threads.Application.Interfaces.Bookmarks;
@@ -41,20 +42,36 @@ public class CommentService : ICommentService
         _mapper = mapper;
     }
 
-    public async Task<IReadOnlyCollection<CommentResponse>> GetByPostIdAsync(
+    public async Task<CursorPageResponse<CommentResponse>> GetByPostIdAsync(
         Guid postId,
+        CursorPageRequest pagination,
         CancellationToken cancellationToken = default,
         Guid? currentUserId = null)
     {
-        var comments = await _commentRepository.GetByPostIdAsync(postId, cancellationToken);
-        var viewCounts = await GetViewCountsAsync(comments, cancellationToken);
-
-        return comments
+        var cursor = CursorCodec.Decode(pagination.Cursor);
+        var comments = await _commentRepository.GetByPostIdAsync(
+            postId,
+            pagination.Limit,
+            cursor,
+            cancellationToken);
+        var hasMore = comments.Count > pagination.Limit;
+        var pageComments = comments.Take(pagination.Limit).ToList();
+        var viewCounts = await GetViewCountsAsync(pageComments, cancellationToken);
+        var items = pageComments
             .Select(comment => MapCommentResponse(
                 comment,
                 currentUserId,
                 viewCounts.GetValueOrDefault(comment.Id)))
             .ToList();
+
+        return new CursorPageResponse<CommentResponse>
+        {
+            Items = items,
+            HasMore = hasMore,
+            NextCursor = hasMore
+                ? CursorCodec.Encode(pageComments[^1].CreatedAt, pageComments[^1].Id)
+                : null
+        };
     }
 
     public async Task<CommentResponse?> GetByIdAsync(
@@ -76,10 +93,16 @@ public class CommentService : ICommentService
 
     public async Task<IReadOnlyCollection<CommentResponse>> GetBookmarkedByUserIdAsync(
         Guid userId,
+        int limit,
+        CursorPosition? cursor = null,
         CancellationToken cancellationToken = default,
         Guid? currentUserId = null)
     {
-        var comments = await _commentRepository.GetBookmarkedByUserIdAsync(userId, cancellationToken);
+        var comments = await _commentRepository.GetBookmarkedByUserIdAsync(
+            userId,
+            limit,
+            cursor,
+            cancellationToken);
         var viewCounts = await GetViewCountsAsync(comments, cancellationToken);
 
         return comments
@@ -87,16 +110,22 @@ public class CommentService : ICommentService
                 comment,
                 currentUserId,
                 viewCounts.GetValueOrDefault(comment.Id),
-                comment.Bookmarks.FirstOrDefault(bookmark => bookmark.UserId == userId)?.CreatedAt))
+                comment.CommentBookmarks.FirstOrDefault(bookmark => bookmark.UserId == userId)?.CreatedAt))
             .ToList();
     }
 
     public async Task<IReadOnlyCollection<CommentResponse>> GetLikedByUserIdAsync(
         Guid userId,
+        int limit,
+        CursorPosition? cursor = null,
         CancellationToken cancellationToken = default,
         Guid? currentUserId = null)
     {
-        var comments = await _commentRepository.GetLikedByUserIdAsync(userId, cancellationToken);
+        var comments = await _commentRepository.GetLikedByUserIdAsync(
+            userId,
+            limit,
+            cursor,
+            cancellationToken);
         var viewCounts = await GetViewCountsAsync(comments, cancellationToken);
 
         return comments
@@ -104,16 +133,22 @@ public class CommentService : ICommentService
                 comment,
                 currentUserId,
                 viewCounts.GetValueOrDefault(comment.Id),
-                comment.Likes.FirstOrDefault(like => like.UserId == userId)?.CreatedAt))
+                comment.CommentLikes.FirstOrDefault(like => like.UserId == userId)?.CreatedAt))
             .ToList();
     }
 
     public async Task<IReadOnlyCollection<CommentResponse>> GetRepostedByUserIdAsync(
         Guid userId,
+        int limit,
+        CursorPosition? cursor = null,
         CancellationToken cancellationToken = default,
         Guid? currentUserId = null)
     {
-        var comments = await _commentRepository.GetRepostedByUserIdAsync(userId, cancellationToken);
+        var comments = await _commentRepository.GetRepostedByUserIdAsync(
+            userId,
+            limit,
+            cursor,
+            cancellationToken);
         var viewCounts = await GetViewCountsAsync(comments, cancellationToken);
 
         return comments
@@ -121,7 +156,7 @@ public class CommentService : ICommentService
                 comment,
                 currentUserId,
                 viewCounts.GetValueOrDefault(comment.Id),
-                comment.Reposts.FirstOrDefault(repost => repost.UserId == userId)?.CreatedAt))
+                comment.CommentReposts.FirstOrDefault(repost => repost.UserId == userId)?.CreatedAt))
             .ToList();
     }
 
@@ -230,10 +265,9 @@ public class CommentService : ICommentService
 
         if (existingLike is null)
         {
-            var like = new Like
+            var like = new CommentLike
             {
                 UserId = userId,
-                PostId = null,
                 CommentId = id
             };
 
@@ -287,10 +321,9 @@ public class CommentService : ICommentService
 
         if (existingBookmark is null)
         {
-            var bookmark = new Bookmark
+            var bookmark = new CommentBookmark
             {
                 UserId = userId,
-                PostId = null,
                 CommentId = id
             };
 
@@ -344,10 +377,9 @@ public class CommentService : ICommentService
 
         if (existingRepost is null)
         {
-            var repost = new Repost
+            var repost = new CommentRepost
             {
                 UserId = userId,
-                PostId = null,
                 CommentId = id
             };
 
@@ -451,13 +483,13 @@ public class CommentService : ICommentService
             Author = MapUserShortResponse(comment.Author),
             LikesCount = response.LikesCount,
             IsLikedByCurrentUser = currentUserId.HasValue &&
-                comment.Likes.Any(like => like.UserId == currentUserId.Value),
+                comment.CommentLikes.Any(like => like.UserId == currentUserId.Value),
             RepliesCount = response.RepliesCount,
             IsBookmarkedByCurrentUser = currentUserId.HasValue &&
-                comment.Bookmarks.Any(bookmark => bookmark.UserId == currentUserId.Value),
+                comment.CommentBookmarks.Any(bookmark => bookmark.UserId == currentUserId.Value),
             RepostsCount = response.RepostsCount,
             IsRepostedByCurrentUser = currentUserId.HasValue &&
-                comment.Reposts.Any(repost => repost.UserId == currentUserId.Value),
+                comment.CommentReposts.Any(repost => repost.UserId == currentUserId.Value),
             ViewsCount = viewsCount,
             ActionAt = actionAt,
             CreatedAt = response.CreatedAt,

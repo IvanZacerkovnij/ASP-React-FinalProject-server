@@ -9,9 +9,12 @@ public class ThreadsDbContext : DbContext
     public DbSet<Post> Posts { get; set; }
     public DbSet<User> Users { get; set; }
     public DbSet<Follow> Follows { get; set; }
-    public DbSet<Like> Likes { get; set; }
-    public DbSet<Repost> Reposts { get; set; }
-    public DbSet<Bookmark> Bookmarks { get; set; }
+    public DbSet<PostLike> PostLikes { get; set; }
+    public DbSet<CommentLike> CommentLikes { get; set; }
+    public DbSet<PostRepost> PostReposts { get; set; }
+    public DbSet<CommentRepost> CommentReposts { get; set; }
+    public DbSet<PostBookmark> PostBookmarks { get; set; }
+    public DbSet<CommentBookmark> CommentBookmarks { get; set; }
     public DbSet<Media> Medias { get; set; }
     public DbSet<Poll> Polls { get; set; }
     public DbSet<PollOption> PollOptions { get; set; }

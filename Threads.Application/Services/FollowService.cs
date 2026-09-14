@@ -1,6 +1,7 @@
 using AutoMapper;
 using Microsoft.Extensions.Caching.Hybrid;
 using Threads.Application.DTOs.Locations;
+using Threads.Application.DTOs.Pagination;
 using Threads.Application.DTOs.Users;
 using Threads.Application.Interfaces.Follows;
 using Threads.Application.Interfaces.Media;
@@ -101,22 +102,54 @@ public class FollowService : IFollowService
             UserProfileCache.GetProfileKey(followingId));
     }
 
-    public async Task<IReadOnlyCollection<UserShortResponse>> GetFollowersAsync(Guid userId, CancellationToken cancellationToken = default)
+    public async Task<CursorPageResponse<UserShortResponse>> GetFollowersAsync(
+        Guid userId,
+        CursorPageRequest pagination,
+        CancellationToken cancellationToken = default)
     {
-        var followers = await _followRepository.GetFollowersAsync(userId, cancellationToken);
+        var cursor = CursorCodec.Decode(pagination.Cursor);
+        var follows = await _followRepository.GetFollowersAsync(
+            userId,
+            pagination.Limit,
+            cursor,
+            cancellationToken);
 
-        return followers
-            .Select(MapUserShortResponse)
-            .ToList();
+        return MapFollowPage(follows, pagination.Limit, follow => follow.Follower);
     }
 
-    public async Task<IReadOnlyCollection<UserShortResponse>> GetFollowingAsync(Guid userId, CancellationToken cancellationToken = default)
+    public async Task<CursorPageResponse<UserShortResponse>> GetFollowingAsync(
+        Guid userId,
+        CursorPageRequest pagination,
+        CancellationToken cancellationToken = default)
     {
-        var following = await _followRepository.GetFollowingAsync(userId, cancellationToken);
+        var cursor = CursorCodec.Decode(pagination.Cursor);
+        var follows = await _followRepository.GetFollowingAsync(
+            userId,
+            pagination.Limit,
+            cursor,
+            cancellationToken);
 
-        return following
-            .Select(MapUserShortResponse)
-            .ToList();
+        return MapFollowPage(follows, pagination.Limit, follow => follow.Following);
+    }
+
+    private CursorPageResponse<UserShortResponse> MapFollowPage(
+        IReadOnlyCollection<Follow> follows,
+        int limit,
+        Func<Follow, User> selectUser)
+    {
+        var hasMore = follows.Count > limit;
+        var pageFollows = follows.Take(limit).ToList();
+
+        return new CursorPageResponse<UserShortResponse>
+        {
+            Items = pageFollows
+                .Select(follow => MapUserShortResponse(selectUser(follow)))
+                .ToList(),
+            HasMore = hasMore,
+            NextCursor = hasMore
+                ? CursorCodec.Encode(pageFollows[^1].CreatedAt, pageFollows[^1].Id)
+                : null
+        };
     }
 
     private UserShortResponse MapUserShortResponse(User user)

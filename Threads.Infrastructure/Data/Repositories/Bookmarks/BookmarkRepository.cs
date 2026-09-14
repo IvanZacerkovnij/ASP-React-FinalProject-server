@@ -12,29 +12,41 @@ public class BookmarkRepository : IBookmarkRepository
     {
         _dbContext = dbContext;
     }
-    public Task<Bookmark?> GetByUserAndPostId(Guid userId, Guid postId, CancellationToken cancellationToken = default)
+    public Task<PostBookmark?> GetByUserAndPostId(Guid userId, Guid postId, CancellationToken cancellationToken = default)
     {
-        return _dbContext.Bookmarks.FirstOrDefaultAsync(
-            bookmark => bookmark.UserId == userId && bookmark.PostId == postId && bookmark.CommentId == null,
+        return _dbContext.PostBookmarks.FirstOrDefaultAsync(
+            bookmark => bookmark.UserId == userId && bookmark.PostId == postId,
             cancellationToken);
     }
 
-    public Task<Bookmark?> GetByUserAndCommentId(Guid userId, Guid commentId, CancellationToken cancellationToken = default)
+    public Task<CommentBookmark?> GetByUserAndCommentId(Guid userId, Guid commentId, CancellationToken cancellationToken = default)
     {
-        return _dbContext.Bookmarks.FirstOrDefaultAsync(
-            bookmark => bookmark.UserId == userId && bookmark.CommentId == commentId && bookmark.PostId == null,
+        return _dbContext.CommentBookmarks.FirstOrDefaultAsync(
+            bookmark => bookmark.UserId == userId && bookmark.CommentId == commentId,
             cancellationToken);
     }
 
-    public Task AddAsync(Bookmark bookmark, CancellationToken cancellationToken = default)
+    public Task AddAsync(PostBookmark bookmark, CancellationToken cancellationToken = default)
     {
-        _dbContext.Add(bookmark);
+        _dbContext.PostBookmarks.Add(bookmark);
         return _dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    public Task DeleteAsync(Bookmark bookmark, CancellationToken cancellationToken = default)
+    public Task AddAsync(CommentBookmark bookmark, CancellationToken cancellationToken = default)
     {
-        _dbContext.Bookmarks.Remove(bookmark);
+        _dbContext.CommentBookmarks.Add(bookmark);
+        return _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public Task DeleteAsync(PostBookmark bookmark, CancellationToken cancellationToken = default)
+    {
+        _dbContext.PostBookmarks.Remove(bookmark);
+        return _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public Task DeleteAsync(CommentBookmark bookmark, CancellationToken cancellationToken = default)
+    {
+        _dbContext.CommentBookmarks.Remove(bookmark);
         return _dbContext.SaveChangesAsync(cancellationToken);
     }
 }

@@ -1,6 +1,7 @@
 using AutoMapper;
 using Microsoft.Extensions.Caching.Hybrid;
 using Threads.Application.DTOs.Locations;
+using Threads.Application.DTOs.Pagination;
 using Threads.Application.DTOs.Polls;
 using Threads.Application.DTOs.Posts.Models;
 using Threads.Application.DTOs.Posts.Requests;
@@ -59,25 +60,47 @@ public class PostService : IPostService
             .ToList();
     }
 
-    public async Task<IReadOnlyCollection<PostResponse>> GetByAuthorIdAsync(
+    public async Task<CursorPageResponse<PostResponse>> GetByAuthorIdAsync(
         Guid authorId,
+        CursorPageRequest pagination,
         CancellationToken cancellationToken = default,
         Guid? currentUserId = null)
     {
-        var posts = await _postRepository.GetByAuthorIdAsync(authorId, cancellationToken);
-        var viewCounts = await GetViewCountsAsync(posts, cancellationToken);
-
-        return posts
+        var cursor = CursorCodec.Decode(pagination.Cursor);
+        var posts = await _postRepository.GetByAuthorIdAsync(
+            authorId,
+            pagination.Limit,
+            cursor,
+            cancellationToken);
+        var hasMore = posts.Count > pagination.Limit;
+        var pagePosts = posts.Take(pagination.Limit).ToList();
+        var viewCounts = await GetViewCountsAsync(pagePosts, cancellationToken);
+        var items = pagePosts
             .Select(post => MapPostResponse(post, currentUserId, viewCounts.GetValueOrDefault(post.Id)))
             .ToList();
+
+        return new CursorPageResponse<PostResponse>
+        {
+            Items = items,
+            HasMore = hasMore,
+            NextCursor = hasMore
+                ? CursorCodec.Encode(pagePosts[^1].CreatedAt, pagePosts[^1].Id)
+                : null
+        };
     }
 
     public async Task<IReadOnlyCollection<PostResponse>> GetLikedByUserIdAsync(
         Guid userId,
+        int limit,
+        CursorPosition? cursor = null,
         CancellationToken cancellationToken = default,
         Guid? currentUserId = null)
     {
-        var posts = await _postRepository.GetLikedByUserIdAsync(userId, cancellationToken);
+        var posts = await _postRepository.GetLikedByUserIdAsync(
+            userId,
+            limit,
+            cursor,
+            cancellationToken);
         var viewCounts = await GetViewCountsAsync(posts, cancellationToken);
 
         return posts
@@ -85,16 +108,22 @@ public class PostService : IPostService
                 post,
                 currentUserId,
                 viewCounts.GetValueOrDefault(post.Id),
-                post.Likes.FirstOrDefault(like => like.UserId == userId)?.CreatedAt))
+                post.PostLikes.FirstOrDefault(like => like.UserId == userId)?.CreatedAt))
             .ToList();
     }
 
     public async Task<IReadOnlyCollection<PostResponse>> GetBookmarkedByUserIdAsync(
         Guid userId,
+        int limit,
+        CursorPosition? cursor = null,
         CancellationToken cancellationToken = default,
         Guid? currentUserId = null)
     {
-        var posts = await _postRepository.GetBookmarkedByUserIdAsync(userId, cancellationToken);
+        var posts = await _postRepository.GetBookmarkedByUserIdAsync(
+            userId,
+            limit,
+            cursor,
+            cancellationToken);
         var viewCounts = await GetViewCountsAsync(posts, cancellationToken);
 
         return posts
@@ -102,16 +131,22 @@ public class PostService : IPostService
                 post,
                 currentUserId,
                 viewCounts.GetValueOrDefault(post.Id),
-                post.Bookmarks.FirstOrDefault(bookmark => bookmark.UserId == userId)?.CreatedAt))
+                post.PostBookmarks.FirstOrDefault(bookmark => bookmark.UserId == userId)?.CreatedAt))
             .ToList();
     }
 
     public async Task<IReadOnlyCollection<PostResponse>> GetRepostedByUserIdAsync(
         Guid userId,
+        int limit,
+        CursorPosition? cursor = null,
         CancellationToken cancellationToken = default,
         Guid? currentUserId = null)
     {
-        var posts = await _postRepository.GetRepostedByUserIdAsync(userId, cancellationToken);
+        var posts = await _postRepository.GetRepostedByUserIdAsync(
+            userId,
+            limit,
+            cursor,
+            cancellationToken);
         var viewCounts = await GetViewCountsAsync(posts, cancellationToken);
 
         return posts
@@ -119,7 +154,7 @@ public class PostService : IPostService
                 post,
                 currentUserId,
                 viewCounts.GetValueOrDefault(post.Id),
-                post.Reposts.FirstOrDefault(repost => repost.UserId == userId)?.CreatedAt))
+                post.PostReposts.FirstOrDefault(repost => repost.UserId == userId)?.CreatedAt))
             .ToList();
     }
 
@@ -630,9 +665,9 @@ public class PostService : IPostService
             RepostsCount = response.RepostsCount,
             ViewsCount = viewsCount,
             BookmarksCount = response.BookmarksCount,
-            IsLikedByCurrentUser = currentUserId.HasValue && post.Likes.Any(like => like.UserId == currentUserId.Value),
-            IsRepostedByCurrentUser = currentUserId.HasValue && post.Reposts.Any(repost => repost.UserId == currentUserId.Value),
-            IsBookmarkedByCurrentUser = currentUserId.HasValue && post.Bookmarks.Any(bookmark => bookmark.UserId == currentUserId.Value),
+            IsLikedByCurrentUser = currentUserId.HasValue && post.PostLikes.Any(like => like.UserId == currentUserId.Value),
+            IsRepostedByCurrentUser = currentUserId.HasValue && post.PostReposts.Any(repost => repost.UserId == currentUserId.Value),
+            IsBookmarkedByCurrentUser = currentUserId.HasValue && post.PostBookmarks.Any(bookmark => bookmark.UserId == currentUserId.Value),
             ActionAt = actionAt,
             CreatedAt = response.CreatedAt,
             UpdatedAt = response.UpdatedAt

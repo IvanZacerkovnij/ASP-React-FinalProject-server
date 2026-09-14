@@ -4,14 +4,16 @@ namespace Threads.Application.Interfaces.Bookmarks;
 
 public interface IBookmarkRepository
 {
-    Task<Bookmark?> GetByUserAndPostId(Guid userId,
+    Task<PostBookmark?> GetByUserAndPostId(Guid userId,
         Guid postId,
         CancellationToken cancellationToken = default);
 
-    Task<Bookmark?> GetByUserAndCommentId(Guid userId,
+    Task<CommentBookmark?> GetByUserAndCommentId(Guid userId,
         Guid commentId,
         CancellationToken cancellationToken = default);
     
-    Task AddAsync(Bookmark bookmark, CancellationToken cancellationToken = default);
-    Task DeleteAsync(Bookmark bookmark, CancellationToken cancellationToken = default);
+    Task AddAsync(PostBookmark bookmark, CancellationToken cancellationToken = default);
+    Task AddAsync(CommentBookmark bookmark, CancellationToken cancellationToken = default);
+    Task DeleteAsync(PostBookmark bookmark, CancellationToken cancellationToken = default);
+    Task DeleteAsync(CommentBookmark bookmark, CancellationToken cancellationToken = default);
 }

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Threads.Application.DTOs.Pagination;
 using Threads.Application.DTOs.Posts.Models;
 using Threads.Application.Interfaces.Posts;
 using Threads.Domain.Entities;
@@ -41,35 +42,70 @@ public class PostRepository : IPostRepository
             .ToList();
     }
 
-    public async Task<IReadOnlyCollection<Post>> GetByAuthorIdAsync(Guid authorId, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyCollection<Post>> GetByAuthorIdAsync(
+        Guid authorId,
+        int limit,
+        CursorPosition? cursor = null,
+        CancellationToken cancellationToken = default)
     {
-        return await BuildPostQuery(trackChanges: false)
-            .Where(post => post.AuthorId == authorId)
+        var query = BuildPostQuery(trackChanges: false)
+            .Where(post => post.AuthorId == authorId);
+
+        if (cursor is not null)
+        {
+            query = query.Where(post => EF.Functions.LessThan(
+                ValueTuple.Create(post.CreatedAt, post.Id),
+                ValueTuple.Create(cursor.CreatedAt, cursor.Id)));
+        }
+
+        return await query
             .OrderByDescending(post => post.CreatedAt)
+            .ThenByDescending(post => post.Id)
+            .Take(limit + 1)
             .ToListAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyCollection<Post>> GetLikedByUserIdAsync(
         Guid userId,
+        int limit,
+        CursorPosition? cursor = null,
         CancellationToken cancellationToken = default)
     {
-        var likedPostIds = await _dbContext.Likes
+        var query = _dbContext.PostLikes
             .AsNoTracking()
-            .Where(like => like.UserId == userId && like.PostId.HasValue && like.CommentId == null)
+            .Where(like => like.UserId == userId);
+
+        if (cursor is not null)
+        {
+            query = query.Where(like => EF.Functions.LessThan(
+                ValueTuple.Create(like.CreatedAt, like.PostId),
+                ValueTuple.Create(cursor.CreatedAt, cursor.Id)));
+        }
+
+        var likedPostIds = await query
             .OrderByDescending(like => like.CreatedAt)
-            .Select(like => like.PostId!.Value)
+            .ThenByDescending(like => like.PostId)
+            .Select(like => like.PostId)
+            .Take(limit + 1)
             .ToListAsync(cancellationToken);
 
-        if (likedPostIds.Count == 0)
+        return await GetByOrderedIdsAsync(likedPostIds, cancellationToken);
+    }
+
+    private async Task<IReadOnlyCollection<Post>> GetByOrderedIdsAsync(
+        IReadOnlyCollection<Guid> postIds,
+        CancellationToken cancellationToken)
+    {
+        if (postIds.Count == 0)
         {
             return [];
         }
 
         var posts = await BuildPostQuery(trackChanges: false)
-            .Where(post => likedPostIds.Contains(post.Id))
+            .Where(post => postIds.Contains(post.Id))
             .ToListAsync(cancellationToken);
 
-        var postOrder = likedPostIds
+        var postOrder = postIds
             .Select((id, index) => new { id, index })
             .ToDictionary(item => item.id, item => item.index);
 
@@ -80,64 +116,56 @@ public class PostRepository : IPostRepository
 
     public async Task<IReadOnlyCollection<Post>> GetBookmarkedByUserIdAsync(
         Guid userId,
+        int limit,
+        CursorPosition? cursor = null,
         CancellationToken cancellationToken = default)
     {
-        var bookmarkedPostIds = await _dbContext.Bookmarks
+        var query = _dbContext.PostBookmarks
             .AsNoTracking()
-            .Where(bookmark => bookmark.UserId == userId && bookmark.PostId.HasValue && bookmark.CommentId == null)
-            .OrderByDescending(bookmark => bookmark.CreatedAt)
-            .Select(bookmark => bookmark.PostId!.Value)
-            .ToListAsync(cancellationToken);
+            .Where(bookmark => bookmark.UserId == userId);
 
-        if (bookmarkedPostIds.Count == 0)
+        if (cursor is not null)
         {
-            return [];
+            query = query.Where(bookmark => EF.Functions.LessThan(
+                ValueTuple.Create(bookmark.CreatedAt, bookmark.PostId),
+                ValueTuple.Create(cursor.CreatedAt, cursor.Id)));
         }
 
-        var posts = await BuildPostQuery(trackChanges: false)
-            .Where(post => bookmarkedPostIds.Contains(post.Id))
+        var bookmarkedPostIds = await query
+            .OrderByDescending(bookmark => bookmark.CreatedAt)
+            .ThenByDescending(bookmark => bookmark.PostId)
+            .Select(bookmark => bookmark.PostId)
+            .Take(limit + 1)
             .ToListAsync(cancellationToken);
 
-        var postOrder = bookmarkedPostIds
-            .Select((id, index) => new { id, index })
-            .ToDictionary(item => item.id, item => item.index);
-
-        return posts
-            .OrderBy(post => postOrder[post.Id])
-            .ToList();
+        return await GetByOrderedIdsAsync(bookmarkedPostIds, cancellationToken);
     }
 
     public async Task<IReadOnlyCollection<Post>> GetRepostedByUserIdAsync(
         Guid userId,
+        int limit,
+        CursorPosition? cursor = null,
         CancellationToken cancellationToken = default)
     {
-        var repostedPostIds = await _dbContext.Reposts
+        var query = _dbContext.PostReposts
             .AsNoTracking()
-            .Where(repost => repost.UserId == userId && repost.PostId.HasValue && repost.CommentId == null)
-            .OrderByDescending(repost => repost.CreatedAt)
-            .Select(repost => repost.PostId!.Value)
-            .ToListAsync(cancellationToken);
+            .Where(repost => repost.UserId == userId);
 
-        repostedPostIds = repostedPostIds
-            .Distinct()
-            .ToList();
-
-        if (repostedPostIds.Count == 0)
+        if (cursor is not null)
         {
-            return [];
+            query = query.Where(repost => EF.Functions.LessThan(
+                ValueTuple.Create(repost.CreatedAt, repost.PostId),
+                ValueTuple.Create(cursor.CreatedAt, cursor.Id)));
         }
 
-        var posts = await BuildPostQuery(trackChanges: false)
-            .Where(post => repostedPostIds.Contains(post.Id))
+        var repostedPostIds = await query
+            .OrderByDescending(repost => repost.CreatedAt)
+            .ThenByDescending(repost => repost.PostId)
+            .Select(repost => repost.PostId)
+            .Take(limit + 1)
             .ToListAsync(cancellationToken);
 
-        var postOrder = repostedPostIds
-            .Select((id, index) => new { id, index })
-            .ToDictionary(item => item.id, item => item.index);
-
-        return posts
-            .OrderBy(post => postOrder[post.Id])
-            .ToList();
+        return await GetByOrderedIdsAsync(repostedPostIds, cancellationToken);
     }
 
     public async Task<IReadOnlyCollection<Post>> SearchAsync(
@@ -237,17 +265,17 @@ public class PostRepository : IPostRepository
             .Select(post => new PostStateReadModel
             {
                 UpdatedAt = post.UpdatedAt,
-                LikesCount = post.Likes.Count,
+                LikesCount = post.PostLikes.Count,
                 CommentsCount = post.Comments.Count,
-                RepostsCount = post.Reposts.Count,
-                BookmarksCount = post.Bookmarks.Count,
+                RepostsCount = post.PostReposts.Count,
+                BookmarksCount = post.PostBookmarks.Count,
                 ViewsCount = post.PostViews.Count,
                 IsLikedByCurrentUser = hasCurrentUser &&
-                    post.Likes.Any(like => like.UserId == effectiveCurrentUserId),
+                    post.PostLikes.Any(like => like.UserId == effectiveCurrentUserId),
                 IsRepostedByCurrentUser = hasCurrentUser &&
-                    post.Reposts.Any(repost => repost.UserId == effectiveCurrentUserId),
+                    post.PostReposts.Any(repost => repost.UserId == effectiveCurrentUserId),
                 IsBookmarkedByCurrentUser = hasCurrentUser &&
-                    post.Bookmarks.Any(bookmark => bookmark.UserId == effectiveCurrentUserId),
+                    post.PostBookmarks.Any(bookmark => bookmark.UserId == effectiveCurrentUserId),
                 Poll = post.Poll == null
                     ? null
                     : new PostPollStateReadModel
@@ -342,9 +370,9 @@ public class PostRepository : IPostRepository
             .Include(post => post.Author)
             .Include(post => post.Media)
             .Include(post => post.Comments)
-            .Include(post => post.Likes)
-            .Include(post => post.Bookmarks)
-            .Include(post => post.Reposts)
+            .Include(post => post.PostLikes)
+            .Include(post => post.PostBookmarks)
+            .Include(post => post.PostReposts)
             .Include(post => post.Poll)
                 .ThenInclude(poll => poll!.Options)
                     .ThenInclude(option => option.Votes)

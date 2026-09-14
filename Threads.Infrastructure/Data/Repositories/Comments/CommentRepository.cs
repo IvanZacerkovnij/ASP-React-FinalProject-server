@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Threads.Application.DTOs.Pagination;
 using Threads.Application.Interfaces.Comments;
 using Threads.Domain.Entities;
 
@@ -15,17 +16,31 @@ public class CommentRepository : ICommentRepository
 
     public async Task<IReadOnlyCollection<Comment>> GetByPostIdAsync(
         Guid postId,
+        int limit,
+        CursorPosition? cursor = null,
         CancellationToken cancellationToken = default)
     {
-        return await _dbContext.Comments
+        var query = _dbContext.Comments
             .AsNoTracking()
+            .AsSplitQuery()
             .Include(comment => comment.Author)
             .Include(comment => comment.Replies)
-            .Include(comment => comment.Likes)
-            .Include(comment => comment.Bookmarks)
-            .Include(comment => comment.Reposts)
-            .Where(comment => comment.PostId == postId)
+            .Include(comment => comment.CommentLikes)
+            .Include(comment => comment.CommentBookmarks)
+            .Include(comment => comment.CommentReposts)
+            .Where(comment => comment.PostId == postId);
+
+        if (cursor is not null)
+        {
+            query = query.Where(comment => EF.Functions.GreaterThan(
+                ValueTuple.Create(comment.CreatedAt, comment.Id),
+                ValueTuple.Create(cursor.CreatedAt, cursor.Id)));
+        }
+
+        return await query
             .OrderBy(comment => comment.CreatedAt)
+            .ThenBy(comment => comment.Id)
+            .Take(limit + 1)
             .ToListAsync(cancellationToken);
     }
 
@@ -34,24 +49,34 @@ public class CommentRepository : ICommentRepository
         return await _dbContext.Comments
             .Include(comment => comment.Author)
             .Include(comment => comment.Replies)
-            .Include(comment => comment.Likes)
-            .Include(comment => comment.Bookmarks)
-            .Include(comment => comment.Reposts)
+            .Include(comment => comment.CommentLikes)
+            .Include(comment => comment.CommentBookmarks)
+            .Include(comment => comment.CommentReposts)
             .FirstOrDefaultAsync(comment => comment.Id == id, cancellationToken);
     }
 
     public async Task<IReadOnlyCollection<Comment>> GetBookmarkedByUserIdAsync(
         Guid userId,
+        int limit,
+        CursorPosition? cursor = null,
         CancellationToken cancellationToken = default)
     {
-        var bookmarkedCommentIds = await _dbContext.Bookmarks
+        var query = _dbContext.CommentBookmarks
             .AsNoTracking()
-            .Where(bookmark =>
-                bookmark.UserId == userId &&
-                bookmark.CommentId.HasValue &&
-                bookmark.PostId == null)
+            .Where(bookmark => bookmark.UserId == userId);
+
+        if (cursor is not null)
+        {
+            query = query.Where(bookmark => EF.Functions.LessThan(
+                ValueTuple.Create(bookmark.CreatedAt, bookmark.CommentId),
+                ValueTuple.Create(cursor.CreatedAt, cursor.Id)));
+        }
+
+        var bookmarkedCommentIds = await query
             .OrderByDescending(bookmark => bookmark.CreatedAt)
-            .Select(bookmark => bookmark.CommentId!.Value)
+            .ThenByDescending(bookmark => bookmark.CommentId)
+            .Select(bookmark => bookmark.CommentId)
+            .Take(limit + 1)
             .ToListAsync(cancellationToken);
 
         return await GetByOrderedIdsAsync(bookmarkedCommentIds, cancellationToken);
@@ -59,16 +84,26 @@ public class CommentRepository : ICommentRepository
 
     public async Task<IReadOnlyCollection<Comment>> GetLikedByUserIdAsync(
         Guid userId,
+        int limit,
+        CursorPosition? cursor = null,
         CancellationToken cancellationToken = default)
     {
-        var likedCommentIds = await _dbContext.Likes
+        var query = _dbContext.CommentLikes
             .AsNoTracking()
-            .Where(like =>
-                like.UserId == userId &&
-                like.CommentId.HasValue &&
-                like.PostId == null)
+            .Where(like => like.UserId == userId);
+
+        if (cursor is not null)
+        {
+            query = query.Where(like => EF.Functions.LessThan(
+                ValueTuple.Create(like.CreatedAt, like.CommentId),
+                ValueTuple.Create(cursor.CreatedAt, cursor.Id)));
+        }
+
+        var likedCommentIds = await query
             .OrderByDescending(like => like.CreatedAt)
-            .Select(like => like.CommentId!.Value)
+            .ThenByDescending(like => like.CommentId)
+            .Select(like => like.CommentId)
+            .Take(limit + 1)
             .ToListAsync(cancellationToken);
 
         return await GetByOrderedIdsAsync(likedCommentIds, cancellationToken);
@@ -76,19 +111,29 @@ public class CommentRepository : ICommentRepository
 
     public async Task<IReadOnlyCollection<Comment>> GetRepostedByUserIdAsync(
         Guid userId,
+        int limit,
+        CursorPosition? cursor = null,
         CancellationToken cancellationToken = default)
     {
-        var repostedCommentIds = await _dbContext.Reposts
+        var query = _dbContext.CommentReposts
             .AsNoTracking()
-            .Where(repost =>
-                repost.UserId == userId &&
-                repost.CommentId.HasValue &&
-                repost.PostId == null)
+            .Where(repost => repost.UserId == userId);
+
+        if (cursor is not null)
+        {
+            query = query.Where(repost => EF.Functions.LessThan(
+                ValueTuple.Create(repost.CreatedAt, repost.CommentId),
+                ValueTuple.Create(cursor.CreatedAt, cursor.Id)));
+        }
+
+        var repostedCommentIds = await query
             .OrderByDescending(repost => repost.CreatedAt)
-            .Select(repost => repost.CommentId!.Value)
+            .ThenByDescending(repost => repost.CommentId)
+            .Select(repost => repost.CommentId)
+            .Take(limit + 1)
             .ToListAsync(cancellationToken);
 
-        return await GetByOrderedIdsAsync(repostedCommentIds.Distinct().ToList(), cancellationToken);
+        return await GetByOrderedIdsAsync(repostedCommentIds, cancellationToken);
     }
 
     private async Task<IReadOnlyCollection<Comment>> GetByOrderedIdsAsync(
@@ -105,9 +150,9 @@ public class CommentRepository : ICommentRepository
             .AsSplitQuery()
             .Include(comment => comment.Author)
             .Include(comment => comment.Replies)
-            .Include(comment => comment.Likes)
-            .Include(comment => comment.Bookmarks)
-            .Include(comment => comment.Reposts)
+            .Include(comment => comment.CommentLikes)
+            .Include(comment => comment.CommentBookmarks)
+            .Include(comment => comment.CommentReposts)
             .Where(comment => commentIds.Contains(comment.Id))
             .ToListAsync(cancellationToken);
 

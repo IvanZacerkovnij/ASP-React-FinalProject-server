@@ -1,3 +1,4 @@
+using Threads.Application.DTOs.Pagination;
 using Threads.Domain.Entities;
 
 namespace Threads.Application.Interfaces.Comments;
@@ -6,6 +7,8 @@ public interface ICommentRepository
 {
     Task<IReadOnlyCollection<Comment>> GetByPostIdAsync(
         Guid postId,
+        int limit,
+        CursorPosition? cursor = null,
         CancellationToken cancellationToken = default);
 
     Task<Comment?> GetByIdAsync(
@@ -14,14 +17,20 @@ public interface ICommentRepository
 
     Task<IReadOnlyCollection<Comment>> GetLikedByUserIdAsync(
         Guid userId,
+        int limit,
+        CursorPosition? cursor = null,
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyCollection<Comment>> GetBookmarkedByUserIdAsync(
         Guid userId,
+        int limit,
+        CursorPosition? cursor = null,
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyCollection<Comment>> GetRepostedByUserIdAsync(
         Guid userId,
+        int limit,
+        CursorPosition? cursor = null,
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyDictionary<Guid, int>> GetViewCountsAsync(

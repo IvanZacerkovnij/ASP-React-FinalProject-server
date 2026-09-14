@@ -38,20 +38,5 @@ public class CommentConfigurator : IEntityTypeConfiguration<Comment>
             .HasForeignKey(comment => comment.ParentCommentId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        builder.HasMany(comment => comment.Likes)
-            .WithOne(like => like.Comment)
-            .HasForeignKey(like => like.CommentId)
-            .OnDelete(DeleteBehavior.Cascade);
-
-        builder.HasMany(comment => comment.Bookmarks)
-            .WithOne(bookmark => bookmark.Comment)
-            .HasForeignKey(bookmark => bookmark.CommentId)
-            .OnDelete(DeleteBehavior.Cascade);
-
-        builder.HasMany(comment => comment.Reposts)
-            .WithOne(repost => repost.Comment)
-            .HasForeignKey(repost => repost.CommentId)
-            .OnDelete(DeleteBehavior.Cascade);
-
     }
 }

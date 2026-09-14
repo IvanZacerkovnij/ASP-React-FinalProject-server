@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Threads.Application.DTOs.Pagination;
 using Threads.Application.Interfaces.Follows;
 using Threads.Domain.Entities;
 
@@ -24,21 +25,53 @@ public class FollowRepository : IFollowRepository
                 cancellationToken);
     }
 
-    public async Task<IReadOnlyCollection<User>> GetFollowersAsync(Guid userId, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyCollection<Follow>> GetFollowersAsync(
+        Guid userId,
+        int limit,
+        CursorPosition? cursor = null,
+        CancellationToken cancellationToken = default)
     {
-        return await _dbContext.Follows
+        var query = _dbContext.Follows
             .AsNoTracking()
-            .Where(follow => follow.FollowingId == userId)
-            .Select(follow => follow.Follower)
+            .Include(follow => follow.Follower)
+            .Where(follow => follow.FollowingId == userId);
+
+        if (cursor is not null)
+        {
+            query = query.Where(follow => EF.Functions.LessThan(
+                ValueTuple.Create(follow.CreatedAt, follow.Id),
+                ValueTuple.Create(cursor.CreatedAt, cursor.Id)));
+        }
+
+        return await query
+            .OrderByDescending(follow => follow.CreatedAt)
+            .ThenByDescending(follow => follow.Id)
+            .Take(limit + 1)
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyCollection<User>> GetFollowingAsync(Guid userId, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyCollection<Follow>> GetFollowingAsync(
+        Guid userId,
+        int limit,
+        CursorPosition? cursor = null,
+        CancellationToken cancellationToken = default)
     {
-        return await _dbContext.Follows
+        var query = _dbContext.Follows
             .AsNoTracking()
-            .Where(follow => follow.FollowerId == userId)
-            .Select(follow => follow.Following)
+            .Include(follow => follow.Following)
+            .Where(follow => follow.FollowerId == userId);
+
+        if (cursor is not null)
+        {
+            query = query.Where(follow => EF.Functions.LessThan(
+                ValueTuple.Create(follow.CreatedAt, follow.Id),
+                ValueTuple.Create(cursor.CreatedAt, cursor.Id)));
+        }
+
+        return await query
+            .OrderByDescending(follow => follow.CreatedAt)
+            .ThenByDescending(follow => follow.Id)
+            .Take(limit + 1)
             .ToListAsync(cancellationToken);
     }
 

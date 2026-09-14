@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Threads.Api.Extensions;
+using Threads.Application.DTOs.Pagination;
 using Threads.Application.DTOs.Users;
 using Threads.Application.Interfaces.Follows;
 using Threads.Application.Interfaces.Users;
@@ -79,8 +80,9 @@ public class FollowsController : ControllerBase
     }
 
     [HttpGet("{userId:guid}/followers")]
-    public async Task<ActionResult<IReadOnlyCollection<UserShortResponse>>> GetFollowers(
+    public async Task<ActionResult<CursorPageResponse<UserShortResponse>>> GetFollowers(
         [FromRoute] Guid userId,
+        [FromQuery] CursorPageRequest pagination,
         CancellationToken cancellationToken)
     {
         var user = await _userService.GetByIdAsync(userId, cancellationToken);
@@ -90,14 +92,15 @@ public class FollowsController : ControllerBase
             return NotFound(new { message = "User was not found." });
         }
 
-        var followers = await _followService.GetFollowersAsync(userId, cancellationToken);
+        var followers = await _followService.GetFollowersAsync(userId, pagination, cancellationToken);
 
         return Ok(followers);
     }
 
     [HttpGet("{userId:guid}/following")]
-    public async Task<ActionResult<IReadOnlyCollection<UserShortResponse>>> GetFollowing(
+    public async Task<ActionResult<CursorPageResponse<UserShortResponse>>> GetFollowing(
         [FromRoute] Guid userId,
+        [FromQuery] CursorPageRequest pagination,
         CancellationToken cancellationToken)
     {
         var user = await _userService.GetByIdAsync(userId, cancellationToken);
@@ -107,7 +110,7 @@ public class FollowsController : ControllerBase
             return NotFound(new { message = "User was not found." });
         }
 
-        var following = await _followService.GetFollowingAsync(userId, cancellationToken);
+        var following = await _followService.GetFollowingAsync(userId, pagination, cancellationToken);
 
         return Ok(following);
     }

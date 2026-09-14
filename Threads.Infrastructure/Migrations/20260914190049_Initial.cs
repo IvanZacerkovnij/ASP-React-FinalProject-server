@@ -242,6 +242,81 @@ namespace Threads.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "PostBookmarks",
+                columns: table => new
+                {
+                    PostId = table.Column<Guid>(type: "uuid", nullable: false),
+                    UserId = table.Column<Guid>(type: "uuid", nullable: false),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_PostBookmarks", x => new { x.PostId, x.UserId });
+                    table.ForeignKey(
+                        name: "FK_PostBookmarks_Posts_PostId",
+                        column: x => x.PostId,
+                        principalTable: "Posts",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_PostBookmarks_Users_UserId",
+                        column: x => x.UserId,
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "PostLikes",
+                columns: table => new
+                {
+                    PostId = table.Column<Guid>(type: "uuid", nullable: false),
+                    UserId = table.Column<Guid>(type: "uuid", nullable: false),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_PostLikes", x => new { x.PostId, x.UserId });
+                    table.ForeignKey(
+                        name: "FK_PostLikes_Posts_PostId",
+                        column: x => x.PostId,
+                        principalTable: "Posts",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_PostLikes_Users_UserId",
+                        column: x => x.UserId,
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "PostReposts",
+                columns: table => new
+                {
+                    PostId = table.Column<Guid>(type: "uuid", nullable: false),
+                    UserId = table.Column<Guid>(type: "uuid", nullable: false),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_PostReposts", x => new { x.PostId, x.UserId });
+                    table.ForeignKey(
+                        name: "FK_PostReposts_Posts_PostId",
+                        column: x => x.PostId,
+                        principalTable: "Posts",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_PostReposts_Users_UserId",
+                        column: x => x.UserId,
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "PostViews",
                 columns: table => new
                 {
@@ -267,34 +342,74 @@ namespace Threads.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "Bookmarks",
+                name: "CommentBookmarks",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    CommentId = table.Column<Guid>(type: "uuid", nullable: false),
                     UserId = table.Column<Guid>(type: "uuid", nullable: false),
-                    PostId = table.Column<Guid>(type: "uuid", nullable: true),
-                    CommentId = table.Column<Guid>(type: "uuid", nullable: true),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP")
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Bookmarks", x => x.Id);
-                    table.CheckConstraint("CK_Bookmarks_ExactlyOneTarget", "(\"PostId\" IS NOT NULL AND \"CommentId\" IS NULL) OR (\"PostId\" IS NULL AND \"CommentId\" IS NOT NULL)");
+                    table.PrimaryKey("PK_CommentBookmarks", x => new { x.CommentId, x.UserId });
                     table.ForeignKey(
-                        name: "FK_Bookmarks_Comments_CommentId",
+                        name: "FK_CommentBookmarks_Comments_CommentId",
                         column: x => x.CommentId,
                         principalTable: "Comments",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
-                        name: "FK_Bookmarks_Posts_PostId",
-                        column: x => x.PostId,
-                        principalTable: "Posts",
+                        name: "FK_CommentBookmarks_Users_UserId",
+                        column: x => x.UserId,
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "CommentLikes",
+                columns: table => new
+                {
+                    CommentId = table.Column<Guid>(type: "uuid", nullable: false),
+                    UserId = table.Column<Guid>(type: "uuid", nullable: false),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_CommentLikes", x => new { x.CommentId, x.UserId });
+                    table.ForeignKey(
+                        name: "FK_CommentLikes_Comments_CommentId",
+                        column: x => x.CommentId,
+                        principalTable: "Comments",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
-                        name: "FK_Bookmarks_Users_UserId",
+                        name: "FK_CommentLikes_Users_UserId",
+                        column: x => x.UserId,
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "CommentReposts",
+                columns: table => new
+                {
+                    CommentId = table.Column<Guid>(type: "uuid", nullable: false),
+                    UserId = table.Column<Guid>(type: "uuid", nullable: false),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_CommentReposts", x => new { x.CommentId, x.UserId });
+                    table.ForeignKey(
+                        name: "FK_CommentReposts_Comments_CommentId",
+                        column: x => x.CommentId,
+                        principalTable: "Comments",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_CommentReposts_Users_UserId",
                         column: x => x.UserId,
                         principalTable: "Users",
                         principalColumn: "Id",
@@ -320,76 +435,6 @@ namespace Threads.Infrastructure.Migrations
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
                         name: "FK_CommentViews_Users_UserId",
-                        column: x => x.UserId,
-                        principalTable: "Users",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "Likes",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    UserId = table.Column<Guid>(type: "uuid", nullable: false),
-                    PostId = table.Column<Guid>(type: "uuid", nullable: true),
-                    CommentId = table.Column<Guid>(type: "uuid", nullable: true),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Likes", x => x.Id);
-                    table.CheckConstraint("CK_Likes_ExactlyOneTarget", "(\"PostId\" IS NOT NULL AND \"CommentId\" IS NULL) OR (\"PostId\" IS NULL AND \"CommentId\" IS NOT NULL)");
-                    table.ForeignKey(
-                        name: "FK_Likes_Comments_CommentId",
-                        column: x => x.CommentId,
-                        principalTable: "Comments",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_Likes_Posts_PostId",
-                        column: x => x.PostId,
-                        principalTable: "Posts",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_Likes_Users_UserId",
-                        column: x => x.UserId,
-                        principalTable: "Users",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "Reposts",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    UserId = table.Column<Guid>(type: "uuid", nullable: false),
-                    PostId = table.Column<Guid>(type: "uuid", nullable: true),
-                    CommentId = table.Column<Guid>(type: "uuid", nullable: true),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Reposts", x => x.Id);
-                    table.CheckConstraint("CK_Reposts_ExactlyOneTarget", "(\"PostId\" IS NOT NULL AND \"CommentId\" IS NULL) OR (\"PostId\" IS NULL AND \"CommentId\" IS NOT NULL)");
-                    table.ForeignKey(
-                        name: "FK_Reposts_Comments_CommentId",
-                        column: x => x.CommentId,
-                        principalTable: "Comments",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_Reposts_Posts_PostId",
-                        column: x => x.PostId,
-                        principalTable: "Posts",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_Reposts_Users_UserId",
                         column: x => x.UserId,
                         principalTable: "Users",
                         principalColumn: "Id",
@@ -453,28 +498,19 @@ namespace Threads.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_Bookmarks_CommentId",
-                table: "Bookmarks",
-                column: "CommentId");
+                name: "IX_CommentBookmarks_UserId",
+                table: "CommentBookmarks",
+                column: "UserId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Bookmarks_PostId",
-                table: "Bookmarks",
-                column: "PostId");
+                name: "IX_CommentLikes_UserId",
+                table: "CommentLikes",
+                column: "UserId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Bookmarks_UserId_CommentId",
-                table: "Bookmarks",
-                columns: new[] { "UserId", "CommentId" },
-                unique: true,
-                filter: "\"CommentId\" IS NOT NULL");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Bookmarks_UserId_PostId",
-                table: "Bookmarks",
-                columns: new[] { "UserId", "PostId" },
-                unique: true,
-                filter: "\"PostId\" IS NOT NULL");
+                name: "IX_CommentReposts_UserId",
+                table: "CommentReposts",
+                column: "UserId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Comments_AuthorId",
@@ -506,30 +542,6 @@ namespace Threads.Infrastructure.Migrations
                 name: "IX_Follows_FollowingId",
                 table: "Follows",
                 column: "FollowingId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Likes_CommentId",
-                table: "Likes",
-                column: "CommentId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Likes_PostId",
-                table: "Likes",
-                column: "PostId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Likes_UserId_CommentId",
-                table: "Likes",
-                columns: new[] { "UserId", "CommentId" },
-                unique: true,
-                filter: "\"CommentId\" IS NOT NULL");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Likes_UserId_PostId",
-                table: "Likes",
-                columns: new[] { "UserId", "PostId" },
-                unique: true,
-                filter: "\"PostId\" IS NOT NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Media_PostId",
@@ -588,6 +600,21 @@ namespace Threads.Infrastructure.Migrations
                 column: "UserId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_PostBookmarks_UserId",
+                table: "PostBookmarks",
+                column: "UserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_PostLikes_UserId",
+                table: "PostLikes",
+                column: "UserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_PostReposts_UserId",
+                table: "PostReposts",
+                column: "UserId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Posts_AuthorId",
                 table: "Posts",
                 column: "AuthorId");
@@ -609,30 +636,6 @@ namespace Threads.Infrastructure.Migrations
                 columns: new[] { "UserId", "ExpiresAt" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_Reposts_CommentId",
-                table: "Reposts",
-                column: "CommentId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Reposts_PostId",
-                table: "Reposts",
-                column: "PostId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Reposts_UserId_CommentId",
-                table: "Reposts",
-                columns: new[] { "UserId", "CommentId" },
-                unique: true,
-                filter: "\"CommentId\" IS NOT NULL");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Reposts_UserId_PostId",
-                table: "Reposts",
-                columns: new[] { "UserId", "PostId" },
-                unique: true,
-                filter: "\"PostId\" IS NOT NULL");
-
-            migrationBuilder.CreateIndex(
                 name: "IX_Users_Email",
                 table: "Users",
                 column: "Email",
@@ -649,16 +652,19 @@ namespace Threads.Infrastructure.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
-                name: "Bookmarks");
+                name: "CommentBookmarks");
+
+            migrationBuilder.DropTable(
+                name: "CommentLikes");
+
+            migrationBuilder.DropTable(
+                name: "CommentReposts");
 
             migrationBuilder.DropTable(
                 name: "CommentViews");
 
             migrationBuilder.DropTable(
                 name: "Follows");
-
-            migrationBuilder.DropTable(
-                name: "Likes");
 
             migrationBuilder.DropTable(
                 name: "Media");
@@ -670,19 +676,25 @@ namespace Threads.Infrastructure.Migrations
                 name: "PollVotes");
 
             migrationBuilder.DropTable(
+                name: "PostBookmarks");
+
+            migrationBuilder.DropTable(
+                name: "PostLikes");
+
+            migrationBuilder.DropTable(
+                name: "PostReposts");
+
+            migrationBuilder.DropTable(
                 name: "PostViews");
 
             migrationBuilder.DropTable(
                 name: "RefreshTokens");
 
             migrationBuilder.DropTable(
-                name: "Reposts");
+                name: "Comments");
 
             migrationBuilder.DropTable(
                 name: "PollOptions");
-
-            migrationBuilder.DropTable(
-                name: "Comments");
 
             migrationBuilder.DropTable(
                 name: "Polls");

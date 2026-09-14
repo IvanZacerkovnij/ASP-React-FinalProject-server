@@ -21,14 +21,14 @@ public class Comment : BaseEntity
     public ICollection<Comment> Replies { get; set; } =
         new List<Comment>();
 
-    public ICollection<Like> Likes { get; set; } =
-        new List<Like>();
+    public ICollection<CommentLike> CommentLikes { get; set; } =
+        new List<CommentLike>();
 
-    public ICollection<Bookmark> Bookmarks { get; set; } =
-        new List<Bookmark>();
+    public ICollection<CommentBookmark> CommentBookmarks { get; set; } =
+        new List<CommentBookmark>();
 
-    public ICollection<Repost> Reposts { get; set; } =
-        new List<Repost>();
+    public ICollection<CommentRepost> CommentReposts { get; set; } =
+        new List<CommentRepost>();
 
     public ICollection<CommentView> CommentViews { get; set; } =
         new List<CommentView>();

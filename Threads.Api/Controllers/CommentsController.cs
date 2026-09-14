@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Threads.Api.Extensions;
 using Threads.Application.DTOs.Comments;
+using Threads.Application.DTOs.Pagination;
 using Threads.Application.Interfaces.Comments;
 using Threads.Infrastructure.Services;
 
@@ -20,14 +21,16 @@ public class CommentsController : ControllerBase
     }
 
     [HttpGet("post/{postId:guid}")]
-    public async Task<ActionResult<IReadOnlyCollection<CommentResponse>>> GetByPostId(
+    public async Task<ActionResult<CursorPageResponse<CommentResponse>>> GetByPostId(
         [FromRoute] Guid postId,
+        [FromQuery] CursorPageRequest pagination,
         CancellationToken cancellationToken)
     {
         var currentUserId = User.GetCurrentUserId();
         
         var comments = await _commentService.GetByPostIdAsync(
             postId,
+            pagination,
             cancellationToken,
             currentUserId);
         return Ok(comments);

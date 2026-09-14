@@ -49,14 +49,23 @@ public class User : BaseEntity
     public ICollection<Comment> Comments { get; set; } =
         new List<Comment>();
 
-    public ICollection<Like> Likes { get; set; } =
-        new List<Like>();
+    public ICollection<PostLike> PostLikes { get; set; } =
+        new List<PostLike>();
 
-    public ICollection<Repost> Reposts { get; set; } =
-        new List<Repost>();
+    public ICollection<CommentLike> CommentLikes { get; set; } =
+        new List<CommentLike>();
+
+    public ICollection<PostRepost> PostReposts { get; set; } =
+        new List<PostRepost>();
+
+    public ICollection<CommentRepost> CommentReposts { get; set; } =
+        new List<CommentRepost>();
     
-    public ICollection<Bookmark> Bookmarks { get; set; } =
-        new List<Bookmark>();
+    public ICollection<PostBookmark> PostBookmarks { get; set; } =
+        new List<PostBookmark>();
+
+    public ICollection<CommentBookmark> CommentBookmarks { get; set; } =
+        new List<CommentBookmark>();
 
     public ICollection<PostView> PostViews { get; set; } =
         new List<PostView>();
