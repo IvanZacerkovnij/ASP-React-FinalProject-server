@@ -90,8 +90,26 @@ public class AuthService : IAuthService
             return null;
         }
 
-        await RevokeRefreshTokenAsync(currentRefreshToken, cancellationToken);
-        var newRefreshToken = await IssueRefreshTokenAsync(currentRefreshToken.UserId, cancellationToken);
+        var newRefreshToken = _tokenService.GenerateRefreshToken();
+        var revokedAt = DateTimeOffset.UtcNow;
+
+        var newRefreshTokenEntity = new RefreshToken()
+        {
+            TokenHash = HashRefreshToken(newRefreshToken),
+            ExpiresAt = revokedAt.AddDays(RefreshTokenLifetimeDays),
+            UserId = currentRefreshToken.UserId
+        };
+
+        var wasRotated = await _refreshTokenRepository.TryRotateAsync(
+            currentRefreshToken.Id,
+            newRefreshTokenEntity,
+            revokedAt,
+            cancellationToken);
+
+        if (!wasRotated)
+        {
+            return null;
+        }
 
         return CreateAuthResponse(currentRefreshToken.User, newRefreshToken);
     }

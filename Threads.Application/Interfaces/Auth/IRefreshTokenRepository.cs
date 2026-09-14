@@ -9,4 +9,9 @@ public interface IRefreshTokenRepository
     Task RevokeAllByUserIdAsync(Guid userId, DateTimeOffset revokedAt, CancellationToken cancellationToken = default);
     Task AddAsync(RefreshToken refreshToken, CancellationToken cancellationToken = default);
     Task UpdateAsync(RefreshToken refreshToken, CancellationToken cancellationToken = default);
+    Task<bool> TryRotateAsync(
+        Guid currentRefreshTokenId,
+        RefreshToken newRefreshToken,
+        DateTimeOffset revokedAt,
+        CancellationToken cancellationToken = default);
 }
