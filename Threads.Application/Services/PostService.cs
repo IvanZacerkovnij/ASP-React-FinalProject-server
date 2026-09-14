@@ -52,9 +52,10 @@ public class PostService : IPostService
         Guid? currentUserId = null)
     {
         var posts = await _postRepository.GetRandomAsync(FeedSize, cancellationToken);
+        var viewCounts = await GetViewCountsAsync(posts, cancellationToken);
 
         return posts
-            .Select(post => MapPostResponse(post, currentUserId))
+            .Select(post => MapPostResponse(post, currentUserId, viewCounts.GetValueOrDefault(post.Id)))
             .ToList();
     }
 
@@ -64,9 +65,10 @@ public class PostService : IPostService
         Guid? currentUserId = null)
     {
         var posts = await _postRepository.GetByAuthorIdAsync(authorId, cancellationToken);
+        var viewCounts = await GetViewCountsAsync(posts, cancellationToken);
 
         return posts
-            .Select(post => MapPostResponse(post, currentUserId))
+            .Select(post => MapPostResponse(post, currentUserId, viewCounts.GetValueOrDefault(post.Id)))
             .ToList();
     }
 
@@ -76,11 +78,13 @@ public class PostService : IPostService
         Guid? currentUserId = null)
     {
         var posts = await _postRepository.GetLikedByUserIdAsync(userId, cancellationToken);
+        var viewCounts = await GetViewCountsAsync(posts, cancellationToken);
 
         return posts
             .Select(post => MapPostResponse(
                 post,
                 currentUserId,
+                viewCounts.GetValueOrDefault(post.Id),
                 post.Likes.FirstOrDefault(like => like.UserId == userId)?.CreatedAt))
             .ToList();
     }
@@ -91,11 +95,13 @@ public class PostService : IPostService
         Guid? currentUserId = null)
     {
         var posts = await _postRepository.GetBookmarkedByUserIdAsync(userId, cancellationToken);
+        var viewCounts = await GetViewCountsAsync(posts, cancellationToken);
 
         return posts
             .Select(post => MapPostResponse(
                 post,
                 currentUserId,
+                viewCounts.GetValueOrDefault(post.Id),
                 post.Bookmarks.FirstOrDefault(bookmark => bookmark.UserId == userId)?.CreatedAt))
             .ToList();
     }
@@ -106,11 +112,13 @@ public class PostService : IPostService
         Guid? currentUserId = null)
     {
         var posts = await _postRepository.GetRepostedByUserIdAsync(userId, cancellationToken);
+        var viewCounts = await GetViewCountsAsync(posts, cancellationToken);
 
         return posts
             .Select(post => MapPostResponse(
                 post,
                 currentUserId,
+                viewCounts.GetValueOrDefault(post.Id),
                 post.Reposts.FirstOrDefault(repost => repost.UserId == userId)?.CreatedAt))
             .ToList();
     }
@@ -126,9 +134,10 @@ public class PostService : IPostService
         }
 
         var posts = await _postRepository.SearchAsync(query.Trim(), cancellationToken: cancellationToken);
+        var viewCounts = await GetViewCountsAsync(posts, cancellationToken);
 
         return posts
-            .Select(post => MapPostResponse(post, currentUserId))
+            .Select(post => MapPostResponse(post, currentUserId, viewCounts.GetValueOrDefault(post.Id)))
             .ToList();
     }
 
@@ -211,7 +220,7 @@ public class PostService : IPostService
 
         var createdPost = await _postRepository.GetByIdAsync(post.Id, cancellationToken);
 
-        return MapPostResponse(createdPost ?? post, authorId);
+        return MapPostResponse(createdPost ?? post, authorId, viewsCount: 0);
     }
 
     public async Task<PostResponse?> UpdateAsync(Guid id, UpdatePostRequest request, CancellationToken cancellationToken = default)
@@ -268,8 +277,9 @@ public class PostService : IPostService
         await CacheInvalidation.TryRemoveAsync(_cache, PostCache.GetKey(post.Id));
 
         var updatedPost = await _postRepository.GetByIdAsync(post.Id, cancellationToken);
+        var viewsCount = await GetViewCountAsync(post.Id, cancellationToken);
 
-        return MapPostResponse(updatedPost ?? post, post.AuthorId);
+        return MapPostResponse(updatedPost ?? post, post.AuthorId, viewsCount);
     }
 
     public async Task<PostViewResponse?> RecordViewAsync(
@@ -568,6 +578,7 @@ public class PostService : IPostService
     private PostResponse MapPostResponse(
         Post post,
         Guid? currentUserId,
+        int viewsCount,
         DateTimeOffset? actionAt = null)
     {
         var response = _mapper.Map<PostResponse>(post);
@@ -617,7 +628,7 @@ public class PostService : IPostService
             LikesCount = response.LikesCount,
             CommentsCount = response.CommentsCount,
             RepostsCount = response.RepostsCount,
-            ViewsCount = response.ViewsCount,
+            ViewsCount = viewsCount,
             BookmarksCount = response.BookmarksCount,
             IsLikedByCurrentUser = currentUserId.HasValue && post.Likes.Any(like => like.UserId == currentUserId.Value),
             IsRepostedByCurrentUser = currentUserId.HasValue && post.Reposts.Any(repost => repost.UserId == currentUserId.Value),
@@ -626,6 +637,22 @@ public class PostService : IPostService
             CreatedAt = response.CreatedAt,
             UpdatedAt = response.UpdatedAt
         };
+    }
+
+    private async Task<IReadOnlyDictionary<Guid, int>> GetViewCountsAsync(
+        IReadOnlyCollection<Post> posts,
+        CancellationToken cancellationToken)
+    {
+        return await _postRepository.GetViewCountsAsync(
+            posts.Select(post => post.Id).ToArray(),
+            cancellationToken);
+    }
+
+    private async Task<int> GetViewCountAsync(Guid postId, CancellationToken cancellationToken)
+    {
+        var viewCounts = await _postRepository.GetViewCountsAsync([postId], cancellationToken);
+
+        return viewCounts.GetValueOrDefault(postId);
     }
 
     private PostResponse MapPostResponse(

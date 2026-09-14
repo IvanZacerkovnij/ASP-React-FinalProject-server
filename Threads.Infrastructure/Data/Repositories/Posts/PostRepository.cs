@@ -241,7 +241,7 @@ public class PostRepository : IPostRepository
                 CommentsCount = post.Comments.Count,
                 RepostsCount = post.Reposts.Count,
                 BookmarksCount = post.Bookmarks.Count,
-                ViewsCount = post.ViewsCount,
+                ViewsCount = post.PostViews.Count,
                 IsLikedByCurrentUser = hasCurrentUser &&
                     post.Likes.Any(like => like.UserId == effectiveCurrentUserId),
                 IsRepostedByCurrentUser = hasCurrentUser &&
@@ -274,54 +274,43 @@ public class PostRepository : IPostRepository
 
     public async Task<int?> RecordViewAsync(Guid id, Guid viewerId, CancellationToken cancellationToken = default)
     {
-        var post = await _dbContext.Posts
-            .FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
 
-        if (post is null)
-        {
-            return null;
-        }
-
-        var alreadyViewed = await _dbContext.Views
-            .AsNoTracking()
-            .AnyAsync(
-                item => item.PostId == id && item.ViewerId == viewerId && item.CommentId == null,
-                cancellationToken);
-
-        if (alreadyViewed)
-        {
-            return post.ViewsCount;
-        }
-
-        await _dbContext.Views.AddAsync(
-            new View
-            {
-                PostId = id,
-                CommentId = null,
-                ViewerId = viewerId
-            },
+        await _dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO "PostViews" ("PostId", "UserId", "CreatedAt")
+            SELECT post."Id", {viewerId}, CURRENT_TIMESTAMP
+            FROM "Posts" AS post
+            WHERE post."Id" = {id}
+            ON CONFLICT ("PostId", "UserId") DO NOTHING
+            """,
             cancellationToken);
 
-        post.ViewsCount++;
-        try
+        var viewsCount = await _dbContext.Posts
+            .AsNoTracking()
+            .Where(post => post.Id == id)
+            .Select(post => (int?)post.PostViews.Count)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        await transaction.CommitAsync(cancellationToken);
+
+        return viewsCount;
+    }
+
+    public async Task<IReadOnlyDictionary<Guid, int>> GetViewCountsAsync(
+        IReadOnlyCollection<Guid> postIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (postIds.Count == 0)
         {
-            await _dbContext.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateException)
-        {
-            var persistedPost = await _dbContext.Posts
-                .AsNoTracking()
-                .FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
-
-            if (persistedPost is not null)
-            {
-                return persistedPost.ViewsCount;
-            }
-
-            throw;
+            return new Dictionary<Guid, int>();
         }
 
-        return post.ViewsCount;
+        return await _dbContext.PostViews
+            .AsNoTracking()
+            .Where(view => postIds.Contains(view.PostId))
+            .GroupBy(view => view.PostId)
+            .ToDictionaryAsync(group => group.Key, group => group.Count(), cancellationToken);
     }
 
     public async Task AddAsync(Post post, CancellationToken cancellationToken = default)

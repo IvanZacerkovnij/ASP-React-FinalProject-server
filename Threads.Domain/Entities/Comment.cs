@@ -30,6 +30,6 @@ public class Comment : BaseEntity
     public ICollection<Repost> Reposts { get; set; } =
         new List<Repost>();
 
-    public ICollection<View> Views { get; set; } =
-        new List<View>();
+    public ICollection<CommentView> CommentViews { get; set; } =
+        new List<CommentView>();
 }

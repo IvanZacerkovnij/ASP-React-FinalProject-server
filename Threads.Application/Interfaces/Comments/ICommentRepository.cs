@@ -24,8 +24,13 @@ public interface ICommentRepository
         Guid userId,
         CancellationToken cancellationToken = default);
 
-    void AttachView(View view);
-    Task SaveChangesAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyDictionary<Guid, int>> GetViewCountsAsync(
+        IReadOnlyCollection<Guid> commentIds,
+        CancellationToken cancellationToken = default);
+    Task<int?> RecordViewAsync(
+        Guid id,
+        Guid userId,
+        CancellationToken cancellationToken = default);
     Task AddAsync(Comment comment, CancellationToken cancellationToken = default);
     Task UpdateAsync(Comment comment, CancellationToken cancellationToken = default);
     Task DeleteAsync(Comment comment, CancellationToken cancellationToken = default);

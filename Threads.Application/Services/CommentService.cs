@@ -47,9 +47,13 @@ public class CommentService : ICommentService
         Guid? currentUserId = null)
     {
         var comments = await _commentRepository.GetByPostIdAsync(postId, cancellationToken);
+        var viewCounts = await GetViewCountsAsync(comments, cancellationToken);
 
         return comments
-            .Select(comment => MapCommentResponse(comment, currentUserId))
+            .Select(comment => MapCommentResponse(
+                comment,
+                currentUserId,
+                viewCounts.GetValueOrDefault(comment.Id)))
             .ToList();
     }
 
@@ -60,9 +64,14 @@ public class CommentService : ICommentService
     {
         var comment = await _commentRepository.GetByIdAsync(id, cancellationToken);
 
-        return comment is null
-            ? null
-            : MapCommentResponse(comment, currentUserId);
+        if (comment is null)
+        {
+            return null;
+        }
+
+        var viewsCount = await GetViewCountAsync(id, cancellationToken);
+
+        return MapCommentResponse(comment, currentUserId, viewsCount);
     }
 
     public async Task<IReadOnlyCollection<CommentResponse>> GetBookmarkedByUserIdAsync(
@@ -71,11 +80,13 @@ public class CommentService : ICommentService
         Guid? currentUserId = null)
     {
         var comments = await _commentRepository.GetBookmarkedByUserIdAsync(userId, cancellationToken);
+        var viewCounts = await GetViewCountsAsync(comments, cancellationToken);
 
         return comments
             .Select(comment => MapCommentResponse(
                 comment,
                 currentUserId,
+                viewCounts.GetValueOrDefault(comment.Id),
                 comment.Bookmarks.FirstOrDefault(bookmark => bookmark.UserId == userId)?.CreatedAt))
             .ToList();
     }
@@ -86,11 +97,13 @@ public class CommentService : ICommentService
         Guid? currentUserId = null)
     {
         var comments = await _commentRepository.GetLikedByUserIdAsync(userId, cancellationToken);
+        var viewCounts = await GetViewCountsAsync(comments, cancellationToken);
 
         return comments
             .Select(comment => MapCommentResponse(
                 comment,
                 currentUserId,
+                viewCounts.GetValueOrDefault(comment.Id),
                 comment.Likes.FirstOrDefault(like => like.UserId == userId)?.CreatedAt))
             .ToList();
     }
@@ -101,11 +114,13 @@ public class CommentService : ICommentService
         Guid? currentUserId = null)
     {
         var comments = await _commentRepository.GetRepostedByUserIdAsync(userId, cancellationToken);
+        var viewCounts = await GetViewCountsAsync(comments, cancellationToken);
 
         return comments
             .Select(comment => MapCommentResponse(
                 comment,
                 currentUserId,
+                viewCounts.GetValueOrDefault(comment.Id),
                 comment.Reposts.FirstOrDefault(repost => repost.UserId == userId)?.CreatedAt))
             .ToList();
     }
@@ -153,7 +168,7 @@ public class CommentService : ICommentService
 
         var createdComment = await _commentRepository.GetByIdAsync(comment.Id, cancellationToken);
 
-        return MapCommentResponse(createdComment ?? comment, authorId);
+        return MapCommentResponse(createdComment ?? comment, authorId, viewsCount: 0);
     }
 
     public async Task<CommentResponse?> UpdateAsync(
@@ -180,8 +195,9 @@ public class CommentService : ICommentService
         await _commentRepository.UpdateAsync(comment, cancellationToken);
 
         var updatedComment = await _commentRepository.GetByIdAsync(comment.Id, cancellationToken);
+        var viewsCount = await GetViewCountAsync(comment.Id, cancellationToken);
 
-        return MapCommentResponse(updatedComment ?? comment, currentUserId);
+        return MapCommentResponse(updatedComment ?? comment, currentUserId, viewsCount);
     }
 
     public async Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default)
@@ -230,11 +246,7 @@ public class CommentService : ICommentService
             }
         }
 
-        var updatedComment = await _commentRepository.GetByIdAsync(id, cancellationToken);
-
-        return updatedComment is null
-            ? null
-            : MapCommentResponse(updatedComment, userId);
+        return await GetResponseByIdAsync(id, userId, cancellationToken);
     }
 
     public async Task<CommentResponse?> UnlikeAsync(Guid id, Guid userId, CancellationToken cancellationToken = default)
@@ -256,11 +268,7 @@ public class CommentService : ICommentService
             await _likeRepository.DeleteAsync(existingLike, cancellationToken);
         }
 
-        var updatedComment = await _commentRepository.GetByIdAsync(id, cancellationToken);
-
-        return updatedComment is null
-            ? null
-            : MapCommentResponse(updatedComment, userId);
+        return await GetResponseByIdAsync(id, userId, cancellationToken);
     }
 
     public async Task<CommentResponse?> BookmarkAsync(Guid id, Guid userId, CancellationToken cancellationToken = default)
@@ -295,11 +303,7 @@ public class CommentService : ICommentService
             }
         }
 
-        var updatedComment = await _commentRepository.GetByIdAsync(id, cancellationToken);
-
-        return updatedComment is null
-            ? null
-            : MapCommentResponse(updatedComment, userId);
+        return await GetResponseByIdAsync(id, userId, cancellationToken);
     }
 
     public async Task<CommentResponse?> UnbookmarkAsync(Guid id, Guid userId, CancellationToken cancellationToken = default)
@@ -321,11 +325,7 @@ public class CommentService : ICommentService
             await _bookmarkRepository.DeleteAsync(existingBookmark, cancellationToken);
         }
 
-        var updatedComment = await _commentRepository.GetByIdAsync(id, cancellationToken);
-
-        return updatedComment is null
-            ? null
-            : MapCommentResponse(updatedComment, userId);
+        return await GetResponseByIdAsync(id, userId, cancellationToken);
     }
 
     public async Task<CommentResponse?> RepostAsync(Guid id, Guid userId, CancellationToken cancellationToken = default)
@@ -360,11 +360,7 @@ public class CommentService : ICommentService
             }
         }
 
-        var updatedComment = await _commentRepository.GetByIdAsync(id, cancellationToken);
-
-        return updatedComment is null
-            ? null
-            : MapCommentResponse(updatedComment, userId);
+        return await GetResponseByIdAsync(id, userId, cancellationToken);
     }
 
     public async Task<CommentResponse?> UnrepostAsync(Guid id, Guid userId, CancellationToken cancellationToken = default)
@@ -386,53 +382,62 @@ public class CommentService : ICommentService
             await _repostRepository.DeleteAsync(existingRepost, cancellationToken);
         }
 
-        var updatedComment = await _commentRepository.GetByIdAsync(id, cancellationToken);
-
-        return updatedComment is null
-            ? null
-            : MapCommentResponse(updatedComment, userId);
+        return await GetResponseByIdAsync(id, userId, cancellationToken);
     }
 
     public async Task<CommentResponse?> ViewAsync(Guid id, Guid userId, CancellationToken cancellationToken = default)
     {
-        var comment = await _commentRepository.GetByIdAsync(id, cancellationToken);
+        var viewsCount = await _commentRepository.RecordViewAsync(id, userId, cancellationToken);
+
+        if (viewsCount is null)
+        {
+            return null;
+        }
+
+        var updatedComment = await _commentRepository.GetByIdAsync(id, cancellationToken);
+
+        return updatedComment is null
+            ? null
+            : MapCommentResponse(updatedComment, userId, viewsCount.Value);
+    }
+
+    private async Task<CommentResponse?> GetResponseByIdAsync(
+        Guid commentId,
+        Guid? currentUserId,
+        CancellationToken cancellationToken)
+    {
+        var comment = await _commentRepository.GetByIdAsync(commentId, cancellationToken);
 
         if (comment is null)
         {
             return null;
         }
 
-        var alreadyViewed = comment.Views.Any(view => view.ViewerId == userId);
+        var viewsCount = await GetViewCountAsync(commentId, cancellationToken);
 
-        if (!alreadyViewed)
-        {
-            var view = new View
-            {
-                PostId = null,
-                CommentId = id,
-                ViewerId = userId
-            };
+        return MapCommentResponse(comment, currentUserId, viewsCount);
+    }
 
-            try
-            {
-                _commentRepository.AttachView(view);
-                await _commentRepository.SaveChangesAsync(cancellationToken);
-            }
-            catch (Exception exception) when (IsDuplicateWriteException(exception))
-            {
-            }
-        }
+    private async Task<IReadOnlyDictionary<Guid, int>> GetViewCountsAsync(
+        IReadOnlyCollection<Comment> comments,
+        CancellationToken cancellationToken)
+    {
+        return await _commentRepository.GetViewCountsAsync(
+            comments.Select(comment => comment.Id).ToArray(),
+            cancellationToken);
+    }
 
-        var updatedComment = await _commentRepository.GetByIdAsync(id, cancellationToken);
+    private async Task<int> GetViewCountAsync(Guid commentId, CancellationToken cancellationToken)
+    {
+        var viewCounts = await _commentRepository.GetViewCountsAsync([commentId], cancellationToken);
 
-        return updatedComment is null
-            ? null
-            : MapCommentResponse(updatedComment, userId);
+        return viewCounts.GetValueOrDefault(commentId);
     }
 
     private CommentResponse MapCommentResponse(
         Comment comment,
-        Guid? currentUserId = null,
+        Guid? currentUserId,
+        int viewsCount,
         DateTimeOffset? actionAt = null)
     {
         var response = _mapper.Map<CommentResponse>(comment);
@@ -453,7 +458,7 @@ public class CommentService : ICommentService
             RepostsCount = response.RepostsCount,
             IsRepostedByCurrentUser = currentUserId.HasValue &&
                 comment.Reposts.Any(repost => repost.UserId == currentUserId.Value),
-            ViewsCount = response.ViewsCount,
+            ViewsCount = viewsCount,
             ActionAt = actionAt,
             CreatedAt = response.CreatedAt,
             UpdatedAt = response.UpdatedAt

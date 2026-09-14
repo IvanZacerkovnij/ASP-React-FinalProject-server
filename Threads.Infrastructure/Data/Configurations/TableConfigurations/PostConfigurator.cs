@@ -36,16 +36,8 @@ public class PostConfigurator : IEntityTypeConfiguration<Post>
         builder.Property(post => post.EmbedThumbnailUrl)
             .HasMaxLength(2048);
 
-        builder.Property(post => post.ViewsCount)
-            .IsRequired();
-
         builder.Property(post => post.CreatedAt)
             .IsRequired();
-
-        builder.ToTable(table =>
-            table.HasCheckConstraint(
-                "CK_Posts_ViewsCount",
-                "\"ViewsCount\" >= 0"));
 
         builder.HasIndex(post => post.AuthorId);
 
@@ -74,12 +66,6 @@ public class PostConfigurator : IEntityTypeConfiguration<Post>
         builder.HasMany(post => post.Bookmarks)
             .WithOne(bookmark => bookmark.Post)
             .HasForeignKey(bookmark => bookmark.PostId)
-            .IsRequired(false)
-            .OnDelete(DeleteBehavior.Cascade);
-
-        builder.HasMany(post => post.Views)
-            .WithOne(view => view.Post)
-            .HasForeignKey(view => view.PostId)
             .IsRequired(false)
             .OnDelete(DeleteBehavior.Cascade);
 

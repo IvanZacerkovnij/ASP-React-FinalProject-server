@@ -24,7 +24,6 @@ public class CommentRepository : ICommentRepository
             .Include(comment => comment.Likes)
             .Include(comment => comment.Bookmarks)
             .Include(comment => comment.Reposts)
-            .Include(comment => comment.Views)
             .Where(comment => comment.PostId == postId)
             .OrderBy(comment => comment.CreatedAt)
             .ToListAsync(cancellationToken);
@@ -38,7 +37,6 @@ public class CommentRepository : ICommentRepository
             .Include(comment => comment.Likes)
             .Include(comment => comment.Bookmarks)
             .Include(comment => comment.Reposts)
-            .Include(comment => comment.Views)
             .FirstOrDefaultAsync(comment => comment.Id == id, cancellationToken);
     }
 
@@ -110,7 +108,6 @@ public class CommentRepository : ICommentRepository
             .Include(comment => comment.Likes)
             .Include(comment => comment.Bookmarks)
             .Include(comment => comment.Reposts)
-            .Include(comment => comment.Views)
             .Where(comment => commentIds.Contains(comment.Id))
             .ToListAsync(cancellationToken);
 
@@ -129,14 +126,48 @@ public class CommentRepository : ICommentRepository
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    public void AttachView(View view)
+    public async Task<IReadOnlyDictionary<Guid, int>> GetViewCountsAsync(
+        IReadOnlyCollection<Guid> commentIds,
+        CancellationToken cancellationToken = default)
     {
-        _dbContext.Views.Add(view);
+        if (commentIds.Count == 0)
+        {
+            return new Dictionary<Guid, int>();
+        }
+
+        return await _dbContext.CommentViews
+            .AsNoTracking()
+            .Where(view => commentIds.Contains(view.CommentId))
+            .GroupBy(view => view.CommentId)
+            .ToDictionaryAsync(group => group.Key, group => group.Count(), cancellationToken);
     }
 
-    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    public async Task<int?> RecordViewAsync(
+        Guid id,
+        Guid userId,
+        CancellationToken cancellationToken = default)
     {
-        return _dbContext.SaveChangesAsync(cancellationToken);
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+        await _dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO "CommentViews" ("CommentId", "UserId", "CreatedAt")
+            SELECT comment."Id", {userId}, CURRENT_TIMESTAMP
+            FROM "Comments" AS comment
+            WHERE comment."Id" = {id}
+            ON CONFLICT ("CommentId", "UserId") DO NOTHING
+            """,
+            cancellationToken);
+
+        var viewsCount = await _dbContext.Comments
+            .AsNoTracking()
+            .Where(comment => comment.Id == id)
+            .Select(comment => (int?)comment.CommentViews.Count)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        await transaction.CommitAsync(cancellationToken);
+
+        return viewsCount;
     }
 
     public async Task UpdateAsync(Comment comment, CancellationToken cancellationToken = default)

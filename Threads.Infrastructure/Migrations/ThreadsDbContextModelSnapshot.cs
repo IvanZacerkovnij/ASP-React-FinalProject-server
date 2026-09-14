@@ -100,6 +100,26 @@ namespace Threads.Infrastructure.Migrations
                     b.ToTable("Comments", (string)null);
                 });
 
+            modelBuilder.Entity("Threads.Domain.Entities.CommentView", b =>
+                {
+                    b.Property<Guid>("CommentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.HasKey("CommentId", "UserId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("CommentViews", (string)null);
+                });
+
             modelBuilder.Entity("Threads.Domain.Entities.Follow", b =>
                 {
                     b.Property<Guid>("Id")
@@ -443,17 +463,31 @@ namespace Threads.Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<int>("ViewsCount")
-                        .HasColumnType("integer");
-
                     b.HasKey("Id");
 
                     b.HasIndex("AuthorId");
 
-                    b.ToTable("Posts", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_Posts_ViewsCount", "\"ViewsCount\" >= 0");
-                        });
+                    b.ToTable("Posts", (string)null);
+                });
+
+            modelBuilder.Entity("Threads.Domain.Entities.PostView", b =>
+                {
+                    b.Property<Guid>("PostId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.HasKey("PostId", "UserId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("PostViews", (string)null);
                 });
 
             modelBuilder.Entity("Threads.Domain.Entities.RefreshToken", b =>
@@ -630,45 +664,6 @@ namespace Threads.Infrastructure.Migrations
                     b.ToTable("Users", (string)null);
                 });
 
-            modelBuilder.Entity("Threads.Domain.Entities.View", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("CommentId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("PostId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("ViewerId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ViewerId");
-
-                    b.HasIndex("CommentId", "ViewerId")
-                        .IsUnique()
-                        .HasFilter("\"CommentId\" IS NOT NULL");
-
-                    b.HasIndex("PostId", "ViewerId")
-                        .IsUnique()
-                        .HasFilter("\"PostId\" IS NOT NULL");
-
-                    b.ToTable("Views", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_Views_ExactlyOneTarget", "(\"PostId\" IS NOT NULL AND \"CommentId\" IS NULL) OR (\"PostId\" IS NULL AND \"CommentId\" IS NOT NULL)");
-                        });
-                });
-
             modelBuilder.Entity("Threads.Domain.Entities.Bookmark", b =>
                 {
                     b.HasOne("Threads.Domain.Entities.Comment", "Comment")
@@ -718,6 +713,25 @@ namespace Threads.Infrastructure.Migrations
                     b.Navigation("ParentComment");
 
                     b.Navigation("Post");
+                });
+
+            modelBuilder.Entity("Threads.Domain.Entities.CommentView", b =>
+                {
+                    b.HasOne("Threads.Domain.Entities.Comment", "Comment")
+                        .WithMany("CommentViews")
+                        .HasForeignKey("CommentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Threads.Domain.Entities.User", "User")
+                        .WithMany("CommentViews")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Comment");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Threads.Domain.Entities.Follow", b =>
@@ -842,6 +856,25 @@ namespace Threads.Infrastructure.Migrations
                     b.Navigation("Author");
                 });
 
+            modelBuilder.Entity("Threads.Domain.Entities.PostView", b =>
+                {
+                    b.HasOne("Threads.Domain.Entities.Post", "Post")
+                        .WithMany("PostViews")
+                        .HasForeignKey("PostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Threads.Domain.Entities.User", "User")
+                        .WithMany("PostViews")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Post");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("Threads.Domain.Entities.RefreshToken", b =>
                 {
                     b.HasOne("Threads.Domain.Entities.User", "User")
@@ -878,42 +911,17 @@ namespace Threads.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Threads.Domain.Entities.View", b =>
-                {
-                    b.HasOne("Threads.Domain.Entities.Comment", "Comment")
-                        .WithMany("Views")
-                        .HasForeignKey("CommentId")
-                        .OnDelete(DeleteBehavior.Cascade);
-
-                    b.HasOne("Threads.Domain.Entities.Post", "Post")
-                        .WithMany("Views")
-                        .HasForeignKey("PostId")
-                        .OnDelete(DeleteBehavior.Cascade);
-
-                    b.HasOne("Threads.Domain.Entities.User", "Viewer")
-                        .WithMany("Views")
-                        .HasForeignKey("ViewerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Comment");
-
-                    b.Navigation("Post");
-
-                    b.Navigation("Viewer");
-                });
-
             modelBuilder.Entity("Threads.Domain.Entities.Comment", b =>
                 {
                     b.Navigation("Bookmarks");
+
+                    b.Navigation("CommentViews");
 
                     b.Navigation("Likes");
 
                     b.Navigation("Replies");
 
                     b.Navigation("Reposts");
-
-                    b.Navigation("Views");
                 });
 
             modelBuilder.Entity("Threads.Domain.Entities.Poll", b =>
@@ -940,14 +948,16 @@ namespace Threads.Infrastructure.Migrations
 
                     b.Navigation("Poll");
 
-                    b.Navigation("Reposts");
+                    b.Navigation("PostViews");
 
-                    b.Navigation("Views");
+                    b.Navigation("Reposts");
                 });
 
             modelBuilder.Entity("Threads.Domain.Entities.User", b =>
                 {
                     b.Navigation("Bookmarks");
+
+                    b.Navigation("CommentViews");
 
                     b.Navigation("Comments");
 
@@ -959,6 +969,8 @@ namespace Threads.Infrastructure.Migrations
 
                     b.Navigation("PollVotes");
 
+                    b.Navigation("PostViews");
+
                     b.Navigation("Posts");
 
                     b.Navigation("RefreshTokens");
@@ -966,8 +978,6 @@ namespace Threads.Infrastructure.Migrations
                     b.Navigation("Reposts");
 
                     b.Navigation("UploadedMedia");
-
-                    b.Navigation("Views");
                 });
 #pragma warning restore 612, 618
         }

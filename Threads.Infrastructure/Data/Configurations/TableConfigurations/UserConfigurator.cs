@@ -89,11 +89,6 @@ public class UserConfigurator : IEntityTypeConfiguration<User>
             .HasForeignKey(repost => repost.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        builder.HasMany(user => user.Views)
-            .WithOne(view => view.Viewer)
-            .HasForeignKey(view => view.ViewerId)
-            .OnDelete(DeleteBehavior.Cascade);
-
         builder.HasMany(user => user.PollVotes)
             .WithOne(vote => vote.User)
             .HasForeignKey(vote => vote.UserId)

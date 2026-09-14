@@ -15,7 +15,7 @@ public class CommentProfile : Profile
             .ForMember(destination => destination.IsBookmarkedByCurrentUser, options => options.Ignore())
             .ForMember(destination => destination.RepostsCount, options => options.MapFrom(source => source.Reposts.Count))
             .ForMember(destination => destination.IsRepostedByCurrentUser, options => options.Ignore())
-            .ForMember(destination => destination.ViewsCount, options => options.MapFrom(source => source.Views.Count))
+            .ForMember(destination => destination.ViewsCount, options => options.Ignore())
             .ForMember(destination => destination.ActionAt, options => options.Ignore())
             .ForMember(destination => destination.CreatedAt, options => options.MapFrom(source => source.CreatedAt.UtcDateTime))
             .ForMember(destination => destination.UpdatedAt, options => options.MapFrom(source =>
@@ -30,7 +30,7 @@ public class CommentProfile : Profile
             .ForMember(destination => destination.Likes, options => options.Ignore())
             .ForMember(destination => destination.Bookmarks, options => options.Ignore())
             .ForMember(destination => destination.Reposts, options => options.Ignore())
-            .ForMember(destination => destination.Views, options => options.Ignore());
+            .ForMember(destination => destination.CommentViews, options => options.Ignore());
 
         CreateMap<UpdateCommentRequest, Comment>()
             .ForMember(destination => destination.PostId, options => options.Ignore())
@@ -43,6 +43,6 @@ public class CommentProfile : Profile
             .ForMember(destination => destination.Likes, options => options.Ignore())
             .ForMember(destination => destination.Bookmarks, options => options.Ignore())
             .ForMember(destination => destination.Reposts, options => options.Ignore())
-            .ForMember(destination => destination.Views, options => options.Ignore());
+            .ForMember(destination => destination.CommentViews, options => options.Ignore());
     }
 }

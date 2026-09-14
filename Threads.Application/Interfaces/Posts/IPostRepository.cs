@@ -18,6 +18,9 @@ public interface IPostRepository
         Guid id,
         Guid? currentUserId = null,
         CancellationToken cancellationToken = default);
+    Task<IReadOnlyDictionary<Guid, int>> GetViewCountsAsync(
+        IReadOnlyCollection<Guid> postIds,
+        CancellationToken cancellationToken = default);
     Task<int?> RecordViewAsync(Guid id, Guid viewerId, CancellationToken cancellationToken = default);
     Task AddAsync(Post post, CancellationToken cancellationToken = default);
     Task UpdateAsync(Post post, CancellationToken cancellationToken = default);

@@ -53,9 +53,5 @@ public class CommentConfigurator : IEntityTypeConfiguration<Comment>
             .HasForeignKey(repost => repost.CommentId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        builder.HasMany(comment => comment.Views)
-            .WithOne(view => view.Comment)
-            .HasForeignKey(view => view.CommentId)
-            .OnDelete(DeleteBehavior.Cascade);
     }
 }

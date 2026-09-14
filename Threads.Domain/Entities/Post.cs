@@ -24,8 +24,6 @@ public class Post : BaseEntity
 
     public string? EmbedThumbnailUrl { get; set; }
 
-    public int ViewsCount { get; set; }
-
     public Guid AuthorId { get; set; }
 
     public User Author { get; set; } = null!;
@@ -45,8 +43,8 @@ public class Post : BaseEntity
     public ICollection<Bookmark> Bookmarks { get; set; } =
         new List<Bookmark>();
 
-    public ICollection<View> Views { get; set; } =
-        new List<View>();
+    public ICollection<PostView> PostViews { get; set; } =
+        new List<PostView>();
 
     public Poll? Poll { get; set; }
 }
