@@ -38,12 +38,9 @@ public interface ICommentService
         UpdateCommentRequest request,
         CancellationToken cancellationToken = default,
         Guid? currentUserId = null);
-    Task<CommentResponse?> LikeAsync(Guid id, Guid userId, CancellationToken cancellationToken = default);
-    Task<CommentResponse?> UnlikeAsync(Guid id, Guid userId, CancellationToken cancellationToken = default);
-    Task<CommentResponse?> BookmarkAsync(Guid id, Guid userId, CancellationToken cancellationToken = default);
-    Task<CommentResponse?> UnbookmarkAsync(Guid id, Guid userId, CancellationToken cancellationToken = default);
-    Task<CommentResponse?> RepostAsync(Guid id, Guid userId, CancellationToken cancellationToken = default);
-    Task<CommentResponse?> UnrepostAsync(Guid id, Guid userId, CancellationToken cancellationToken = default);
-    Task<CommentResponse?> ViewAsync(Guid id, Guid userId, CancellationToken cancellationToken = default);
+    Task<CommentViewResponse?> RecordViewAsync(
+        Guid id,
+        Guid viewerId,
+        CancellationToken cancellationToken = default);
     Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default);
 }

@@ -56,7 +56,10 @@ public sealed class CommentQueryService
         CancellationToken cancellationToken = default,
         Guid? currentUserId = null)
     {
-        var comment = await _commentRepository.GetByIdAsync(id, cancellationToken);
+        var comment = await _commentRepository.GetByIdAsync(
+            id,
+            cancellationToken,
+            trackChanges: false);
 
         if (comment is null)
         {

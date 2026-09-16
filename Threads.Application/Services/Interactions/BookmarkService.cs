@@ -6,6 +6,8 @@ using Threads.Application.Interfaces.Bookmarks;
 using Threads.Application.Interfaces.Comments;
 using Threads.Application.Interfaces.Posts;
 using Threads.Application.Services.Common;
+using Threads.Application.Services.Comments;
+using Threads.Application.Services.Posts;
 using Threads.Domain.Entities;
 
 namespace Threads.Application.Services.Interactions;
@@ -14,19 +16,22 @@ public class BookmarkService : IBookmarkService
 {
     private readonly IBookmarkRepository _bookmarkRepository;
     private readonly IPostRepository _postRepository;
-    private readonly IPostService _postService;
-    private readonly ICommentService _commentService;
+    private readonly ICommentRepository _commentRepository;
+    private readonly PostQueryService _postQueryService;
+    private readonly CommentQueryService _commentQueryService;
 
     public BookmarkService(
         IBookmarkRepository bookmarkRepository,
         IPostRepository postRepository,
-        IPostService postService,
-        ICommentService commentService)
+        ICommentRepository commentRepository,
+        PostQueryService postQueryService,
+        CommentQueryService commentQueryService)
     {
         _bookmarkRepository = bookmarkRepository;
         _postRepository = postRepository;
-        _postService = postService;
-        _commentService = commentService;
+        _commentRepository = commentRepository;
+        _postQueryService = postQueryService;
+        _commentQueryService = commentQueryService;
     }
 
     public async Task<UserBookmarksPageResponse> GetByUserIdAsync(
@@ -36,13 +41,13 @@ public class BookmarkService : IBookmarkService
         Guid? currentUserId = null)
     {
         var cursor = CursorCodec.Decode(pagination.Cursor);
-        var posts = await _postService.GetBookmarkedByUserIdAsync(
+        var posts = await _postQueryService.GetBookmarkedByUserIdAsync(
             userId,
             pagination.Limit,
             cursor,
             cancellationToken,
             currentUserId);
-        var comments = await _commentService.GetBookmarkedByUserIdAsync(
+        var comments = await _commentQueryService.GetBookmarkedByUserIdAsync(
             userId,
             pagination.Limit,
             cursor,
@@ -88,23 +93,11 @@ public class BookmarkService : IBookmarkService
         };
     }
     
-    public async Task<bool> AddBookmarkAsync(Guid userId, Guid postId, CancellationToken cancellationToken = default)
+    public async Task<bool> AddPostBookmarkAsync(Guid userId, Guid postId, CancellationToken cancellationToken = default)
     {
-        var post = await _postRepository.GetByIdAsync(
-            postId,
-            cancellationToken);
+        var postExists = await _postRepository.ExistsAsync(postId, cancellationToken);
         
-        if (post == null)
-        {
-            return false;
-        }
-        
-        var existingBookmark = await _bookmarkRepository.GetByUserAndPostId(
-            userId,
-            postId,
-            cancellationToken);
-
-        if (existingBookmark is not null)
+        if (!postExists)
         {
             return false;
         }
@@ -115,38 +108,40 @@ public class BookmarkService : IBookmarkService
             PostId = postId
         };
 
-        try
-        {
-            await _bookmarkRepository.AddAsync(bookmark, cancellationToken);
-        }
-        catch (Exception exeption) when (IsDuplicateWriteException(exeption))
+        return await _bookmarkRepository.TryAddAsync(bookmark, cancellationToken);
+    }
+    public async Task<bool> AddCommentBookmarkAsync(Guid userId, Guid commentId, CancellationToken cancellationToken = default)
+    {
+        var commentExists = await _commentRepository.ExistsAsync(commentId, cancellationToken);
+        
+        if (!commentExists)
         {
             return false;
         }
-        
-        return true;
+
+        var bookmark = new CommentBookmark
+        {
+            UserId = userId,
+            CommentId = commentId
+        };
+
+        return await _bookmarkRepository.TryAddAsync(bookmark, cancellationToken);
     }
 
-    public async Task<bool> RemoveBookmarkAsync(Guid userId, Guid postId, CancellationToken cancellationToken = default)
+    public Task<bool> RemovePostBookmarkAsync(Guid userId, Guid postId, CancellationToken cancellationToken = default)
     {
-        var existingBookmark = await _bookmarkRepository.GetByUserAndPostId(
+        return _bookmarkRepository.TryDeletePostAsync(
             userId,
             postId,
             cancellationToken);
-
-        if (existingBookmark is null)
-        {
-            return false;
-        }
-
-        await _bookmarkRepository.DeleteAsync(existingBookmark, cancellationToken);
-        
-        return true;
     }
     
-    private static bool IsDuplicateWriteException(Exception exception)
+    public Task<bool> RemoveCommentBookmarkAsync(Guid userId, Guid commentId, CancellationToken cancellationToken = default)
     {
-        return exception.GetType().Name == "DbUpdateException";
+        return _bookmarkRepository.TryDeleteCommentAsync(
+            userId,
+            commentId,
+            cancellationToken);
     }
 
     private sealed record BookmarkedItem(

@@ -10,6 +10,8 @@ public interface IRepostService
         CursorPageRequest pagination,
         CancellationToken cancellationToken = default,
         Guid? currentUserId = null);
-    Task<bool> AddRepostAsync(Guid userId, Guid postId, CancellationToken cancellationToken = default);
-    Task<bool> RemoveRepostAsync(Guid userId, Guid postId, CancellationToken cancellationToken = default);
+    Task<bool> AddCommentRepostAsync(Guid userId, Guid commentId, CancellationToken cancellationToken = default);
+    Task<bool> AddPostRepostAsync(Guid userId, Guid postId, CancellationToken cancellationToken = default);
+    Task<bool> RemoveCommentRepostAsync(Guid userId, Guid commentId, CancellationToken cancellationToken = default);
+    Task<bool> RemovePostRepostAsync(Guid userId, Guid postId, CancellationToken cancellationToken = default);
 }

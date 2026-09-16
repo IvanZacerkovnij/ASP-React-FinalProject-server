@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Threads.Application.Interfaces.Reposts;
 using Threads.Domain.Entities;
 
@@ -13,49 +14,68 @@ public class RepostRepository : IRepostRepository
         _dbContext = dbContext;
     }
 
-    public async Task<PostRepost?> GetByUserAndPostAsync(
+    public async Task<bool> TryAddAsync(PostRepost repost, CancellationToken cancellationToken = default)
+    {
+        await _dbContext.PostReposts.AddAsync(repost, cancellationToken);
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+        catch (DbUpdateException exception)
+            when (exception.InnerException is PostgresException
+                  {
+                      SqlState: PostgresErrorCodes.UniqueViolation,
+                      ConstraintName: "PK_PostReposts"
+                  })
+        {
+            _dbContext.Entry(repost).State = EntityState.Detached;
+            return false;
+        }
+    }
+
+    public async Task<bool> TryAddAsync(CommentRepost repost, CancellationToken cancellationToken = default)
+    {
+        await _dbContext.CommentReposts.AddAsync(repost, cancellationToken);
+
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+        catch (DbUpdateException exception)
+            when (exception.InnerException is PostgresException
+                  {
+                      SqlState: PostgresErrorCodes.UniqueViolation,
+                      ConstraintName: "PK_CommentReposts"
+                  })
+        {
+            _dbContext.Entry(repost).State = EntityState.Detached;
+            return false;
+        }
+    }
+
+    public async Task<bool> TryDeletePostAsync(
         Guid userId,
         Guid postId,
         CancellationToken cancellationToken = default)
     {
-        return await _dbContext.PostReposts
-            .FirstOrDefaultAsync(
-                repost => repost.UserId == userId && repost.PostId == postId,
-                cancellationToken);
+        var affectedRows = await _dbContext.PostReposts
+            .Where(repost => repost.UserId == userId && repost.PostId == postId)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        return affectedRows == 1;
     }
 
-    public async Task<CommentRepost?> GetByUserAndCommentAsync(
+    public async Task<bool> TryDeleteCommentAsync(
         Guid userId,
         Guid commentId,
         CancellationToken cancellationToken = default)
     {
-        return await _dbContext.CommentReposts
-            .FirstOrDefaultAsync(
-                repost => repost.UserId == userId && repost.CommentId == commentId,
-                cancellationToken);
-    }
+        var affectedRows = await _dbContext.CommentReposts
+            .Where(repost => repost.UserId == userId && repost.CommentId == commentId)
+            .ExecuteDeleteAsync(cancellationToken);
 
-    public async Task AddAsync(PostRepost repost, CancellationToken cancellationToken = default)
-    {
-        await _dbContext.PostReposts.AddAsync(repost, cancellationToken);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-    }
-
-    public async Task AddAsync(CommentRepost repost, CancellationToken cancellationToken = default)
-    {
-        await _dbContext.CommentReposts.AddAsync(repost, cancellationToken);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-    }
-
-    public async Task DeleteAsync(PostRepost repost, CancellationToken cancellationToken = default)
-    {
-        _dbContext.PostReposts.Remove(repost);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-    }
-
-    public async Task DeleteAsync(CommentRepost repost, CancellationToken cancellationToken = default)
-    {
-        _dbContext.CommentReposts.Remove(repost);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        return affectedRows == 1;
     }
 }

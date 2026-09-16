@@ -4,18 +4,14 @@ namespace Threads.Application.Interfaces.Likes;
 
 public interface ILikeRepository
 {
-    Task<PostLike?> GetByUserAndPostAsync(
+    Task<bool> TryAddAsync(PostLike like, CancellationToken cancellationToken = default);
+    Task<bool> TryAddAsync(CommentLike like, CancellationToken cancellationToken = default);
+    Task<bool> TryDeletePostAsync(
         Guid userId,
         Guid postId,
         CancellationToken cancellationToken = default);
-
-    Task<CommentLike?> GetByUserAndCommentAsync(
+    Task<bool> TryDeleteCommentAsync(
         Guid userId,
         Guid commentId,
         CancellationToken cancellationToken = default);
-
-    Task AddAsync(PostLike like, CancellationToken cancellationToken = default);
-    Task AddAsync(CommentLike like, CancellationToken cancellationToken = default);
-    Task DeleteAsync(PostLike like, CancellationToken cancellationToken = default);
-    Task DeleteAsync(CommentLike like, CancellationToken cancellationToken = default);
 }

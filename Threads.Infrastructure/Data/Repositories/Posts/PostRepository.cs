@@ -202,6 +202,13 @@ public class PostRepository : IPostRepository
             .FirstOrDefaultAsync(post => post.Id == id, cancellationToken);
     }
 
+    public Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        return _dbContext.Posts
+            .AsNoTracking()
+            .AnyAsync(post => post.Id == id, cancellationToken);
+    }
+
     public async Task<PostReadModel?> GetReadModelByIdAsync(
         Guid id,
         CancellationToken cancellationToken = default)

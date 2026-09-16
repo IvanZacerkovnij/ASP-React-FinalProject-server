@@ -10,6 +10,8 @@ public interface ILikeService
         CursorPageRequest pagination,
         CancellationToken cancellationToken = default,
         Guid? currentUserId = null);
-    Task<bool> AddLikeAsync(Guid userId, Guid postId, CancellationToken cancellationToken = default);
-    Task<bool> RemoveLikeAsync(Guid userId, Guid postId, CancellationToken cancellationToken = default);
+    Task<bool> AddCommentLikeAsync(Guid userId, Guid commentId, CancellationToken cancellationToken = default);
+    Task<bool> AddPostLikeAsync(Guid userId, Guid postId, CancellationToken cancellationToken = default);
+    Task<bool> RemoveCommentLikeAsync(Guid userId, Guid commentId, CancellationToken cancellationToken = default);
+    Task<bool> RemovePostLikeAsync(Guid userId, Guid postId, CancellationToken cancellationToken = default);
 }

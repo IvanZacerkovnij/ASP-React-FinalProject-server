@@ -6,6 +6,8 @@ using Threads.Application.Interfaces.Comments;
 using Threads.Application.Interfaces.Posts;
 using Threads.Application.Interfaces.Reposts;
 using Threads.Application.Services.Common;
+using Threads.Application.Services.Comments;
+using Threads.Application.Services.Posts;
 using Threads.Domain.Entities;
 
 namespace Threads.Application.Services.Interactions;
@@ -14,19 +16,22 @@ public class RepostService : IRepostService
 {
     private readonly IRepostRepository _repostRepository;
     private readonly IPostRepository _postRepository;
-    private readonly IPostService _postService;
-    private readonly ICommentService _commentService;
+    private readonly ICommentRepository _commentRepository;
+    private readonly PostQueryService _postQueryService;
+    private readonly CommentQueryService _commentQueryService;
 
     public RepostService(
         IRepostRepository repostRepository,
         IPostRepository postRepository,
-        IPostService postService,
-        ICommentService commentService)
+        ICommentRepository commentRepository,
+        PostQueryService postQueryService,
+        CommentQueryService commentQueryService)
     {
         _repostRepository = repostRepository;
         _postRepository = postRepository;
-        _postService = postService;
-        _commentService = commentService;
+        _commentRepository = commentRepository;
+        _postQueryService = postQueryService;
+        _commentQueryService = commentQueryService;
     }
 
     public async Task<UserRepostsPageResponse> GetByUserIdAsync(
@@ -36,13 +41,13 @@ public class RepostService : IRepostService
         Guid? currentUserId = null)
     {
         var cursor = CursorCodec.Decode(pagination.Cursor);
-        var posts = await _postService.GetRepostedByUserIdAsync(
+        var posts = await _postQueryService.GetRepostedByUserIdAsync(
             userId,
             pagination.Limit,
             cursor,
             cancellationToken,
             currentUserId);
-        var comments = await _commentService.GetRepostedByUserIdAsync(
+        var comments = await _commentQueryService.GetRepostedByUserIdAsync(
             userId,
             pagination.Limit,
             cursor,
@@ -88,18 +93,11 @@ public class RepostService : IRepostService
         };
     }
 
-    public async Task<bool> AddRepostAsync(Guid userId, Guid postId, CancellationToken cancellationToken = default)
+    public async Task<bool> AddPostRepostAsync(Guid userId, Guid postId, CancellationToken cancellationToken = default)
     {
-        var post = await _postRepository.GetByIdAsync(postId, cancellationToken);
+        var postExists = await _postRepository.ExistsAsync(postId, cancellationToken);
 
-        if (post is null)
-        {
-            return false;
-        }
-
-        var existingRepost = await _repostRepository.GetByUserAndPostAsync(userId, postId, cancellationToken);
-
-        if (existingRepost is not null)
+        if (!postExists)
         {
             return false;
         }
@@ -110,35 +108,35 @@ public class RepostService : IRepostService
             PostId = postId
         };
 
-        try
-        {
-            await _repostRepository.AddAsync(repost, cancellationToken);
-        }
-        catch (Exception exception) when (IsDuplicateWriteException(exception))
+        return await _repostRepository.TryAddAsync(repost, cancellationToken);
+    }
+    
+    public async Task<bool> AddCommentRepostAsync(Guid userId, Guid commentId, CancellationToken cancellationToken = default)
+    {
+        var commentExists = await _commentRepository.ExistsAsync(commentId, cancellationToken);
+
+        if (!commentExists)
         {
             return false;
         }
 
-        return true;
-    }
-
-    public async Task<bool> RemoveRepostAsync(Guid userId, Guid postId, CancellationToken cancellationToken = default)
-    {
-        var repost = await _repostRepository.GetByUserAndPostAsync(userId, postId, cancellationToken);
-
-        if (repost is null)
+        var repost = new CommentRepost
         {
-            return false;
-        }
+            UserId = userId,
+            CommentId = commentId
+        };
 
-        await _repostRepository.DeleteAsync(repost, cancellationToken);
-
-        return true;
+        return await _repostRepository.TryAddAsync(repost, cancellationToken);
     }
 
-    private static bool IsDuplicateWriteException(Exception exception)
+    public Task<bool> RemovePostRepostAsync(Guid userId, Guid postId, CancellationToken cancellationToken = default)
     {
-        return exception.GetType().Name == "DbUpdateException";
+        return _repostRepository.TryDeletePostAsync(userId, postId, cancellationToken);
+    }
+    
+    public Task<bool> RemoveCommentRepostAsync(Guid userId, Guid commentId, CancellationToken cancellationToken = default)
+    {
+        return _repostRepository.TryDeleteCommentAsync(userId, commentId, cancellationToken);
     }
 
     private sealed record RepostedItem(

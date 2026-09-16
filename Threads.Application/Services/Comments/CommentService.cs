@@ -107,60 +107,12 @@ public sealed class CommentService : ICommentService
             currentUserId);
     }
 
-    public Task<CommentResponse?> LikeAsync(
+    public Task<CommentViewResponse?> RecordViewAsync(
         Guid id,
-        Guid userId,
+        Guid viewerId,
         CancellationToken cancellationToken = default)
     {
-        return _commentInteractionService.LikeAsync(id, userId, cancellationToken);
-    }
-
-    public Task<CommentResponse?> UnlikeAsync(
-        Guid id,
-        Guid userId,
-        CancellationToken cancellationToken = default)
-    {
-        return _commentInteractionService.UnlikeAsync(id, userId, cancellationToken);
-    }
-
-    public Task<CommentResponse?> BookmarkAsync(
-        Guid id,
-        Guid userId,
-        CancellationToken cancellationToken = default)
-    {
-        return _commentInteractionService.BookmarkAsync(id, userId, cancellationToken);
-    }
-
-    public Task<CommentResponse?> UnbookmarkAsync(
-        Guid id,
-        Guid userId,
-        CancellationToken cancellationToken = default)
-    {
-        return _commentInteractionService.UnbookmarkAsync(id, userId, cancellationToken);
-    }
-
-    public Task<CommentResponse?> RepostAsync(
-        Guid id,
-        Guid userId,
-        CancellationToken cancellationToken = default)
-    {
-        return _commentInteractionService.RepostAsync(id, userId, cancellationToken);
-    }
-
-    public Task<CommentResponse?> UnrepostAsync(
-        Guid id,
-        Guid userId,
-        CancellationToken cancellationToken = default)
-    {
-        return _commentInteractionService.UnrepostAsync(id, userId, cancellationToken);
-    }
-
-    public Task<CommentResponse?> ViewAsync(
-        Guid id,
-        Guid userId,
-        CancellationToken cancellationToken = default)
-    {
-        return _commentInteractionService.ViewAsync(id, userId, cancellationToken);
+        return _commentInteractionService.RecordViewAsync(id, viewerId, cancellationToken);
     }
 
     public Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default)

@@ -10,6 +10,8 @@ public interface IBookmarkService
         CursorPageRequest pagination,
         CancellationToken cancellationToken = default,
         Guid? currentUserId = null);
-    Task<bool> AddBookmarkAsync(Guid userId, Guid postId, CancellationToken cancellationToken = default);
-    Task<bool> RemoveBookmarkAsync(Guid userId, Guid postId, CancellationToken cancellationToken = default);
+    Task<bool> AddCommentBookmarkAsync(Guid userId, Guid commentId, CancellationToken cancellationToken = default);
+    Task<bool> AddPostBookmarkAsync(Guid userId, Guid postId, CancellationToken cancellationToken = default);
+    Task<bool> RemoveCommentBookmarkAsync(Guid userId, Guid commentId, CancellationToken cancellationToken = default);
+    Task<bool> RemovePostBookmarkAsync(Guid userId, Guid postId, CancellationToken cancellationToken = default);
 }

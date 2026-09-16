@@ -4,18 +4,14 @@ namespace Threads.Application.Interfaces.Reposts;
 
 public interface IRepostRepository
 {
-    Task<PostRepost?> GetByUserAndPostAsync(
+    Task<bool> TryAddAsync(PostRepost repost, CancellationToken cancellationToken = default);
+    Task<bool> TryAddAsync(CommentRepost repost, CancellationToken cancellationToken = default);
+    Task<bool> TryDeletePostAsync(
         Guid userId,
         Guid postId,
         CancellationToken cancellationToken = default);
-
-    Task<CommentRepost?> GetByUserAndCommentAsync(
+    Task<bool> TryDeleteCommentAsync(
         Guid userId,
         Guid commentId,
         CancellationToken cancellationToken = default);
-
-    Task AddAsync(PostRepost repost, CancellationToken cancellationToken = default);
-    Task AddAsync(CommentRepost repost, CancellationToken cancellationToken = default);
-    Task DeleteAsync(PostRepost repost, CancellationToken cancellationToken = default);
-    Task DeleteAsync(CommentRepost repost, CancellationToken cancellationToken = default);
 }

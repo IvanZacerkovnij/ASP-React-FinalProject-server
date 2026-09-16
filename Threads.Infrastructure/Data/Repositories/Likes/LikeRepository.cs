@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Threads.Application.Interfaces.Likes;
 using Threads.Domain.Entities;
 
@@ -13,49 +14,70 @@ public class LikeRepository : ILikeRepository
         _dbContext = dbContext;
     }
 
-    public async Task<PostLike?> GetByUserAndPostAsync(
+    public async Task<bool> TryAddAsync(PostLike like, CancellationToken cancellationToken = default)
+    {
+        await _dbContext.PostLikes.AddAsync(like, cancellationToken);
+
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+        catch (DbUpdateException exception)
+            when (exception.InnerException is PostgresException
+                  {
+                      SqlState: PostgresErrorCodes.UniqueViolation,
+                      ConstraintName: "PK_PostLikes"
+                  })
+        {
+            _dbContext.Entry(like).State = EntityState.Detached;
+            return false;
+        }
+    }
+
+    public async Task<bool> TryAddAsync(CommentLike like, CancellationToken cancellationToken = default)
+    {
+        
+        await _dbContext.CommentLikes.AddAsync(like, cancellationToken);
+
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+        catch (DbUpdateException exception)
+            when (exception.InnerException is PostgresException
+                  {
+                      SqlState: PostgresErrorCodes.UniqueViolation,
+                      ConstraintName: "PK_CommentLikes"
+                  })
+        {
+            _dbContext.Entry(like).State = EntityState.Detached;
+            return false;
+        }
+    }
+
+    public async Task<bool> TryDeletePostAsync(
         Guid userId,
         Guid postId,
         CancellationToken cancellationToken = default)
     {
-        return await _dbContext.PostLikes
-            .FirstOrDefaultAsync(
-                like => like.UserId == userId && like.PostId == postId,
-                cancellationToken);
+        var affectedRows = await _dbContext.PostLikes
+            .Where(like => like.UserId == userId && like.PostId == postId)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        return affectedRows == 1;
     }
 
-    public async Task<CommentLike?> GetByUserAndCommentAsync(
+    public async Task<bool> TryDeleteCommentAsync(
         Guid userId,
         Guid commentId,
         CancellationToken cancellationToken = default)
     {
-        return await _dbContext.CommentLikes
-            .FirstOrDefaultAsync(
-                like => like.UserId == userId && like.CommentId == commentId,
-                cancellationToken);
-    }
+        var affectedRows = await _dbContext.CommentLikes
+            .Where(like => like.UserId == userId && like.CommentId == commentId)
+            .ExecuteDeleteAsync(cancellationToken);
 
-    public async Task AddAsync(PostLike like, CancellationToken cancellationToken = default)
-    {
-        await _dbContext.PostLikes.AddAsync(like, cancellationToken);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-    }
-
-    public async Task AddAsync(CommentLike like, CancellationToken cancellationToken = default)
-    {
-        await _dbContext.CommentLikes.AddAsync(like, cancellationToken);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-    }
-
-    public async Task DeleteAsync(PostLike like, CancellationToken cancellationToken = default)
-    {
-        _dbContext.PostLikes.Remove(like);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-    }
-
-    public async Task DeleteAsync(CommentLike like, CancellationToken cancellationToken = default)
-    {
-        _dbContext.CommentLikes.Remove(like);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        return affectedRows == 1;
     }
 }

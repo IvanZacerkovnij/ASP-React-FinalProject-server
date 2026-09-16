@@ -13,7 +13,10 @@ public interface ICommentRepository
 
     Task<Comment?> GetByIdAsync(
         Guid id,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        bool trackChanges = true);
+
+    Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyCollection<Comment>> GetLikedByUserIdAsync(
         Guid userId,

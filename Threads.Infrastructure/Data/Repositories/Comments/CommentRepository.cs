@@ -44,15 +44,30 @@ public class CommentRepository : ICommentRepository
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<Comment?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    public async Task<Comment?> GetByIdAsync(
+        Guid id,
+        CancellationToken cancellationToken = default,
+        bool trackChanges = true)
     {
-        return await _dbContext.Comments
+        var query = trackChanges
+            ? _dbContext.Comments.AsQueryable()
+            : _dbContext.Comments.AsNoTracking();
+
+        return await query
+            .AsSplitQuery()
             .Include(comment => comment.Author)
             .Include(comment => comment.Replies)
             .Include(comment => comment.CommentLikes)
             .Include(comment => comment.CommentBookmarks)
             .Include(comment => comment.CommentReposts)
             .FirstOrDefaultAsync(comment => comment.Id == id, cancellationToken);
+    }
+
+    public Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        return _dbContext.Comments
+            .AsNoTracking()
+            .AnyAsync(comment => comment.Id == id, cancellationToken);
     }
 
     public async Task<IReadOnlyCollection<Comment>> GetBookmarkedByUserIdAsync(

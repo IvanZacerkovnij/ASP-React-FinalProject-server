@@ -108,7 +108,7 @@ public class PostsController : ControllerBase
             return NotFound(new { message = "Post was not found." });
         }
 
-        await _likeService.AddLikeAsync(currentUserId.Value, id, cancellationToken);
+        await _likeService.AddPostLikeAsync(currentUserId.Value, id, cancellationToken);
         var updatedPost = await _postService.GetByIdAsync(id, cancellationToken, currentUserId.Value);
 
         return updatedPost is null
@@ -137,7 +137,7 @@ public class PostsController : ControllerBase
             return NotFound(new { message = "Post was not found." });
         }
 
-        var wasAdded = await _repostService.AddRepostAsync(currentUserId.Value, id, cancellationToken);
+        var wasAdded = await _repostService.AddPostRepostAsync(currentUserId.Value, id, cancellationToken);
 
         if (!wasAdded)
         {
@@ -176,7 +176,7 @@ public class PostsController : ControllerBase
             return NotFound(new { message = "Post was not found." });
         }
 
-        var wasRemoved = await _repostService.RemoveRepostAsync(currentUserId.Value, id, cancellationToken);
+        var wasRemoved = await _repostService.RemovePostRepostAsync(currentUserId.Value, id, cancellationToken);
 
         if (!wasRemoved)
         {
@@ -215,7 +215,7 @@ public class PostsController : ControllerBase
             return NotFound(new { message = "Post was not found." });
         }
 
-        await _likeService.RemoveLikeAsync(currentUserId.Value, id, cancellationToken);
+        await _likeService.RemovePostLikeAsync(currentUserId.Value, id, cancellationToken);
         var updatedPost = await _postService.GetByIdAsync(id, cancellationToken, currentUserId.Value);
 
         return updatedPost is null
@@ -244,7 +244,7 @@ public class PostsController : ControllerBase
             return NotFound(new { message = "Post was not found." });
         }
         
-        var wasAdded = await _bookmarkService.AddBookmarkAsync(currentUserId.Value, id, cancellationToken);
+        var wasAdded = await _bookmarkService.AddPostBookmarkAsync(currentUserId.Value, id, cancellationToken);
         if (!wasAdded)
         {
             var postAfterFailedBookmark = await _postService.GetByIdAsync(id, cancellationToken, currentUserId.Value);
@@ -282,7 +282,7 @@ public class PostsController : ControllerBase
             return NotFound(new { message = "Post was not found." });
         }
         
-        var wasRemoved = await _bookmarkService.RemoveBookmarkAsync(currentUserId.Value, id, cancellationToken);
+        var wasRemoved = await _bookmarkService.RemovePostBookmarkAsync(currentUserId.Value, id, cancellationToken);
         if (!wasRemoved)
         {
             var postAfterFailedBookmark = await _postService.GetByIdAsync(id, cancellationToken, currentUserId.Value);

@@ -6,6 +6,8 @@ using Threads.Application.Interfaces.Comments;
 using Threads.Application.Interfaces.Likes;
 using Threads.Application.Interfaces.Posts;
 using Threads.Application.Services.Common;
+using Threads.Application.Services.Comments;
+using Threads.Application.Services.Posts;
 using Threads.Domain.Entities;
 
 namespace Threads.Application.Services.Interactions;
@@ -14,19 +16,22 @@ public class LikeService : ILikeService
 {
     private readonly ILikeRepository _likeRepository;
     private readonly IPostRepository _postRepository;
-    private readonly IPostService _postService;
-    private readonly ICommentService _commentService;
+    private readonly ICommentRepository _commentRepository;
+    private readonly PostQueryService _postQueryService;
+    private readonly CommentQueryService _commentQueryService;
 
     public LikeService(
         ILikeRepository likeRepository,
-        IPostRepository postRepository,
-        IPostService postService,
-        ICommentService commentService)
+        IPostRepository postRepository, 
+        ICommentRepository commentRepository,
+        PostQueryService postQueryService,
+        CommentQueryService commentQueryService)
     {
         _likeRepository = likeRepository;
         _postRepository = postRepository;
-        _postService = postService;
-        _commentService = commentService;
+        _commentRepository = commentRepository;
+        _postQueryService = postQueryService;
+        _commentQueryService = commentQueryService;
     }
 
     public async Task<UserLikesPageResponse> GetByUserIdAsync(
@@ -36,13 +41,13 @@ public class LikeService : ILikeService
         Guid? currentUserId = null)
     {
         var cursor = CursorCodec.Decode(pagination.Cursor);
-        var posts = await _postService.GetLikedByUserIdAsync(
+        var posts = await _postQueryService.GetLikedByUserIdAsync(
             userId,
             pagination.Limit,
             cursor,
             cancellationToken,
             currentUserId);
-        var comments = await _commentService.GetLikedByUserIdAsync(
+        var comments = await _commentQueryService.GetLikedByUserIdAsync(
             userId,
             pagination.Limit,
             cursor,
@@ -88,21 +93,29 @@ public class LikeService : ILikeService
         };
     }
 
-    public async Task<bool> AddLikeAsync(Guid userId, Guid postId, CancellationToken cancellationToken = default)
+    public async Task<bool> AddCommentLikeAsync(Guid userId, Guid commentId, CancellationToken cancellationToken = default)
     {
-        var post = await _postRepository.GetByIdAsync(postId, cancellationToken);
+        var commentExists = await _commentRepository.ExistsAsync(commentId, cancellationToken);
 
-        if (post is null)
+        if (!commentExists)
         {
             return false;
         }
 
-        var existingLike = await _likeRepository.GetByUserAndPostAsync(
-            userId,
-            postId,
-            cancellationToken);
+        var like = new CommentLike()
+        {
+            UserId = userId,
+            CommentId = commentId
+        };
+        
+        return await _likeRepository.TryAddAsync(like, cancellationToken);
+    }
+    
+    public async Task<bool> AddPostLikeAsync(Guid userId, Guid postId, CancellationToken cancellationToken = default)
+    {
+        var postExists = await _postRepository.ExistsAsync(postId, cancellationToken);
 
-        if (existingLike is not null)
+        if (!postExists)
         {
             return false;
         }
@@ -112,39 +125,24 @@ public class LikeService : ILikeService
             UserId = userId,
             PostId = postId
         };
-
-        try
-        {
-            await _likeRepository.AddAsync(like, cancellationToken);
-        }
-        catch (Exception exception) when (IsDuplicateWriteException(exception))
-        {
-            return false;
-        }
-
-        return true;
+        
+        return await _likeRepository.TryAddAsync(like, cancellationToken);
     }
 
-    public async Task<bool> RemoveLikeAsync(Guid userId, Guid postId, CancellationToken cancellationToken = default)
+    public Task<bool> RemovePostLikeAsync(Guid userId, Guid postId, CancellationToken cancellationToken = default)
     {
-        var existingLike = await _likeRepository.GetByUserAndPostAsync(
+        return _likeRepository.TryDeletePostAsync(
             userId,
             postId,
             cancellationToken);
-
-        if (existingLike is null)
-        {
-            return false;
-        }
-
-        await _likeRepository.DeleteAsync(existingLike, cancellationToken);
-
-        return true;
     }
 
-    private static bool IsDuplicateWriteException(Exception exception)
+    public Task<bool> RemoveCommentLikeAsync(Guid userId, Guid commentId, CancellationToken cancellationToken = default)
     {
-        return exception.GetType().Name == "DbUpdateException";
+        return _likeRepository.TryDeleteCommentAsync(
+            userId,
+            commentId,
+            cancellationToken);
     }
 
     private sealed record LikedItem(

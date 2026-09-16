@@ -33,6 +33,7 @@ public interface IPostRepository
         int limit,
         CursorPosition? cursor = null,
         CancellationToken cancellationToken = default);
+    Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken = default);
     Task<Post?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<PostReadModel?> GetReadModelByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<PostStateReadModel?> GetStateByIdAsync(

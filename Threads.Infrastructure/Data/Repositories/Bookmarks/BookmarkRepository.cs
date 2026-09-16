@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Threads.Application.Interfaces.Bookmarks;
 using Threads.Domain.Entities;
 
@@ -12,41 +13,69 @@ public class BookmarkRepository : IBookmarkRepository
     {
         _dbContext = dbContext;
     }
-    public Task<PostBookmark?> GetByUserAndPostId(Guid userId, Guid postId, CancellationToken cancellationToken = default)
+    public async Task<bool> TryAddAsync(PostBookmark bookmark, CancellationToken cancellationToken = default)
     {
-        return _dbContext.PostBookmarks.FirstOrDefaultAsync(
-            bookmark => bookmark.UserId == userId && bookmark.PostId == postId,
-            cancellationToken);
+        await _dbContext.PostBookmarks.AddAsync(bookmark, cancellationToken);
+
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+        catch (DbUpdateException exception)
+            when (exception.InnerException is PostgresException
+                  {
+                      SqlState: PostgresErrorCodes.UniqueViolation,
+                      ConstraintName: "PK_PostBookmarks"
+                  })
+        {
+            _dbContext.Entry(bookmark).State = EntityState.Detached;
+            return false;
+        }
     }
 
-    public Task<CommentBookmark?> GetByUserAndCommentId(Guid userId, Guid commentId, CancellationToken cancellationToken = default)
+    public async Task<bool> TryAddAsync(CommentBookmark bookmark, CancellationToken cancellationToken = default)
     {
-        return _dbContext.CommentBookmarks.FirstOrDefaultAsync(
-            bookmark => bookmark.UserId == userId && bookmark.CommentId == commentId,
-            cancellationToken);
+        await _dbContext.CommentBookmarks.AddAsync(bookmark, cancellationToken);
+
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+        catch (DbUpdateException exception)
+            when (exception.InnerException is PostgresException
+                  {
+                      SqlState: PostgresErrorCodes.UniqueViolation,
+                      ConstraintName: "PK_CommentBookmarks"
+                  })
+        {
+            _dbContext.Entry(bookmark).State = EntityState.Detached;
+            return false;
+        }
     }
 
-    public Task AddAsync(PostBookmark bookmark, CancellationToken cancellationToken = default)
+    public async Task<bool> TryDeletePostAsync(
+        Guid userId,
+        Guid postId,
+        CancellationToken cancellationToken = default)
     {
-        _dbContext.PostBookmarks.Add(bookmark);
-        return _dbContext.SaveChangesAsync(cancellationToken);
+        var affectedRows = await _dbContext.PostBookmarks
+            .Where(bookmark => bookmark.UserId == userId && bookmark.PostId == postId)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        return affectedRows == 1;
     }
 
-    public Task AddAsync(CommentBookmark bookmark, CancellationToken cancellationToken = default)
+    public async Task<bool> TryDeleteCommentAsync(
+        Guid userId,
+        Guid commentId,
+        CancellationToken cancellationToken = default)
     {
-        _dbContext.CommentBookmarks.Add(bookmark);
-        return _dbContext.SaveChangesAsync(cancellationToken);
-    }
+        var affectedRows = await _dbContext.CommentBookmarks
+            .Where(bookmark => bookmark.UserId == userId && bookmark.CommentId == commentId)
+            .ExecuteDeleteAsync(cancellationToken);
 
-    public Task DeleteAsync(PostBookmark bookmark, CancellationToken cancellationToken = default)
-    {
-        _dbContext.PostBookmarks.Remove(bookmark);
-        return _dbContext.SaveChangesAsync(cancellationToken);
-    }
-
-    public Task DeleteAsync(CommentBookmark bookmark, CancellationToken cancellationToken = default)
-    {
-        _dbContext.CommentBookmarks.Remove(bookmark);
-        return _dbContext.SaveChangesAsync(cancellationToken);
+        return affectedRows == 1;
     }
 }
