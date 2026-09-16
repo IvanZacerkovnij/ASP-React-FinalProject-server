@@ -75,20 +75,25 @@ public sealed class CommentManagementService
         return _responseFactory.Create(createdComment ?? comment, authorId, viewsCount: 0);
     }
 
-    public async Task<CommentResponse?> UpdateAsync(
+    public async Task<CommentResponse> UpdateAsync(
         Guid id,
+        Guid currentUserId,
         UpdateCommentRequest request,
-        CancellationToken cancellationToken = default,
-        Guid? currentUserId = null)
+        CancellationToken cancellationToken = default)
     {
-        ValidateContent(request.Content);
-
         var comment = await _commentRepository.GetByIdAsync(id, cancellationToken);
 
         if (comment is null)
         {
-            return null;
+            throw new NotFoundException("Comment was not found.");
         }
+
+        if (comment.AuthorId != currentUserId)
+        {
+            throw new ForbiddenException("You cannot update this comment.");
+        }
+
+        ValidateContent(request.Content);
 
         comment.Content = request.Content.Trim();
         comment.UpdatedAt = DateTimeOffset.UtcNow;
@@ -101,20 +106,24 @@ public sealed class CommentManagementService
         return _responseFactory.Create(updatedComment ?? comment, currentUserId, viewsCount);
     }
 
-    public async Task<bool> DeleteAsync(
+    public async Task DeleteAsync(
         Guid id,
+        Guid currentUserId,
         CancellationToken cancellationToken = default)
     {
         var comment = await _commentRepository.GetByIdAsync(id, cancellationToken);
 
         if (comment is null)
         {
-            return false;
+            throw new NotFoundException("Comment was not found.");
+        }
+
+        if (comment.AuthorId != currentUserId)
+        {
+            throw new ForbiddenException("You cannot delete this comment.");
         }
 
         await _commentRepository.DeleteAsync(comment, cancellationToken);
-
-        return true;
     }
 
     private static void ValidateContent(string content)

@@ -3,6 +3,7 @@ using Microsoft.Extensions.Caching.Hybrid;
 using Threads.Application.DTOs.Locations;
 using Threads.Application.DTOs.Pagination;
 using Threads.Application.DTOs.Users;
+using Threads.Application.Exceptions;
 using Threads.Application.Interfaces.Follows;
 using Threads.Application.Interfaces.Media;
 using Threads.Application.Interfaces.Users;
@@ -94,6 +95,39 @@ public class FollowService : IFollowService
 
         await InvalidateProfileCacheAsync(followerId, followingId);
         return true;
+    }
+
+    public async Task RemoveFollowerAsync(
+        Guid currentUserId,
+        Guid userId,
+        Guid followerId,
+        CancellationToken cancellationToken = default)
+    {
+        if (currentUserId != userId)
+        {
+            throw new ForbiddenException("You cannot remove followers from another user.");
+        }
+
+        var user = await _userRepository.GetByIdAsync(userId, cancellationToken);
+
+        if (user is null)
+        {
+            throw new NotFoundException("User was not found.");
+        }
+
+        var follower = await _userRepository.GetByIdAsync(followerId, cancellationToken);
+
+        if (follower is null)
+        {
+            throw new NotFoundException("Follower was not found.");
+        }
+
+        var wasRemoved = await RemoveFollowAsync(followerId, userId, cancellationToken);
+
+        if (!wasRemoved)
+        {
+            throw new NotFoundException("Follow was not found.");
+        }
     }
 
     private async Task InvalidateProfileCacheAsync(Guid followerId, Guid followingId)

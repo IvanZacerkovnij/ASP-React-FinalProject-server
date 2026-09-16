@@ -115,12 +115,13 @@ public sealed class PostService : IPostService
         return _postManagementService.CreateAsync(authorId, request, cancellationToken);
     }
 
-    public Task<PostResponse?> UpdateAsync(
+    public Task<PostResponse> UpdateAsync(
         Guid id,
+        Guid currentUserId,
         UpdatePostRequest request,
         CancellationToken cancellationToken = default)
     {
-        return _postManagementService.UpdateAsync(id, request, cancellationToken);
+        return _postManagementService.UpdateAsync(id, currentUserId, request, cancellationToken);
     }
 
     public Task<PostViewResponse?> RecordViewAsync(
@@ -131,8 +132,11 @@ public sealed class PostService : IPostService
         return _postInteractionService.RecordViewAsync(id, viewerId, cancellationToken);
     }
 
-    public Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default)
+    public Task DeleteAsync(
+        Guid id,
+        Guid currentUserId,
+        CancellationToken cancellationToken = default)
     {
-        return _postManagementService.DeleteAsync(id, cancellationToken);
+        return _postManagementService.DeleteAsync(id, currentUserId, cancellationToken);
     }
 }

@@ -99,27 +99,13 @@ public class CommentsController : ControllerBase
             return Unauthorized(new { message = "Invalid token claims." });
         }
 
-        var existingComment = await _commentService.GetByIdAsync(id, cancellationToken);
-
-        if (existingComment is null)
-        {
-            return NotFound(new { message = "Comment was not found." });
-        }
-
-        if (existingComment.Author.Id != currentUserId.Value)
-        {
-            return Forbid();
-        }
-
         var updatedComment = await _commentService.UpdateAsync(
             id,
+            currentUserId.Value,
             request,
-            cancellationToken,
-            currentUserId.Value);
+            cancellationToken);
 
-        return updatedComment is null
-            ? NotFound(new { message = "Comment was not found." })
-            : Ok(updatedComment);
+        return Ok(updatedComment);
     }
 
     [Authorize]
@@ -135,23 +121,9 @@ public class CommentsController : ControllerBase
             return Unauthorized(new { message = "Invalid token claims." });
         }
 
-        var existingComment = await _commentService.GetByIdAsync(id, cancellationToken);
+        await _commentService.DeleteAsync(id, currentUserId.Value, cancellationToken);
 
-        if (existingComment is null)
-        {
-            return NotFound(new { message = "Comment was not found." });
-        }
-
-        if (existingComment.Author.Id != currentUserId.Value)
-        {
-            return Forbid();
-        }
-
-        var wasDeleted = await _commentService.DeleteAsync(id, cancellationToken);
-
-        return wasDeleted
-            ? NoContent()
-            : NotFound(new { message = "Comment was not found." });
+        return NoContent();
     }
 
     [Authorize]

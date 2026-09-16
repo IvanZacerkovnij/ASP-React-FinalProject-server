@@ -7,6 +7,11 @@ public interface IFollowService
 {
     Task<bool> AddFollowAsync(Guid followerId, Guid followingId, CancellationToken cancellationToken = default);
     Task<bool> RemoveFollowAsync(Guid followerId, Guid followingId, CancellationToken cancellationToken = default);
+    Task RemoveFollowerAsync(
+        Guid currentUserId,
+        Guid userId,
+        Guid followerId,
+        CancellationToken cancellationToken = default);
     Task<CursorPageResponse<UserShortResponse>> GetFollowersAsync(
         Guid userId,
         CursorPageRequest pagination,

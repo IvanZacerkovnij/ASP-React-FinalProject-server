@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Caching.Hybrid;
 using Threads.Application.DTOs.Posts.Requests;
 using Threads.Application.DTOs.Posts.Responses;
+using Threads.Application.Exceptions;
 using Threads.Application.Interfaces.Posts;
 using Threads.Application.Services.Common;
 using Threads.Application.Services.Users;
@@ -46,8 +47,9 @@ public sealed class PostManagementService
         return _responseFactory.Create(createdPost ?? post, authorId, viewsCount: 0);
     }
 
-    public async Task<PostResponse?> UpdateAsync(
+    public async Task<PostResponse> UpdateAsync(
         Guid id,
+        Guid currentUserId,
         UpdatePostRequest request,
         CancellationToken cancellationToken = default)
     {
@@ -55,7 +57,12 @@ public sealed class PostManagementService
 
         if (post is null)
         {
-            return null;
+            throw new NotFoundException("Post was not found.");
+        }
+
+        if (post.AuthorId != currentUserId)
+        {
+            throw new ForbiddenException("You cannot update this post.");
         }
 
         PostInputMapper.ApplyContent(post, request.Content);
@@ -82,15 +89,21 @@ public sealed class PostManagementService
         return _responseFactory.Create(updatedPost ?? post, post.AuthorId, viewsCount);
     }
 
-    public async Task<bool> DeleteAsync(
+    public async Task DeleteAsync(
         Guid id,
+        Guid currentUserId,
         CancellationToken cancellationToken = default)
     {
         var post = await _postRepository.GetByIdAsync(id, cancellationToken);
 
         if (post is null)
         {
-            return false;
+            throw new NotFoundException("Post was not found.");
+        }
+
+        if (post.AuthorId != currentUserId)
+        {
+            throw new ForbiddenException("You cannot delete this post.");
         }
 
         var mediaStorageKeys = post.Media
@@ -110,7 +123,5 @@ public sealed class PostManagementService
             PostCache.GetKey(post.Id),
             UserProfileCache.GetProfileKey(post.AuthorId));
         await _postMediaManager.TryDeleteAsync(mediaStorageKeys, cancellationToken);
-
-        return true;
     }
 }

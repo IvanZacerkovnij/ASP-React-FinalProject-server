@@ -361,23 +361,13 @@ public class PostsController : ControllerBase
             return Unauthorized(new { message = "Invalid token claims." });
         }
 
-        var existingPost = await _postService.GetByIdAsync(id, cancellationToken, currentUserId);
+        var updatedPost = await _postService.UpdateAsync(
+            id,
+            currentUserId.Value,
+            request,
+            cancellationToken);
 
-        if (existingPost is null)
-        {
-            return NotFound(new { message = "Post was not found." });
-        }
-
-        if (existingPost.Author.Id != currentUserId.Value)
-        {
-            return Forbid();
-        }
-
-        var updatedPost = await _postService.UpdateAsync(id, request, cancellationToken);
-
-        return updatedPost is null
-            ? NotFound(new { message = "Post was not found." })
-            : Ok(updatedPost);
+        return Ok(updatedPost);
     }
 
     [Authorize]
@@ -393,19 +383,7 @@ public class PostsController : ControllerBase
             return Unauthorized(new { message = "Invalid token claims." });
         }
 
-        var existingPost = await _postService.GetByIdAsync(id, cancellationToken, currentUserId);
-
-        if (existingPost is null)
-        {
-            return NotFound(new { message = "Post was not found." });
-        }
-
-        if (existingPost.Author.Id != currentUserId.Value)
-        {
-            return Forbid();
-        }
-
-        await _postService.DeleteAsync(id, cancellationToken);
+        await _postService.DeleteAsync(id, currentUserId.Value, cancellationToken);
 
         return NoContent();
     }

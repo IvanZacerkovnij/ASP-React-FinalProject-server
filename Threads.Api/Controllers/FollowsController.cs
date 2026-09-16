@@ -130,29 +130,12 @@ public class FollowsController : ControllerBase
             return Unauthorized(new { message = "Invalid token claims." });
         }
 
-        if (currentUserId.Value != userId)
-        {
-            return Forbid();
-        }
+        await _followService.RemoveFollowerAsync(
+            currentUserId.Value,
+            userId,
+            followId,
+            cancellationToken);
 
-        var user = await _userService.GetByIdAsync(userId, cancellationToken);
-
-        if (user is null)
-        {
-            return NotFound(new { message = "User was not found." });
-        }
-
-        var follower = await _userService.GetByIdAsync(followId, cancellationToken);
-
-        if (follower is null)
-        {
-            return NotFound(new { message = "Follower was not found." });
-        }
-
-        var wasRemoved = await _followService.RemoveFollowAsync(followId, userId, cancellationToken);
-
-        return wasRemoved
-            ? NoContent()
-            : NotFound(new { message = "Follow was not found." });
+        return NoContent();
     }
 }

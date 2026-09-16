@@ -37,7 +37,11 @@ public interface IPostService
         Guid? currentUserId = null);
     Task<PostResponse?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default, Guid? currentUserId = null);
     Task<PostResponse> CreateAsync(Guid authorId, CreatePostRequest request, CancellationToken cancellationToken = default);
-    Task<PostResponse?> UpdateAsync(Guid id, UpdatePostRequest request, CancellationToken cancellationToken = default);
+    Task<PostResponse> UpdateAsync(
+        Guid id,
+        Guid currentUserId,
+        UpdatePostRequest request,
+        CancellationToken cancellationToken = default);
     Task<PostViewResponse?> RecordViewAsync(Guid id, Guid viewerId, CancellationToken cancellationToken = default);
-    Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default);
+    Task DeleteAsync(Guid id, Guid currentUserId, CancellationToken cancellationToken = default);
 }

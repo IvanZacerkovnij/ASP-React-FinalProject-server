@@ -94,17 +94,17 @@ public sealed class CommentService : ICommentService
         return _commentManagementService.CreateAsync(authorId, request, cancellationToken);
     }
 
-    public Task<CommentResponse?> UpdateAsync(
+    public Task<CommentResponse> UpdateAsync(
         Guid id,
+        Guid currentUserId,
         UpdateCommentRequest request,
-        CancellationToken cancellationToken = default,
-        Guid? currentUserId = null)
+        CancellationToken cancellationToken = default)
     {
         return _commentManagementService.UpdateAsync(
             id,
+            currentUserId,
             request,
-            cancellationToken,
-            currentUserId);
+            cancellationToken);
     }
 
     public Task<CommentViewResponse?> RecordViewAsync(
@@ -115,8 +115,11 @@ public sealed class CommentService : ICommentService
         return _commentInteractionService.RecordViewAsync(id, viewerId, cancellationToken);
     }
 
-    public Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default)
+    public Task DeleteAsync(
+        Guid id,
+        Guid currentUserId,
+        CancellationToken cancellationToken = default)
     {
-        return _commentManagementService.DeleteAsync(id, cancellationToken);
+        return _commentManagementService.DeleteAsync(id, currentUserId, cancellationToken);
     }
 }

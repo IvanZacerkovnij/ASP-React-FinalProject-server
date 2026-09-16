@@ -33,14 +33,14 @@ public interface ICommentService
         CancellationToken cancellationToken = default,
         Guid? currentUserId = null);
     Task<CommentResponse> CreateAsync(Guid authorId, CreateCommentRequest request, CancellationToken cancellationToken = default);
-    Task<CommentResponse?> UpdateAsync(
+    Task<CommentResponse> UpdateAsync(
         Guid id,
+        Guid currentUserId,
         UpdateCommentRequest request,
-        CancellationToken cancellationToken = default,
-        Guid? currentUserId = null);
+        CancellationToken cancellationToken = default);
     Task<CommentViewResponse?> RecordViewAsync(
         Guid id,
         Guid viewerId,
         CancellationToken cancellationToken = default);
-    Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default);
+    Task DeleteAsync(Guid id, Guid currentUserId, CancellationToken cancellationToken = default);
 }
