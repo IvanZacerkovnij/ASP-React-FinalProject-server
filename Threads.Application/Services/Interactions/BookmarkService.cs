@@ -5,9 +5,10 @@ using Threads.Application.DTOs.Posts.Responses;
 using Threads.Application.Interfaces.Bookmarks;
 using Threads.Application.Interfaces.Comments;
 using Threads.Application.Interfaces.Posts;
+using Threads.Application.Services.Common;
 using Threads.Domain.Entities;
 
-namespace Threads.Application.Services;
+namespace Threads.Application.Services.Interactions;
 
 public class BookmarkService : IBookmarkService
 {

@@ -6,9 +6,11 @@ using Threads.Application.DTOs.Users;
 using Threads.Application.Interfaces.Follows;
 using Threads.Application.Interfaces.Media;
 using Threads.Application.Interfaces.Users;
+using Threads.Application.Services.Common;
+using Threads.Application.Services.Users;
 using Threads.Domain.Entities;
 
-namespace Threads.Application.Services;
+namespace Threads.Application.Services.Follows;
 
 public class FollowService : IFollowService
 {

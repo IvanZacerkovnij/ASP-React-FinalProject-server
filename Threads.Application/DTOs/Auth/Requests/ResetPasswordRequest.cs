@@ -10,6 +10,6 @@ public sealed class ResetPasswordRequest
     [Required, RegularExpression(@"^\d{6}$")]
     public required string Code { get; init; }
     
-    [Required, StringLength(32 , MinimumLength = 8)]
+    [Required, StringLength(64 , MinimumLength = 8)]
     public required string NewPassword { get; init; }
 }

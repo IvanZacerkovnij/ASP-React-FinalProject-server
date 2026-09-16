@@ -5,9 +5,10 @@ using Threads.Application.DTOs.Reposts;
 using Threads.Application.Interfaces.Comments;
 using Threads.Application.Interfaces.Posts;
 using Threads.Application.Interfaces.Reposts;
+using Threads.Application.Services.Common;
 using Threads.Domain.Entities;
 
-namespace Threads.Application.Services;
+namespace Threads.Application.Services.Interactions;
 
 public class RepostService : IRepostService
 {

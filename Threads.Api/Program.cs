@@ -16,7 +16,13 @@ using Threads.Application.Interfaces.Security;
 using Threads.Application.Interfaces.Users;
 using Threads.Application.Interfaces.Likes;
 using Threads.Application.Mapping;
-using Threads.Application.Services;
+using Threads.Application.Services.Auth;
+using Threads.Application.Services.Comments;
+using Threads.Application.Services.Follows;
+using Threads.Application.Services.Interactions;
+using Threads.Application.Services.Media;
+using Threads.Application.Services.Posts;
+using Threads.Application.Services.Users;
 using Threads.Infrastructure.Data;
 using Threads.Infrastructure.Data.Configurations;
 using Threads.Infrastructure.Data.Repositories.Bookmarks;
@@ -30,6 +36,7 @@ using Threads.Infrastructure.Data.Repositories.Posts;
 using Threads.Infrastructure.Data.Repositories.Reposts;
 using Threads.Infrastructure.Data.Repositories.RefreshTokens;
 using Threads.Infrastructure.Data.Repositories.Users;
+using Threads.Infrastructure.Data.Transactions;
 using Threads.Infrastructure.Security;
 using Threads.Infrastructure.Services;
 
@@ -50,19 +57,39 @@ public class Program
         builder.Services.AddScoped<IPollRepository, PollRepository>();
         builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         builder.Services.AddScoped<IPendingRegistrationRepository, PendingRegistrationRepository>();
+        builder.Services.AddScoped<IAuthTransaction, AuthTransaction>();
     }
 
     private static void AddServices(WebApplicationBuilder builder)
     {
+        builder.Services.AddScoped<UserQueryService>();
+        builder.Services.AddScoped<UserProfileService>();
+        builder.Services.AddScoped<UserDeletionService>();
+        builder.Services.AddScoped<UserResponseFactory>();
+        builder.Services.AddScoped<ProfileImageManager>();
         builder.Services.AddScoped<IUserService, UserService>();
+        builder.Services.AddScoped<PostQueryService>();
+        builder.Services.AddScoped<PostManagementService>();
+        builder.Services.AddScoped<PostInteractionService>();
+        builder.Services.AddScoped<PostMediaManager>();
+        builder.Services.AddScoped<PostResponseFactory>();
         builder.Services.AddScoped<IPostService, PostService>();
         builder.Services.AddScoped<IPollService, PollService>();
+        builder.Services.AddScoped<CommentQueryService>();
+        builder.Services.AddScoped<CommentManagementService>();
+        builder.Services.AddScoped<CommentInteractionService>();
+        builder.Services.AddScoped<CommentResponseFactory>();
         builder.Services.AddScoped<ICommentService, CommentService>();
         builder.Services.AddScoped<IFollowService, FollowService>();
         builder.Services.AddScoped<ILikeService, LikeService>();
         builder.Services.AddScoped<IRepostService, RepostService>();
         builder.Services.AddScoped<IBookmarkService, BookmarkService>();
         builder.Services.AddScoped<IMediaService, MediaService>();
+        builder.Services.AddScoped<RegistrationService>();
+        builder.Services.AddScoped<SessionService>();
+        builder.Services.AddScoped<PasswordRecoveryService>();
+        builder.Services.AddScoped<PasswordChangeService>();
+        builder.Services.AddScoped<RefreshTokenManager>();
         builder.Services.AddScoped<IAuthService, AuthService>();
         builder.Services.AddAutoMapper(cfg => { }, typeof(UserProfile));
     }

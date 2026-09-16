@@ -4,7 +4,7 @@ using Threads.Application.Interfaces.Media;
 using Threads.Domain.Enums;
 using MediaEntity = Threads.Domain.Entities.Media;
 
-namespace Threads.Application.Services;
+namespace Threads.Application.Services.Media;
 
 public class MediaService : IMediaService
 {

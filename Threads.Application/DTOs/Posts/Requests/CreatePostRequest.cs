@@ -8,7 +8,7 @@ public class CreatePostRequest
     [StringLength(2000, MinimumLength = 1)]
     public string? Content { get; init; }
 
-    [Required, UniqueNotEmptyGuids]
+    [Required, MaxLength(20), UniqueNotEmptyGuids]
     public IReadOnlyCollection<Guid> MediaIds { get; init; } = [];
 
     public CreatePostPollRequest? Poll { get; init; }

@@ -3,7 +3,7 @@ using System.Text;
 using Threads.Application.DTOs.Pagination;
 using Threads.Application.Exceptions;
 
-namespace Threads.Application.Services;
+namespace Threads.Application.Services.Common;
 
 internal static class CursorCodec
 {

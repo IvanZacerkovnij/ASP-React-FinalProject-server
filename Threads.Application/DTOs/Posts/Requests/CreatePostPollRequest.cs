@@ -5,7 +5,7 @@ namespace Threads.Application.DTOs.Posts.Requests;
 
 public class CreatePostPollRequest
 {
-    [Required, MinLength(2), ValidPollOptions]
+    [Required, MinLength(2), MaxLength(4), ValidPollOptions]
     public IReadOnlyCollection<string> Options { get; init; } = [];
 
     [FutureDateTime]

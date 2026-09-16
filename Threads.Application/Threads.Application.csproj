@@ -35,9 +35,6 @@
       <Compile Update="Interfaces\Media\IObjectStorageService.cs" />
       <Compile Update="Interfaces\Polls\IPollRepository.cs" />
       <Compile Update="Interfaces\Polls\IPollService.cs" />
-      <Compile Update="Services\FollowService.cs" />
-      <Compile Update="Services\MediaService.cs" />
-      <Compile Update="Services\PollService.cs" />
     </ItemGroup>
 
     <ItemGroup>

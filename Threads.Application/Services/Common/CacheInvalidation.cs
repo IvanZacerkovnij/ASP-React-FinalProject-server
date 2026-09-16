@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Caching.Hybrid;
 
-namespace Threads.Application.Services;
+namespace Threads.Application.Services.Common;
 
 internal static class CacheInvalidation
 {

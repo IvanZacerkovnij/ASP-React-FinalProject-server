@@ -3,7 +3,7 @@ using Threads.Application.Interfaces.Polls;
 using Threads.Application.Interfaces.Posts;
 using Threads.Domain.Entities;
 
-namespace Threads.Application.Services;
+namespace Threads.Application.Services.Interactions;
 
 public class PollService : IPollService
 {
