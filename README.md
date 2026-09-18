@@ -2,7 +2,7 @@
 
 Backend для соціального застосунку у стилі Threads, побудований на `ASP.NET Core Web API` з `PostgreSQL`, `EF Core`, `JWT`, `AWS S3` і обробкою медіа через `ffmpeg`.
 
-> Останнє оновлення документації: `2026-09-14`
+> Останнє оновлення документації: `2026-09-16`
 
 ## Зміст
 
@@ -87,10 +87,10 @@ BackEndForFinalProject
 ### Архітектурний потік
 
 1. Запит приходить у контролер з `Threads.Api`.
-2. Контролер дістає auth context і валідує route-level умови.
-3. Application service виконує бізнес-логіку.
+2. Контролер виконує HTTP binding, дістає auth context і передає дані в application service.
+3. Application service виконує бізнес-логіку, включно з ownership-перевірками для команд зміни й видалення ресурсів.
 4. Репозиторії та зовнішні інтеграції працюють через `Threads.Infrastructure`.
-5. Очікувані негативні результати повертаються через `null`, `bool` або status DTO.
+5. Очікувані негативні результати повертаються через `null`, `bool`, status DTO або application exceptions залежно від сценарію.
 6. Необроблені винятки проходять через глобальний exception handler і перетворюються на `ProblemDetails`.
 7. API повертає DTO або стандартизовану помилку у вигляді JSON-відповіді.
 
@@ -274,7 +274,7 @@ API використовує `GlobalExceptionHandler` із `IExceptionHandler`, 
 
 Application exceptions розміщені в `Threads.Application/Exceptions`, а технічні винятки конфігурації — у `Threads.Infrastructure/Exceptions`. Giphy та Geoapify перетворюють мережеві помилки й некоректний JSON на `ExternalServiceException`, не передаючи клієнту внутрішні деталі інтеграції.
 
-Винятки використовуються лише для переривання сценарію. Очікувані результати, наприклад неправильні credentials, недійсний refresh token, прострочений verification code або повторне видалення interaction, залишаються `null`, `false` чи окремим status і обробляються контролером.
+Винятки використовуються для переривання сценарію та бізнес-помилок команд. Зокрема, update/delete неіснуючого ресурсу спричиняє `NotFoundException`, а спроба змінити чужий пост, коментар або список followers — `ForbiddenException`. Результати на кшталт неправильних credentials, недійсного refresh token, простроченого verification code або повторної interaction залишаються `null`, `false` чи окремим status і обробляються контролером.
 
 Приклад відповіді глобального handler:
 
@@ -329,6 +329,8 @@ Endpoint-и з однаковою named policy використовують сп
 Базовий префікс: `api/`
 
 У колонці `Auth` значення `Так` означає, що endpoint вимагає Bearer access token. Публічні endpoint-и можуть використовувати переданий token для формування персоналізованих полів відповіді.
+
+Усі часові точки в request/response DTO використовують `DateTimeOffset` і передаються у форматі ISO 8601 з UTC або явним offset, наприклад `2026-10-01T12:00:00Z` чи `2026-10-01T15:00:00+03:00`. Це стосується `CreatedAt`, `UpdatedAt`, `ActionAt`, `EndsAt` і `AccessTokenExpiresAt`. Календарна дата народження залишається `DateOnly` у форматі `YYYY-MM-DD`.
 
 ### Auth
 
@@ -471,6 +473,8 @@ Endpoint-и з однаковою named policy використовують сп
 | `PUT` | `/api/posts/{id}` | Так | Оновити власний пост |
 | `DELETE` | `/api/posts/{id}` | Так | Видалити власний пост |
 
+Повторний конкурентний vote не створює дублікат: `PollRepository` перехоплює лише PostgreSQL `UniqueViolation` для constraint `IX_PollVotes_PollId_UserId` і повертає сервісу `false`. Інші помилки БД не маскуються як повторне голосування.
+
 ### Comments
 
 | Method | Route | Auth | Призначення |
@@ -490,7 +494,7 @@ Endpoint-и з однаковою named policy використовують сп
 
 ### Логіка CommentService
 
-`CommentService` знаходиться у `Threads.Application/Services/CommentService.cs` і виконує бізнес-логіку між API-контролерами та репозиторіями. Для роботи він використовує `ICommentRepository`, `IPostRepository`, репозиторії likes/bookmarks/reposts, `IObjectStorageService` для URL аватара та `IMapper` для перетворення entities на response DTO.
+`CommentService` знаходиться у `Threads.Application/Services/Comments/CommentService.cs` і є фасадом над `CommentQueryService`, `CommentManagementService` та `CommentInteractionService`. Читання, команди створення/оновлення/видалення і реєстрація переглядів розділені між цими сервісами, а `CommentResponseFactory` разом із `UserResponseFactory` формують response DTO та read URL для аватара.
 
 Усі публічні методи асинхронні та приймають `CancellationToken`, щоб запит до БД можна було скасувати, якщо клієнт розірвав HTTP-з'єднання або застосунок завершує роботу.
 
@@ -522,33 +526,30 @@ Endpoint-и з однаковою named policy використовують сп
 
 ##### `UpdateAsync`
 
-Метод перевіряє новий текст, знаходить коментар, оновлює тільки `Content`, виставляє `UpdatedAt` у UTC і зберігає зміни. Якщо коментар не знайдений, повертає `null`. Автор, пост і `ParentCommentId` не змінюються.
+Метод знаходить коментар, викидає `NotFoundException`, якщо його немає, і `ForbiddenException`, якщо `currentUserId` не збігається з `AuthorId`. Після ownership-перевірки він валідує новий текст, оновлює тільки `Content`, виставляє `UpdatedAt` у UTC і повертає `CommentResponse`. Автор, пост і `ParentCommentId` не змінюються.
 
 ##### `DeleteAsync`
 
-Метод повертає `false`, якщо коментар не знайдений, або видаляє його і повертає `true`. Через cascade delete разом із коментарем видаляються його replies, likes, bookmarks, reposts і views.
-
-Перевірка того, що редагувати або видаляти коментар намагається саме його автор, зараз виконується в `CommentsController`, а не всередині `CommentService`.
+Метод викидає `NotFoundException`, якщо коментар не знайдений, і `ForbiddenException`, якщо операцію виконує не автор. Після перевірки `CommentManagementService` видаляє коментар; через cascade delete разом із ним видаляються replies, likes, bookmarks, reposts і views.
 
 #### Likes, bookmarks і reposts
 
-Пари методів `LikeAsync` / `UnlikeAsync`, `BookmarkAsync` / `UnbookmarkAsync` і `RepostAsync` / `UnrepostAsync` працюють за однаковим принципом:
+Методи `AddCommentLikeAsync` / `RemoveCommentLikeAsync`, `AddCommentBookmarkAsync` / `RemoveCommentBookmarkAsync` і `AddCommentRepostAsync` / `RemoveCommentRepostAsync` розміщені відповідно в `LikeService`, `BookmarkService` та `RepostService` і працюють за однаковим принципом:
 
-1. Перевіряють існування коментаря; якщо його немає — повертають `null`.
-2. Шукають interaction за парою `userId + commentId`.
-3. Add-метод створює interaction тільки тоді, коли його ще немає.
-4. Remove-метод видаляє interaction тільки тоді, коли він існує.
-5. Повторно завантажують коментар та повертають актуальні counters і персональні flags.
+1. Add-метод перевіряє існування коментаря та повертає `false`, якщо target відсутній.
+2. Add-метод викликає repository `TryAddAsync`; унікальний ключ не дозволяє створити дублікат.
+3. Remove-метод виконує атомарний `ExecuteDeleteAsync` за парою `userId + commentId` і повертає результат за кількістю змінених рядків.
+4. Контролер читає коментар до та після команди, щоб повернути коректний HTTP status, актуальні counters і персональні flags.
 
-Операції є ідемпотентними: повторний like/bookmark/repost не створює логічний дублікат, а повторне видалення відсутньої взаємодії не завершується помилкою. Коментарі використовують окремі сутності `CommentLike`, `CommentBookmark` і `CommentRepost` зі складеним primary key `CommentId + UserId`. Якщо два однакові add-запити виконуються одночасно, сервіс перехоплює `DbUpdateException`, після чого повертає актуальний стан коментаря.
+Повторний like/bookmark/repost не створює логічний дублікат. Коментарі використовують окремі сутності `CommentLike`, `CommentBookmark` і `CommentRepost` зі складеним primary key `CommentId + UserId`. Якщо два однакові add-запити виконуються одночасно, repository перехоплює лише PostgreSQL `UniqueViolation` відповідного primary key, від'єднує невдалу entity від `DbContext` і повертає `false`; інші DB-помилки поширюються далі.
 
-#### `ViewAsync`
+#### `RecordViewAsync`
 
-Метод реєструє унікальний перегляд коментаря авторизованим користувачем через атомарний `INSERT ... ON CONFLICT DO NOTHING`, після чого отримує актуальний `ViewsCount` і формує оновлений `CommentResponse`. Один користувач збільшує лічильник конкретного коментаря лише один раз завдяки складеному primary key `CommentId + UserId`.
+Метод реєструє унікальний перегляд коментаря авторизованим користувачем через атомарний `INSERT ... ON CONFLICT DO NOTHING`, після чого отримує актуальний `ViewsCount` і формує `CommentViewResponse`. Один користувач збільшує лічильник конкретного коментаря лише один раз завдяки складеному primary key `CommentId + UserId`.
 
 #### Формування CommentResponse
 
-Приватний метод `MapCommentResponse` формує фінальний `CommentResponse` із такими даними:
+`CommentResponseFactory` формує фінальний `CommentResponse` із такими даними:
 
 - основні поля: `Id`, `PostId`, `ParentCommentId`, `Content`, `CreatedAt`, `UpdatedAt`;
 - автор: `Id`, `Username`, `DisplayName`, `Location`, `AvatarUrl`, `IsVerified`;
@@ -556,7 +557,7 @@ Endpoint-и з однаковою named policy використовують сп
 - viewer state: `IsLikedByCurrentUser`, `IsBookmarkedByCurrentUser`, `IsRepostedByCurrentUser`;
 - `ActionAt`: час like/bookmark/repost у відповідній interaction collection або `null` у звичайних content endpoints.
 
-URL аватара не зберігається безпосередньо в DTO: якщо в користувача є `AvatarObjectKey`, `CommentService` формує read URL через `IObjectStorageService`. Якщо локація автора не задана, `Location` дорівнює `null`.
+URL аватара не зберігається безпосередньо в DTO: якщо в користувача є `AvatarObjectKey`, `UserResponseFactory` формує read URL через `IObjectStorageService`. Якщо локація автора не задана, `Location` дорівнює `null`.
 
 #### Відповідність методів HTTP endpoints
 
@@ -567,10 +568,10 @@ URL аватара не зберігається безпосередньо в D
 | `CreateAsync` | `POST /api/comments` |
 | `UpdateAsync` | `PUT /api/comments/{id}` |
 | `DeleteAsync` | `DELETE /api/comments/{id}` |
-| `ViewAsync` | `POST /api/comments/{id}/view` |
-| `LikeAsync` / `UnlikeAsync` | `POST` / `DELETE /api/comments/{id}/like` |
-| `BookmarkAsync` / `UnbookmarkAsync` | `POST` / `DELETE /api/comments/{id}/bookmark` |
-| `RepostAsync` / `UnrepostAsync` | `POST` / `DELETE /api/comments/{id}/repost` |
+| `RecordViewAsync` | `POST /api/comments/{id}/view` |
+| `AddCommentLikeAsync` / `RemoveCommentLikeAsync` | `POST` / `DELETE /api/comments/{id}/like` |
+| `AddCommentBookmarkAsync` / `RemoveCommentBookmarkAsync` | `POST` / `DELETE /api/comments/{id}/bookmark` |
+| `AddCommentRepostAsync` / `RemoveCommentRepostAsync` | `POST` / `DELETE /api/comments/{id}/repost` |
 | `GetLikedByUserIdAsync` через `LikeService` | `GET /api/users/{username}/likes`, `GET /api/me/likes` |
 | `GetBookmarkedByUserIdAsync` через `BookmarkService` | `GET /api/me/bookmarks` |
 | `GetRepostedByUserIdAsync` через `RepostService` | `GET /api/users/{username}/reposts`, `GET /api/me/reposts` |
@@ -584,6 +585,8 @@ URL аватара не зберігається безпосередньо в D
 | `GET` | `/api/follows/{userId}/followers?limit=20&cursor=...` | Ні | Отримати сторінку followers користувача |
 | `GET` | `/api/follows/{userId}/following?limit=20&cursor=...` | Ні | Отримати сторінку користувачів, на яких оформлена підписка |
 | `DELETE` | `/api/follows/{userId}/followers/{followId}` | Так | Видалити follower зі свого профілю |
+
+`RemoveFollowerAsync` перевіряє ownership у `FollowService`: спроба змінити чужий список followers спричиняє `ForbiddenException`, а відсутній user, follower або follow — `NotFoundException`. Конкурентне створення однакової підписки обробляється в `FollowRepository.TryAddAsync`: repository повертає `false` лише для `UniqueViolation` constraint `IX_Follows_FollowerId_FollowingId`, а інші помилки БД не приховує.
 
 ### Search
 
@@ -638,4 +641,4 @@ Search users сортується за `Username + Id` у зростаючому
 - Swagger у поточному проєкті не підключений.
 - README описує фактичні контролери, маршрути й конфігурацію, які є в коді зараз.
 - `Like`, `Bookmark`, `Repost` і `View` розділені на окремі сутності для дописів і коментарів.
-- Останні зміни від `2026-09-14`: posts профілю, comments, followers/following, likes, bookmarks і reposts переведені на cursor pagination; interaction entities розділені на окремі post/comment таблиці зі складеними ключами та індексами для paginated вибірок.
+- Останні зміни від `2026-09-16`: ownership-перевірки update/delete перенесені в application services; часові поля DTO уніфіковані на `DateTimeOffset`; конкурентні follow і poll vote inserts обробляються repositories за точними PostgreSQL constraints.
