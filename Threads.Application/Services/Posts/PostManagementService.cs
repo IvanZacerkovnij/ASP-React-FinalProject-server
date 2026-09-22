@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Caching.Hybrid;
+using Microsoft.Extensions.Logging;
 using Threads.Application.DTOs.Posts.Requests;
 using Threads.Application.DTOs.Posts.Responses;
 using Threads.Application.Exceptions;
@@ -15,19 +16,22 @@ public sealed class PostManagementService
     private readonly PostQueryService _postQueryService;
     private readonly PostResponseFactory _responseFactory;
     private readonly HybridCache _cache;
+    private readonly ILogger<PostManagementService> _logger;
 
     public PostManagementService(
         IPostRepository postRepository,
         PostMediaManager postMediaManager,
         PostQueryService postQueryService,
         PostResponseFactory responseFactory,
-        HybridCache cache)
+        HybridCache cache,
+        ILogger<PostManagementService> logger)
     {
         _postRepository = postRepository;
         _postMediaManager = postMediaManager;
         _postQueryService = postQueryService;
         _responseFactory = responseFactory;
         _cache = cache;
+        _logger = logger;
     }
 
     public async Task<PostResponse> CreateAsync(
@@ -40,7 +44,7 @@ public sealed class PostManagementService
 
         await _postMediaManager.ApplyAsync(post, authorId, mediaIds, cancellationToken);
         await _postRepository.AddAsync(post, cancellationToken);
-        await CacheInvalidation.TryRemoveAsync(_cache, UserProfileCache.GetProfileKey(authorId));
+        await CacheInvalidation.TryRemoveAsync(_cache, _logger, UserProfileCache.GetProfileKey(authorId));
 
         var createdPost = await _postRepository.GetByIdAsync(post.Id, cancellationToken);
 
@@ -81,7 +85,7 @@ public sealed class PostManagementService
         post.UpdatedAt = DateTimeOffset.UtcNow;
 
         await _postRepository.UpdateAsync(post, cancellationToken);
-        await CacheInvalidation.TryRemoveAsync(_cache, PostCache.GetKey(post.Id));
+        await CacheInvalidation.TryRemoveAsync(_cache, _logger, PostCache.GetKey(post.Id));
 
         var updatedPost = await _postRepository.GetByIdAsync(post.Id, cancellationToken);
         var viewsCount = await _postQueryService.GetViewCountAsync(post.Id, cancellationToken);
@@ -120,6 +124,7 @@ public sealed class PostManagementService
         await _postRepository.DeleteAsync(post, cancellationToken);
         await CacheInvalidation.TryRemoveAsync(
             _cache,
+            _logger,
             PostCache.GetKey(post.Id),
             UserProfileCache.GetProfileKey(post.AuthorId));
         await _postMediaManager.TryDeleteAsync(mediaStorageKeys, cancellationToken);

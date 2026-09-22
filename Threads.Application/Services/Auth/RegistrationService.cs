@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Threads.Application.DTOs.Auth.Requests;
 using Threads.Application.DTOs.Auth.Responses;
 using Threads.Application.Exceptions;
@@ -16,6 +17,7 @@ public sealed class RegistrationService
     private readonly IAuthEmailService _authEmailService;
     private readonly IPasswordHasher _passwordHasher;
     private readonly SessionService _sessionService;
+    private readonly ILogger<RegistrationService> _logger;
 
     public RegistrationService(
         IUserRepository userRepository,
@@ -23,7 +25,8 @@ public sealed class RegistrationService
         IAuthTransaction authTransaction,
         IAuthEmailService authEmailService,
         IPasswordHasher passwordHasher,
-        SessionService sessionService)
+        SessionService sessionService,
+        ILogger<RegistrationService> logger)
     {
         _userRepository = userRepository;
         _pendingRegistrationRepository = pendingRegistrationRepository;
@@ -31,6 +34,7 @@ public sealed class RegistrationService
         _authEmailService = authEmailService;
         _passwordHasher = passwordHasher;
         _sessionService = sessionService;
+        _logger = logger;
     }
 
     public async Task RegisterAsync(
@@ -52,6 +56,10 @@ public sealed class RegistrationService
             pendingRegistration.Email,
             code,
             cancellationToken);
+        _logger.LogInformation(
+            "Registration verification code sent for pending registration {PendingRegistrationId}. IsNew: {IsNew}",
+            pendingRegistration.Id,
+            isNew);
     }
 
     public async Task<AuthResponse?> VerifyEmailAsync(
@@ -66,10 +74,13 @@ public sealed class RegistrationService
 
         if (pendingRegistration is null)
         {
+            _logger.LogWarning("Email verification failed because the code or registration was invalid");
             return null;
         }
 
-        return await CompleteEmailVerificationAsync(pendingRegistration, cancellationToken);
+        var response = await CompleteEmailVerificationAsync(pendingRegistration, cancellationToken);
+        _logger.LogInformation("Email verified and user {UserId} registered", response.UserId);
+        return response;
     }
 
     public async Task<bool> ResendVerificationCodeAsync(
@@ -87,6 +98,9 @@ public sealed class RegistrationService
         }
 
         await RefreshEmailVerificationCodeAsync(pendingRegistration, cancellationToken);
+        _logger.LogInformation(
+            "Verification code resent for pending registration {PendingRegistrationId}",
+            pendingRegistration.Id);
         return true;
     }
 

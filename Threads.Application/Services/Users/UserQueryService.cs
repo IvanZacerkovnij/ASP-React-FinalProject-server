@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Caching.Hybrid;
+using Microsoft.Extensions.Logging;
 using Threads.Application.DTOs.Pagination;
 using Threads.Application.DTOs.Users;
 using Threads.Application.Interfaces.Follows;
@@ -16,17 +17,20 @@ public sealed class UserQueryService
     private readonly IFollowRepository _followRepository;
     private readonly UserResponseFactory _responseFactory;
     private readonly HybridCache _cache;
+    private readonly ILogger<UserQueryService> _logger;
 
     public UserQueryService(
         IUserRepository userRepository,
         IFollowRepository followRepository,
         UserResponseFactory responseFactory,
-        HybridCache cache)
+        HybridCache cache,
+        ILogger<UserQueryService> logger)
     {
         _userRepository = userRepository;
         _followRepository = followRepository;
         _responseFactory = responseFactory;
         _cache = cache;
+        _logger = logger;
     }
 
     public async Task<CursorPageResponse<UserShortResponse>> SearchAsync(
@@ -85,7 +89,7 @@ public sealed class UserQueryService
 
         if (publicProfile is null)
         {
-            await CacheInvalidation.TryRemoveAsync(_cache, cacheKey);
+            await CacheInvalidation.TryRemoveAsync(_cache, _logger, cacheKey);
             return null;
         }
 
@@ -139,7 +143,7 @@ public sealed class UserQueryService
 
         if (!userId.HasValue)
         {
-            await CacheInvalidation.TryRemoveAsync(_cache, cacheKey);
+            await CacheInvalidation.TryRemoveAsync(_cache, _logger, cacheKey);
             return null;
         }
 
@@ -147,7 +151,7 @@ public sealed class UserQueryService
 
         if (user is null)
         {
-            await CacheInvalidation.TryRemoveAsync(_cache, cacheKey);
+            await CacheInvalidation.TryRemoveAsync(_cache, _logger, cacheKey);
         }
 
         return user;

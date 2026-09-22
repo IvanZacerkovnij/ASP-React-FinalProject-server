@@ -1,5 +1,6 @@
 using AutoMapper;
 using Microsoft.Extensions.Caching.Hybrid;
+using Microsoft.Extensions.Logging;
 using Threads.Application.DTOs.Locations;
 using Threads.Application.DTOs.Pagination;
 using Threads.Application.DTOs.Users;
@@ -20,19 +21,22 @@ public class FollowService : IFollowService
     private readonly IObjectStorageService _objectStorageService;
     private readonly IMapper _mapper;
     private readonly HybridCache _cache;
+    private readonly ILogger<FollowService> _logger;
 
     public FollowService(
         IFollowRepository followRepository,
         IUserRepository userRepository,
         IObjectStorageService objectStorageService,
         IMapper mapper,
-        HybridCache cache)
+        HybridCache cache,
+        ILogger<FollowService> logger)
     {
         _followRepository = followRepository;
         _userRepository = userRepository;
         _objectStorageService = objectStorageService;
         _mapper = mapper;
         _cache = cache;
+        _logger = logger;
     }
 
     public async Task<bool> AddFollowAsync(Guid followerId, Guid followingId, CancellationToken cancellationToken = default)
@@ -132,6 +136,7 @@ public class FollowService : IFollowService
     {
         await CacheInvalidation.TryRemoveAsync(
             _cache,
+            _logger,
             UserProfileCache.GetProfileKey(followerId),
             UserProfileCache.GetProfileKey(followingId));
     }

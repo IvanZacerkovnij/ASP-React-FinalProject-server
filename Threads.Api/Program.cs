@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Features;
 using Resend;
 using Threads.Api.ExceptionHandling;
+using Threads.Api.Middleware;
 using Threads.Application.Interfaces.Auth;
 using Threads.Application.Interfaces.Bookmarks;
 using Threads.Application.Interfaces.Comments;
@@ -169,6 +170,7 @@ public class Program
         });
         
         app.UseForwardedHeaders();
+        app.UseMiddleware<SlowRequestLoggingMiddleware>();
         app.UseExceptionHandler();
         
         app.UseCors("AllowAll");

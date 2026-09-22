@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Threads.Application.DTOs.Auth.Requests;
 using Threads.Application.DTOs.Auth.Responses;
 using Threads.Application.Interfaces.Auth;
@@ -15,6 +16,7 @@ public sealed class PasswordChangeService
     private readonly IAuthEmailService _authEmailService;
     private readonly IAuthCodeHasher _authCodeHasher;
     private readonly IPasswordHasher _passwordHasher;
+    private readonly ILogger<PasswordChangeService> _logger;
 
     public PasswordChangeService(
         IUserRepository userRepository,
@@ -22,7 +24,8 @@ public sealed class PasswordChangeService
         IAuthTransaction authTransaction,
         IAuthEmailService authEmailService,
         IAuthCodeHasher authCodeHasher,
-        IPasswordHasher passwordHasher)
+        IPasswordHasher passwordHasher,
+        ILogger<PasswordChangeService> logger)
     {
         _userRepository = userRepository;
         _refreshTokenRepository = refreshTokenRepository;
@@ -30,6 +33,7 @@ public sealed class PasswordChangeService
         _authEmailService = authEmailService;
         _authCodeHasher = authCodeHasher;
         _passwordHasher = passwordHasher;
+        _logger = logger;
     }
 
     public async Task<ChangePasswordResult> StartPasswordChangeAsync(
@@ -47,16 +51,19 @@ public sealed class PasswordChangeService
 
         if (user is null || !user.IsActive)
         {
+            _logger.LogWarning("Password change requested for missing or inactive user {UserId}", userId);
             return CreateResult(ChangePasswordStatus.UserNotFound);
         }
 
         if (!_passwordHasher.VerifyPassword(normalizedCurrentPassword, user.PasswordHash))
         {
+            _logger.LogWarning("Password change rejected for user {UserId}: invalid current password", userId);
             return CreateResult(ChangePasswordStatus.InvalidCurrentPassword);
         }
 
         if (_passwordHasher.VerifyPassword(normalizedNewPassword, user.PasswordHash))
         {
+            _logger.LogInformation("Password change rejected for user {UserId}: password was not changed", userId);
             return CreateResult(ChangePasswordStatus.InvalidNewPassword);
         }
 
@@ -67,6 +74,7 @@ public sealed class PasswordChangeService
 
         await _userRepository.UpdateAsync(user, cancellationToken);
         await _authEmailService.SendPasswordChangeCodeAsync(user.Email, code, cancellationToken);
+        _logger.LogInformation("Password change confirmation code sent for user {UserId}", userId);
 
         return CreateResult(ChangePasswordStatus.ConfirmationCodeSent);
     }
@@ -80,16 +88,19 @@ public sealed class PasswordChangeService
 
         if (user is null || !user.IsActive)
         {
+            _logger.LogWarning("Password change confirmation requested for missing or inactive user {UserId}", userId);
             return CreateResult(ChangePasswordStatus.UserNotFound);
         }
 
         if (user.PendingPasswordHash is null)
         {
+            _logger.LogWarning("Password change confirmation has no pending change for user {UserId}", userId);
             return CreateResult(ChangePasswordStatus.NoPendingPasswordChange);
         }
 
         if (!AuthCode.IsPasswordChangeCodeValid(user, request.Code, _authCodeHasher))
         {
+            _logger.LogWarning("Password change confirmation code is invalid for user {UserId}", userId);
             return CreateResult(ChangePasswordStatus.InvalidConfirmationCode);
         }
 
@@ -115,6 +126,8 @@ public sealed class PasswordChangeService
                 DateTimeOffset.UtcNow,
                 token);
         }, cancellationToken);
+
+        _logger.LogInformation("Password changed and active sessions revoked for user {UserId}", user.Id);
     }
 
     private static ChangePasswordResult CreateResult(ChangePasswordStatus status)

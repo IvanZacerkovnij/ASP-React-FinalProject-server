@@ -2,7 +2,7 @@
 
 Backend для соціального застосунку у стилі Threads, побудований на `ASP.NET Core Web API` з `PostgreSQL`, `EF Core`, `JWT`, `AWS S3` і обробкою медіа через `ffmpeg`.
 
-> Останнє оновлення документації: `2026-09-16`
+> Останнє оновлення документації: `2026-09-22`
 
 ## Зміст
 
@@ -11,13 +11,16 @@ Backend для соціального застосунку у стилі Threads
 - [Технології](#технології)
 - [Запуск через Docker](#запуск-через-docker)
 - [Конфігурація](#конфігурація)
+- [Документація API](#документація-api)
 - [Рольова авторизація](#рольова-авторизація)
 - [Обробка помилок](#обробка-помилок)
 - [Rate limiting](#rate-limiting)
 - [Огляд API](#огляд-api)
 - [Логіка CommentService](#логіка-commentservice)
 - [Кешування](#кешування)
+- [Логування](#логування)
 - [Обробка медіа](#обробка-медіа)
+- [Тестування](#тестування)
 - [Розгортання](#розгортання)
 
 ## Що вміє API
@@ -32,10 +35,12 @@ Backend для соціального застосунку у стилі Threads
 - пошук користувачів і постів
 - пошук GIF через `Giphy`
 - пошук локацій через `Geoapify`
-- дворівневе кешування пошуку через `HybridCache` і `Redis`
+- кешування профілів, постів і зовнішнього пошуку через `HybridCache` і `Redis`
 - завантаження зображень і відео в `AWS S3`
 - стиснення відео та генерація thumbnail перед upload
 - endpoint-specific rate limiting для auth, створення контенту, interactions, upload і зовнішнього пошуку
+- OpenAPI-опис і Swagger UI
+- структуроване логування auth-подій, помилок, зовнішніх інтеграцій і повільних запитів
 
 ## Структура проєкту
 
@@ -52,6 +57,7 @@ BackEndForFinalProject
 │   │   ├── SearchController.cs     # пошук користувачів, постів, GIF і локацій
 │   │   └── MediaController.cs      # upload і доступ до медіа
 │   ├── ExceptionHandling           # глобальне перетворення винятків у ProblemDetails
+│   ├── Middleware                  # логування повільних HTTP-запитів
 │   ├── Requests                    # HTTP-моделі для multipart/form-data
 │   └── Program.cs                  # entrypoint і DI-конфігурація API
 ├── Threads.Application
@@ -79,6 +85,8 @@ BackEndForFinalProject
 │   ├── Security                    # JWT, password hashing, CORS і policies
 │   └── Services                    # S3, Redis, email, GIF, location і ffmpeg
 ├── deploy/nginx                    # nginx reverse proxy configuration
+├── tests
+│   └── Threads.Application.UnitTests # xUnit-тести application-рівня
 ├── Dockerfile                      # образ API
 ├── docker-compose.yml              # API та Redis для локального запуску
 └── BackEndForFinalProject.sln      # solution file
@@ -105,6 +113,7 @@ BackEndForFinalProject
 - `Npgsql`
 - `JWT Bearer Authentication`
 - `ASP.NET Core Rate Limiting Middleware`
+- `OpenAPI` + `Swagger UI`
 - `AWS S3`
 - `ffmpeg` / `ffprobe`
 - `Resend`
@@ -112,6 +121,7 @@ BackEndForFinalProject
 - `Geoapify API`
 - `Docker`
 - `Nginx`
+- `xUnit` + `NSubstitute`
 
 ## Запуск через Docker
 
@@ -135,6 +145,8 @@ Jwt__Issuer=threads-api
 Jwt__Audience=threads-client
 Jwt__Key=your-very-long-secret-key
 Jwt__AccessTokenLifetimeMinutes=60
+
+AuthCodes__HashKey=PASTE_BASE64_OUTPUT_HERE
 
 AWS__S3__Region=eu-central-1
 AWS__S3__BucketName=your-bucket-name
@@ -160,8 +172,13 @@ LocationApi__BaseURL=https://api.geoapify.com/
 
 REDIS_PASSWORD=your-strong-redis-password
 
-Cors__AllowedOrigins__0=http://localhost:8000
-Cors__AllowedOrigins__1=http://127.0.0.1:8000
+Logging__SlowRequestThresholdMilliseconds=1500
+```
+
+`AuthCodes__HashKey` має бути Base64-encoded ключем щонайменше на `32` байти. Згенерувати його можна так:
+
+```bash
+openssl rand -base64 32
 ```
 
 `ReverseProxy__KnownProxy` — адреса Docker gateway, з якої Nginx підключається до API-контейнера. Актуальне значення можна отримати після створення контейнера:
@@ -191,16 +208,18 @@ API стартує після успішного healthcheck Redis. Для Redis
 
 ## Конфігурація
 
-### Обов'язково для старту API
+### Обов'язково для базової роботи API
 
 - `ConnectionStrings__DefaultConnection`
 - `Jwt__Issuer`
 - `Jwt__Audience`
 - `Jwt__Key`
-- `ReverseProxy__KnownProxy`
+- `AuthCodes__HashKey` для verification/reset/change-password codes
 - `Redis__ConnectionString` при запуску без `docker compose`
 
 При запуску через `docker compose` замість ручного `Redis__ConnectionString` достатньо задати `REDIS_PASSWORD` у `.env`.
+
+`ReverseProxy__KnownProxy` за замовчуванням дорівнює `127.0.0.1`. Для Docker + Nginx його потрібно перевизначити адресою Docker gateway, щоб forwarded headers і IP-based rate limiting працювали коректно.
 
 ### Обов'язково для медіа
 
@@ -234,6 +253,12 @@ API стартує після успішного healthcheck Redis. Для Redis
 - `GIPHY_RATING=pg-13`
 - `GifApi__BaseURL=https://api.giphy.com/`
 - `LocationApi__BaseURL=https://api.geoapify.com/`
+- `ReverseProxy__KnownProxy=127.0.0.1`
+- `Logging__SlowRequestThresholdMilliseconds=1500`
+
+### CORS
+
+Поточна policy `AllowAll` дозволяє будь-які origin, method і header. Секція `Cors:AllowedOrigins` є в `appsettings.json`, але зараз не використовується для обмеження policy, тому змінні `Cors__AllowedOrigins__*` не впливають на поведінку API.
 
 ### База даних
 
@@ -244,6 +269,15 @@ dotnet ef database update \
   --project Threads.Infrastructure \
   --startup-project Threads.Api
 ```
+
+## Документація API
+
+OpenAPI і Swagger UI підключені для всіх середовищ:
+
+- OpenAPI JSON: `/openapi/v1.json`
+- Swagger UI: `/swagger`
+
+Після запуску через `docker compose` вони доступні за адресами `http://127.0.0.1:7000/openapi/v1.json` і `http://127.0.0.1:7000/swagger`.
 
 ## Рольова авторизація
 
@@ -608,13 +642,32 @@ Search users сортується за `Username + Id` у зростаючому
 
 ## Кешування
 
-Оновлено: `2026-09-07`
+API використовує `HybridCache` з memory L1 і Redis L2. Redis-ключі мають instance prefix `threads:`.
 
-- пошук GIF і локацій використовує `HybridCache`
-- L1-кеш зберігається в пам'яті API-контейнера протягом `5 хвилин`
-- L2-кеш зберігається в Redis протягом `30 хвилин`
-- ключі Redis мають префікс `threads:`
-- загальні значення за замовчуванням для інших HybridCache entries: L1 — `1 хвилина`, L2 — `5 хвилин`
+| Дані | L1 | L2 | Ключ |
+|---|---:|---:|---|
+| GIF search | `5 хв` | `30 хв` | `giphy:search:{rating}:{query}` |
+| Location search | `5 хв` | `30 хв` | `geoapify:search:{query}` |
+| Публічний профіль за ID | вимкнено | `5 хв` | `users:profile:v1:{userId}` |
+| Username → user ID | вимкнено | `30 хв` | `users:username:v1:{username}` |
+| Основний вміст поста за ID | вимкнено | `10 хв` | `posts:core:v1:{postId}` |
+
+Engagement поста не кешується: counters і viewer-specific state читаються окремо. `UpdatedAt` використовується для виявлення застарілого cached content і його оновлення.
+
+Після змін профілю, follow-зв'язків, постів або видалення користувача відповідні entries інвалідуються. Cache update/invalidation є best-effort операцією з timeout `2 секунди`: збій кешу логується, але не скасовує успішну основну операцію.
+
+Загальні значення `HybridCache` для entries без власних options: L1 — `1 хвилина`, L2 — `5 хвилин`.
+
+## Логування
+
+Проєкт використовує структуроване `ILogger`-логування без окремого logging provider. Базові рівні задаються в `Threads.Api/appsettings.json`: application logs — `Information`, `Microsoft.AspNetCore`, EF Core і HTTP clients — `Warning`.
+
+- `SlowRequestLoggingMiddleware` записує `Warning` для запитів, довших за `Logging:SlowRequestThresholdMilliseconds`; значення за замовчуванням — `1500 ms`.
+- Глобальний exception handler додає до логів endpoint, status code, `TraceId` і user ID; client cancellation логується як `Debug` без `ProblemDetails` response.
+- JWT authentication failures, forbidden responses і rate-limit rejections логуються окремими security categories.
+- Auth flows логують значущі події без паролів, access/refresh tokens і verification codes.
+- Resend, Giphy, Geoapify, S3 та ffmpeg логують тривалість успішних операцій і деталі технічних збоїв.
+- Невдалі best-effort cache invalidation та cleanup тимчасових/S3-файлів логуються як `Warning`.
 
 ## Обробка медіа
 
@@ -624,6 +677,16 @@ Search users сортується за `Username + Id` у зростаючому
 - для відео генерується thumbnail
 - ліміт upload у застосунку: `100 MB`
 - у `nginx` зараз дозволено `512M`, що не конфліктує з API-лімітом
+
+## Тестування
+
+Solution містить проєкт `tests/Threads.Application.UnitTests` на `xUnit` з `NSubstitute`. Наразі тести покривають валідацію майбутніх дат і базові сценарії `SessionService`.
+
+Запуск усіх тестів:
+
+```bash
+dotnet test BackEndForFinalProject.sln
+```
 
 ## Розгортання
 
@@ -638,7 +701,6 @@ Search users сортується за `Username + Id` у зростаючому
 
 ## Примітки
 
-- Swagger у поточному проєкті не підключений.
 - README описує фактичні контролери, маршрути й конфігурацію, які є в коді зараз.
 - `Like`, `Bookmark`, `Repost` і `View` розділені на окремі сутності для дописів і коментарів.
-- Останні зміни від `2026-09-16`: ownership-перевірки update/delete перенесені в application services; часові поля DTO уніфіковані на `DateTimeOffset`; конкурентні follow і poll vote inserts обробляються repositories за точними PostgreSQL constraints.
+- Останні зміни від `2026-09-22`: додано Swagger UI, unit test project, структуроване логування та best-effort cache/file cleanup; ownership-перевірки update/delete залишаються в application services, а часові поля DTO використовують `DateTimeOffset`.

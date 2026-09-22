@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Resend;
 using Threads.Application.Exceptions;
 using Threads.Application.Interfaces.Auth;
@@ -10,11 +12,16 @@ public class AuthEmailService : IAuthEmailService
 {
     private readonly IResend _resend;
     private readonly IConfiguration _configuration;
+    private readonly ILogger<AuthEmailService> _logger;
 
-    public AuthEmailService(IResend resend, IConfiguration configuration)
+    public AuthEmailService(
+        IResend resend,
+        IConfiguration configuration,
+        ILogger<AuthEmailService> logger)
     {
         _resend = resend;
         _configuration = configuration;
+        _logger = logger;
     }
 
     public async Task SendEmailVerificationCodeAsync(
@@ -33,12 +40,21 @@ public class AuthEmailService : IAuthEmailService
              """,
             $"Your email verification code is {code}. This code expires in 15 minutes.");
 
+        var stopwatch = Stopwatch.StartNew();
+
         try
         {
             await _resend.EmailSendAsync(message, cancellationToken);
+            _logger.LogInformation(
+                "Verification email sent in {ElapsedMilliseconds} ms",
+                stopwatch.ElapsedMilliseconds);
         }
         catch (ResendException exception)
         {
+            _logger.LogWarning(
+                exception,
+                "Verification email delivery failed after {ElapsedMilliseconds} ms",
+                stopwatch.ElapsedMilliseconds);
             throw new ExternalServiceException("Unable to send verification email.", exception);
         }
     }
@@ -59,12 +75,21 @@ public class AuthEmailService : IAuthEmailService
              """,
             $"Your password reset code is {code}. This code expires in 15 minutes.");
 
+        var stopwatch = Stopwatch.StartNew();
+
         try
         {
             await _resend.EmailSendAsync(message, cancellationToken);
+            _logger.LogInformation(
+                "Password reset email sent in {ElapsedMilliseconds} ms",
+                stopwatch.ElapsedMilliseconds);
         }
         catch (ResendException exception)
         {
+            _logger.LogWarning(
+                exception,
+                "Password reset email delivery failed after {ElapsedMilliseconds} ms",
+                stopwatch.ElapsedMilliseconds);
             throw new ExternalServiceException("Unable to send password reset email.", exception);
         }
     }
@@ -85,12 +110,21 @@ public class AuthEmailService : IAuthEmailService
              """,
             $"Your password change confirmation code is {code}. This code expires in 15 minutes.");
 
+        var stopwatch = Stopwatch.StartNew();
+
         try
         {
             await _resend.EmailSendAsync(message, cancellationToken);
+            _logger.LogInformation(
+                "Password change email sent in {ElapsedMilliseconds} ms",
+                stopwatch.ElapsedMilliseconds);
         }
         catch (ResendException exception)
         {
+            _logger.LogWarning(
+                exception,
+                "Password change email delivery failed after {ElapsedMilliseconds} ms",
+                stopwatch.ElapsedMilliseconds);
             throw new ExternalServiceException("Unable to send password change email.", exception);
         }
     }

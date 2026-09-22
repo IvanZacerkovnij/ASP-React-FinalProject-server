@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Caching.Hybrid;
+using Microsoft.Extensions.Logging;
 using Threads.Application.DTOs.Posts.Models;
 
 namespace Threads.Application.Services.Posts;
@@ -21,7 +22,8 @@ internal static class PostCache
     public static async Task<bool> TrySetAsync(
         HybridCache cache,
         string cacheKey,
-        PostContentReadModel post)
+        PostContentReadModel post,
+        ILogger logger)
     {
         using var timeout = new CancellationTokenSource(OperationTimeout);
 
@@ -34,8 +36,9 @@ internal static class PostCache
                 cancellationToken: timeout.Token);
             return true;
         }
-        catch
+        catch (Exception exception)
         {
+            logger.LogWarning(exception, "Failed to update post cache entry {CacheKey}", cacheKey);
             return false;
         }
     }

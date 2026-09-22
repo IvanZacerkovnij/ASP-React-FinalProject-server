@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Threads.Application.DTOs.Users;
 using Threads.Application.Exceptions;
 using Threads.Application.Interfaces.Media;
@@ -16,10 +17,14 @@ public sealed class ProfileImageManager
     private const long MaxImageSizeInBytes = 10 * 1024 * 1024;
 
     private readonly IObjectStorageService _objectStorageService;
+    private readonly ILogger<ProfileImageManager> _logger;
 
-    public ProfileImageManager(IObjectStorageService objectStorageService)
+    public ProfileImageManager(
+        IObjectStorageService objectStorageService,
+        ILogger<ProfileImageManager> logger)
     {
         _objectStorageService = objectStorageService;
+        _logger = logger;
     }
 
     public Task<string> UploadAvatarAsync(
@@ -72,9 +77,12 @@ public sealed class ProfileImageManager
             {
                 await _objectStorageService.DeleteAsync(objectKey!, cancellationToken);
             }
-            catch
+            catch (Exception exception)
             {
-                // Best-effort cleanup after DB state is already persisted.
+                _logger.LogWarning(
+                    exception,
+                    "Failed to delete profile image object {ObjectKey}",
+                    objectKey);
             }
         }
     }

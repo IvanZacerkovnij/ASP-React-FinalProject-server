@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Caching.Hybrid;
+using Microsoft.Extensions.Logging;
 using Threads.Application.DTOs.Pagination;
 using Threads.Application.DTOs.Posts.Models;
 using Threads.Application.DTOs.Posts.Responses;
@@ -17,17 +18,20 @@ public sealed class PostQueryService
     private readonly IUserService _userService;
     private readonly PostResponseFactory _responseFactory;
     private readonly HybridCache _cache;
+    private readonly ILogger<PostQueryService> _logger;
 
     public PostQueryService(
         IPostRepository postRepository,
         IUserService userService,
         PostResponseFactory responseFactory,
-        HybridCache cache)
+        HybridCache cache,
+        ILogger<PostQueryService> logger)
     {
         _postRepository = postRepository;
         _userService = userService;
         _responseFactory = responseFactory;
         _cache = cache;
+        _logger = logger;
     }
 
     public async Task<IReadOnlyCollection<PostResponse>> GetFeedAsync(
@@ -187,7 +191,7 @@ public sealed class PostQueryService
 
         if (post is null)
         {
-            await CacheInvalidation.TryRemoveAsync(_cache, cacheKey);
+            await CacheInvalidation.TryRemoveAsync(_cache, _logger, cacheKey);
             return null;
         }
 
@@ -198,7 +202,7 @@ public sealed class PostQueryService
 
         if (engagement is null)
         {
-            await CacheInvalidation.TryRemoveAsync(_cache, cacheKey);
+            await CacheInvalidation.TryRemoveAsync(_cache, _logger, cacheKey);
             return null;
         }
 
@@ -208,19 +212,19 @@ public sealed class PostQueryService
 
             if (refreshedPost is null)
             {
-                await CacheInvalidation.TryRemoveAsync(_cache, cacheKey);
+                await CacheInvalidation.TryRemoveAsync(_cache, _logger, cacheKey);
                 return null;
             }
 
             post = refreshedPost;
-            await PostCache.TrySetAsync(_cache, cacheKey, post);
+            await PostCache.TrySetAsync(_cache, cacheKey, post, _logger);
         }
 
         var author = await _userService.GetByIdAsync(post.AuthorId, cancellationToken);
 
         if (author is null)
         {
-            await CacheInvalidation.TryRemoveAsync(_cache, cacheKey);
+            await CacheInvalidation.TryRemoveAsync(_cache, _logger, cacheKey);
             return null;
         }
 

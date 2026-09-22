@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Threads.Application.DTOs.Auth.Requests;
 using Threads.Application.Interfaces.Auth;
 using Threads.Application.Interfaces.Security;
@@ -13,19 +14,22 @@ public sealed class PasswordRecoveryService
     private readonly IAuthCodeHasher _authCodeHasher;
     private readonly IPasswordHasher _passwordHasher;
     private readonly PasswordChangeService _passwordChangeService;
+    private readonly ILogger<PasswordRecoveryService> _logger;
 
     public PasswordRecoveryService(
         IUserRepository userRepository,
         IAuthEmailService authEmailService,
         IAuthCodeHasher authCodeHasher,
         IPasswordHasher passwordHasher,
-        PasswordChangeService passwordChangeService)
+        PasswordChangeService passwordChangeService,
+        ILogger<PasswordRecoveryService> logger)
     {
         _userRepository = userRepository;
         _authEmailService = authEmailService;
         _authCodeHasher = authCodeHasher;
         _passwordHasher = passwordHasher;
         _passwordChangeService = passwordChangeService;
+        _logger = logger;
     }
 
     public async Task ForgotPasswordAsync(
@@ -46,6 +50,7 @@ public sealed class PasswordRecoveryService
 
         await _userRepository.UpdateAsync(user, cancellationToken);
         await _authEmailService.SendPasswordResetCodeAsync(user.Email, code, cancellationToken);
+        _logger.LogInformation("Password reset code sent for user {UserId}", user.Id);
     }
 
     public async Task<bool> VerifyResetCodeAsync(
@@ -55,7 +60,14 @@ public sealed class PasswordRecoveryService
         var normalizedEmail = AuthInputNormalizer.NormalizeEmail(request.Email);
         var user = await _userRepository.GetByEmailAsync(normalizedEmail, cancellationToken);
 
-        return AuthCode.IsPasswordResetCodeValid(user, request.Code, _authCodeHasher);
+        var isValid = AuthCode.IsPasswordResetCodeValid(user, request.Code, _authCodeHasher);
+
+        if (!isValid)
+        {
+            _logger.LogWarning("Password reset code validation failed for user {UserId}", user?.Id);
+        }
+
+        return isValid;
     }
 
     public async Task<bool> ResetPasswordAsync(
@@ -70,6 +82,7 @@ public sealed class PasswordRecoveryService
 
         if (!AuthCode.IsPasswordResetCodeValid(user, request.Code, _authCodeHasher))
         {
+            _logger.LogWarning("Password reset failed because the code was invalid for user {UserId}", user?.Id);
             return false;
         }
 

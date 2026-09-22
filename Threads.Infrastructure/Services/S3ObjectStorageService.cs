@@ -1,8 +1,10 @@
+using System.Diagnostics;
 using Amazon;
 using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.S3.Model;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Threads.Application.Exceptions;
 using Threads.Application.Interfaces.Media;
 using Threads.Infrastructure.Exceptions;
@@ -14,9 +16,13 @@ public class S3ObjectStorageService : IObjectStorageService
     private readonly IAmazonS3 _s3Client;
     private readonly string _bucketName;
     private readonly int _readUrlExpirationMinutes;
+    private readonly ILogger<S3ObjectStorageService> _logger;
 
-    public S3ObjectStorageService(IConfiguration configuration)
+    public S3ObjectStorageService(
+        IConfiguration configuration,
+        ILogger<S3ObjectStorageService> logger)
     {
+        _logger = logger;
         var regionName = configuration["AWS:S3:Region"] ??
                          throw new InfrastructureConfigurationException("AWS:S3:Region");
         _bucketName = configuration["AWS:S3:BucketName"] ??
@@ -53,12 +59,23 @@ public class S3ObjectStorageService : IObjectStorageService
             ContentType = contentType
         };
 
+        var stopwatch = Stopwatch.StartNew();
+
         try
         {
             await _s3Client.PutObjectAsync(request, cancellationToken);
+            _logger.LogDebug(
+                "S3 object {ObjectKey} uploaded in {ElapsedMilliseconds} ms",
+                objectKey,
+                stopwatch.ElapsedMilliseconds);
         }
         catch (AmazonClientException exception)
         {
+            _logger.LogWarning(
+                exception,
+                "S3 object {ObjectKey} upload failed after {ElapsedMilliseconds} ms",
+                objectKey,
+                stopwatch.ElapsedMilliseconds);
             throw new ExternalServiceException("Unable to upload object to S3.", exception);
         }
     }
@@ -70,12 +87,23 @@ public class S3ObjectStorageService : IObjectStorageService
             return;
         }
 
+        var stopwatch = Stopwatch.StartNew();
+
         try
         {
             await _s3Client.DeleteObjectAsync(_bucketName, objectKey, cancellationToken);
+            _logger.LogDebug(
+                "S3 object {ObjectKey} deleted in {ElapsedMilliseconds} ms",
+                objectKey,
+                stopwatch.ElapsedMilliseconds);
         }
         catch (AmazonClientException exception)
         {
+            _logger.LogWarning(
+                exception,
+                "S3 object {ObjectKey} deletion failed after {ElapsedMilliseconds} ms",
+                objectKey,
+                stopwatch.ElapsedMilliseconds);
             throw new ExternalServiceException("Unable to delete object from S3.", exception);
         }
     }
@@ -95,6 +123,7 @@ public class S3ObjectStorageService : IObjectStorageService
         }
         catch (AmazonClientException exception)
         {
+            _logger.LogWarning(exception, "S3 read URL generation failed for object {ObjectKey}", objectKey);
             throw new ExternalServiceException("Unable to generate an S3 read URL.", exception);
         }
     }

@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Threads.Application.DTOs.Media;
 using Threads.Application.Exceptions;
 using Threads.Application.Interfaces.Media;
@@ -17,9 +18,13 @@ public class FfmpegMediaProcessingService : IMediaProcessingService
     private readonly int _videoCompressionCrf;
     private readonly int _videoCompressionAudioBitrateKbps;
     private readonly int _videoCompressionMaxWidth;
+    private readonly ILogger<FfmpegMediaProcessingService> _logger;
 
-    public FfmpegMediaProcessingService(IConfiguration configuration)
+    public FfmpegMediaProcessingService(
+        IConfiguration configuration,
+        ILogger<FfmpegMediaProcessingService> logger)
     {
+        _logger = logger;
         _ffprobePath = configuration["MediaProcessing:FfprobePath"] ?? "ffprobe";
         _ffmpegPath = configuration["MediaProcessing:FfmpegPath"] ?? "ffmpeg";
         _videoCompressionPreset = configuration["MediaProcessing:VideoCompression:Preset"] ?? "medium";
@@ -35,24 +40,36 @@ public class FfmpegMediaProcessingService : IMediaProcessingService
         string contentType,
         CancellationToken cancellationToken = default)
     {
+        var stopwatch = Stopwatch.StartNew();
+
         try
         {
             if (!contentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase))
             {
-                return await ExtractMetadataAsync(sourceFilePath, cancellationToken);
+                var imageMetadata = await ExtractMetadataAsync(sourceFilePath, cancellationToken);
+                _logger.LogDebug(
+                    "Image metadata extracted in {ElapsedMilliseconds} ms",
+                    stopwatch.ElapsedMilliseconds);
+                return imageMetadata;
             }
 
             var compressedFilePath = await CompressVideoAsync(sourceFilePath, cancellationToken);
             var metadata = await ExtractMetadataAsync(compressedFilePath, cancellationToken);
             var thumbnailFilePath = await TryGenerateThumbnailAsync(compressedFilePath, cancellationToken);
 
-            return metadata with
+            var result = metadata with
             {
                 ProcessedFilePath = compressedFilePath,
                 OutputContentType = CompressedVideoContentType,
                 OutputSizeInBytes = GetFileSizeInBytes(compressedFilePath),
                 ThumbnailFilePath = thumbnailFilePath
             };
+
+            _logger.LogInformation(
+                "Video processed in {ElapsedMilliseconds} ms with output size {OutputSizeInBytes} bytes",
+                stopwatch.ElapsedMilliseconds,
+                result.OutputSizeInBytes);
+            return result;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -207,6 +224,9 @@ public class FfmpegMediaProcessingService : IMediaProcessingService
 
             if (process.ExitCode != 0 || !File.Exists(thumbnailFilePath))
             {
+                _logger.LogWarning(
+                    "Video thumbnail generation failed with exit code {ExitCode}",
+                    process.ExitCode);
                 TryDeleteLocalFile(thumbnailFilePath);
                 return null;
             }
@@ -215,6 +235,7 @@ public class FfmpegMediaProcessingService : IMediaProcessingService
 
             if (thumbnailFile.Length == 0)
             {
+                _logger.LogWarning("Video thumbnail generation produced an empty file");
                 TryDeleteLocalFile(thumbnailFilePath);
                 return null;
             }
@@ -233,6 +254,7 @@ public class FfmpegMediaProcessingService : IMediaProcessingService
             System.ComponentModel.Win32Exception or
             InvalidOperationException)
         {
+            _logger.LogWarning(exception, "Video thumbnail generation failed");
             TryDeleteLocalFile(thumbnailFilePath);
             return null;
         }
@@ -257,6 +279,7 @@ public class FfmpegMediaProcessingService : IMediaProcessingService
         CancellationToken cancellationToken)
     {
         var processStartInfo = BuildProcessStartInfo(fileName, arguments);
+        var stopwatch = Stopwatch.StartNew();
 
         using var process = Process.Start(processStartInfo);
 
@@ -275,12 +298,22 @@ public class FfmpegMediaProcessingService : IMediaProcessingService
 
         if (process.ExitCode != 0)
         {
+            _logger.LogWarning(
+                "Media process {ProcessName} failed with exit code {ExitCode} after {ElapsedMilliseconds} ms",
+                Path.GetFileName(fileName),
+                process.ExitCode,
+                stopwatch.ElapsedMilliseconds);
             var message = string.IsNullOrWhiteSpace(standardError)
                 ? failureMessage
                 : $"{failureMessage} {standardError.Trim()}";
 
             throw new MediaProcessingException(message);
         }
+
+        _logger.LogDebug(
+            "Media process {ProcessName} completed in {ElapsedMilliseconds} ms",
+            Path.GetFileName(fileName),
+            stopwatch.ElapsedMilliseconds);
 
         return standardOutput;
     }
@@ -309,7 +342,7 @@ public class FfmpegMediaProcessingService : IMediaProcessingService
         return processStartInfo;
     }
 
-    private static void TryDeleteLocalFile(string filePath)
+    private void TryDeleteLocalFile(string filePath)
     {
         try
         {
@@ -318,9 +351,12 @@ public class FfmpegMediaProcessingService : IMediaProcessingService
                 File.Delete(filePath);
             }
         }
-        catch
+        catch (Exception exception)
         {
-            //
+            _logger.LogWarning(
+                exception,
+                "Failed to delete temporary media file {FileName}",
+                Path.GetFileName(filePath));
         }
     }
 

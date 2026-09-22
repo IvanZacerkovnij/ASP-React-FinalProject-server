@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Caching.Hybrid;
+using Microsoft.Extensions.Logging;
 using Threads.Application.Interfaces.Media;
 using Threads.Application.Interfaces.Users;
 using Threads.Application.Services.Common;
@@ -12,17 +13,20 @@ public sealed class UserDeletionService
     private readonly IMediaRepository _mediaRepository;
     private readonly ProfileImageManager _profileImageManager;
     private readonly HybridCache _cache;
+    private readonly ILogger<UserDeletionService> _logger;
 
     public UserDeletionService(
         IUserRepository userRepository,
         IMediaRepository mediaRepository,
         ProfileImageManager profileImageManager,
-        HybridCache cache)
+        HybridCache cache,
+        ILogger<UserDeletionService> logger)
     {
         _userRepository = userRepository;
         _mediaRepository = mediaRepository;
         _profileImageManager = profileImageManager;
         _cache = cache;
+        _logger = logger;
     }
 
     public async Task<bool> DeleteAsync(
@@ -50,10 +54,14 @@ public sealed class UserDeletionService
             .ToArray();
 
         await _userRepository.DeleteAsync(user, cancellationToken);
-        await CacheInvalidation.TryRemoveAsync(_cache, affectedCacheKeys);
+        await CacheInvalidation.TryRemoveAsync(_cache, _logger, affectedCacheKeys);
         await _profileImageManager.TryDeleteAsync(
             uploadedMediaStorageKeys.Concat([user.AvatarObjectKey, user.BannerObjectKey]),
             cancellationToken);
+
+        _logger.LogInformation(
+            "User {UserId} database data deleted and storage cleanup attempted",
+            id);
 
         return true;
     }

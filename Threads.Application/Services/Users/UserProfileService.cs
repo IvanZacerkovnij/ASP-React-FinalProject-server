@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Caching.Hybrid;
+using Microsoft.Extensions.Logging;
 using Threads.Application.DTOs.Locations;
 using Threads.Application.DTOs.Users;
 using Threads.Application.Exceptions;
@@ -20,17 +21,20 @@ public sealed class UserProfileService
     private readonly ProfileImageManager _profileImageManager;
     private readonly UserResponseFactory _responseFactory;
     private readonly HybridCache _cache;
+    private readonly ILogger<UserProfileService> _logger;
 
     public UserProfileService(
         IUserRepository userRepository,
         ProfileImageManager profileImageManager,
         UserResponseFactory responseFactory,
-        HybridCache cache)
+        HybridCache cache,
+        ILogger<UserProfileService> logger)
     {
         _userRepository = userRepository;
         _profileImageManager = profileImageManager;
         _responseFactory = responseFactory;
         _cache = cache;
+        _logger = logger;
     }
 
     public async Task<UserResponse?> UpdateAsync(
@@ -93,7 +97,7 @@ public sealed class UserProfileService
                 user.BannerObjectKey),
             cancellationToken);
 
-        await CacheInvalidation.TryRemoveAsync(_cache, UserProfileCache.GetProfileKey(id));
+        await CacheInvalidation.TryRemoveAsync(_cache, _logger, UserProfileCache.GetProfileKey(id));
 
         return _responseFactory.Create(user, id);
     }

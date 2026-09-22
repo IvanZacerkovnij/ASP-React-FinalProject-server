@@ -1,8 +1,10 @@
+using System.Diagnostics;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Threads.Application.DTOs.Locations;
 using Threads.Application.Exceptions;
 using Threads.Application.Interfaces.Locations;
@@ -18,15 +20,18 @@ public class GeoapifyLocationSearchService : ILocationSearchService
     private readonly HttpClient _httpClient;
     private readonly IConfiguration _configuration;
     private readonly HybridCache _cache;
+    private readonly ILogger<GeoapifyLocationSearchService> _logger;
 
     public GeoapifyLocationSearchService(
         HttpClient httpClient,
         IConfiguration configuration,
-        HybridCache cache)
+        HybridCache cache,
+        ILogger<GeoapifyLocationSearchService> logger)
     {
         _httpClient = httpClient;
         _configuration = configuration;
         _cache = cache;
+        _logger = logger;
     }
 
     public async Task<IReadOnlyCollection<LocationResponse>> SearchAsync(
@@ -60,6 +65,7 @@ public class GeoapifyLocationSearchService : ILocationSearchService
                     $"&format=json" +
                     $"&limit={DefaultLimit}" +
                     $"&apiKey={Uri.EscapeDataString(apiKey)}";
+                var stopwatch = Stopwatch.StartNew();
 
                 try
                 {
@@ -67,6 +73,10 @@ public class GeoapifyLocationSearchService : ILocationSearchService
 
                     if (!response.IsSuccessStatusCode)
                     {
+                        _logger.LogWarning(
+                            "Geoapify request returned status code {StatusCode} after {ElapsedMilliseconds} ms",
+                            (int)response.StatusCode,
+                            stopwatch.ElapsedMilliseconds);
                         throw new ExternalServiceException(
                             $"Geoapify returned status code {(int)response.StatusCode}.");
                     }
@@ -74,17 +84,31 @@ public class GeoapifyLocationSearchService : ILocationSearchService
                     var payload = await response.Content.ReadFromJsonAsync<GeoapifyAutocompleteResponse>(
                         cancellationToken: token);
 
-                    return payload?.Results?
+                    var locations = payload?.Results?
                         .Where(item => item.Latitude.HasValue && item.Longitude.HasValue)
                         .Select(MapLocationResponse)
                         .ToList() ?? [];
+
+                    _logger.LogDebug(
+                        "Geoapify request returned {ResultCount} results in {ElapsedMilliseconds} ms",
+                        locations.Count,
+                        stopwatch.ElapsedMilliseconds);
+                    return locations;
                 }
                 catch (HttpRequestException exception)
                 {
+                    _logger.LogWarning(
+                        exception,
+                        "Geoapify request failed after {ElapsedMilliseconds} ms",
+                        stopwatch.ElapsedMilliseconds);
                     throw new ExternalServiceException("Unable to communicate with Geoapify.", exception);
                 }
                 catch (JsonException exception)
                 {
+                    _logger.LogWarning(
+                        exception,
+                        "Geoapify returned invalid JSON after {ElapsedMilliseconds} ms",
+                        stopwatch.ElapsedMilliseconds);
                     throw new ExternalServiceException("Geoapify returned an invalid response.", exception);
                 }
             },

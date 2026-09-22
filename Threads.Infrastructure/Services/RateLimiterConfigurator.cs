@@ -3,6 +3,8 @@ using System.Security.Claims;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Threads.Infrastructure.Services;
 
@@ -79,6 +81,11 @@ public static class RateLimiterConfigurator
         
         options.OnRejected = async (context, cancellationToken) =>
         {
+            var httpContext = context.HttpContext;
+            var logger = httpContext.RequestServices
+                .GetRequiredService<ILoggerFactory>()
+                .CreateLogger("Threads.Security.RateLimiter");
+
             if (context.Lease.TryGetMetadata(
                     MetadataName.RetryAfter,
                     out var retryAfter))
@@ -88,7 +95,14 @@ public static class RateLimiterConfigurator
                         .ToString(CultureInfo.InvariantCulture);
             }
 
-            await context.HttpContext.Response.WriteAsJsonAsync(
+            logger.LogWarning(
+                "Rate limit rejected {Method} {Endpoint}. TraceId: {TraceId}, UserId: {UserId}",
+                httpContext.Request.Method,
+                httpContext.GetEndpoint()?.DisplayName ?? "unknown",
+                httpContext.TraceIdentifier,
+                httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "anonymous");
+
+            await httpContext.Response.WriteAsJsonAsync(
                 new
                 {
                     message = "Too many requests. Please try again later."

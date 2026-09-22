@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Threads.Application.DTOs.Auth.Requests;
 using Threads.Application.DTOs.Auth.Responses;
 using Threads.Application.Interfaces.Security;
@@ -12,17 +13,20 @@ public sealed class SessionService
     private readonly IPasswordHasher _passwordHasher;
     private readonly ITokenService _tokenService;
     private readonly RefreshTokenManager _refreshTokenManager;
+    private readonly ILogger<SessionService> _logger;
 
     public SessionService(
         IUserRepository userRepository,
         IPasswordHasher passwordHasher,
         ITokenService tokenService,
-        RefreshTokenManager refreshTokenManager)
+        RefreshTokenManager refreshTokenManager,
+        ILogger<SessionService> logger)
     {
         _userRepository = userRepository;
         _passwordHasher = passwordHasher;
         _tokenService = tokenService;
         _refreshTokenManager = refreshTokenManager;
+        _logger = logger;
     }
 
     public async Task<AuthResponse?> LoginAsync(
@@ -40,10 +44,13 @@ public sealed class SessionService
         if (!CanUserLogin(user) ||
             !_passwordHasher.VerifyPassword(normalizedPassword, user!.PasswordHash))
         {
+            _logger.LogWarning("Login failed for user {UserId}", user?.Id);
             return null;
         }
 
-        return await CreateAuthResponseAsync(user, cancellationToken);
+        var response = await CreateAuthResponseAsync(user, cancellationToken);
+        _logger.LogInformation("User {UserId} logged in", user.Id);
+        return response;
     }
 
     public async Task<AuthResponse?> RefreshTokenAsync(
@@ -56,6 +63,7 @@ public sealed class SessionService
 
         if (currentToken is null)
         {
+            _logger.LogWarning("Refresh token validation failed");
             return null;
         }
 
@@ -63,9 +71,17 @@ public sealed class SessionService
             currentToken,
             cancellationToken);
 
-        return newRefreshToken is null
-            ? null
-            : CreateAuthResponse(currentToken.User, newRefreshToken);
+        if (newRefreshToken is null)
+        {
+            _logger.LogWarning(
+                "Refresh token rotation failed for user {UserId} and token record {RefreshTokenId}",
+                currentToken.UserId,
+                currentToken.Id);
+            return null;
+        }
+
+        _logger.LogInformation("Refresh token rotated for user {UserId}", currentToken.UserId);
+        return CreateAuthResponse(currentToken.User, newRefreshToken);
     }
 
     public async Task<bool> LogoutAsync(
@@ -78,10 +94,12 @@ public sealed class SessionService
 
         if (refreshToken is null || !refreshToken.IsActive)
         {
+            _logger.LogWarning("Logout attempted with an invalid refresh token");
             return false;
         }
 
         await _refreshTokenManager.RevokeAsync(refreshToken, cancellationToken);
+        _logger.LogInformation("User {UserId} logged out", refreshToken.UserId);
         return true;
     }
 

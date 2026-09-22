@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 using Threads.Application.DTOs.Media;
 using Threads.Application.Exceptions;
 using Threads.Application.Interfaces.Media;
@@ -25,15 +27,18 @@ public class MediaService : IMediaService
     private readonly IMediaRepository _mediaRepository;
     private readonly IMediaProcessingService _mediaProcessingService;
     private readonly IObjectStorageService _objectStorageService;
+    private readonly ILogger<MediaService> _logger;
 
     public MediaService(
         IMediaRepository mediaRepository,
         IMediaProcessingService mediaProcessingService,
-        IObjectStorageService objectStorageService)
+        IObjectStorageService objectStorageService,
+        ILogger<MediaService> logger)
     {
         _mediaRepository = mediaRepository;
         _mediaProcessingService = mediaProcessingService;
         _objectStorageService = objectStorageService;
+        _logger = logger;
     }
 
     public async Task<MediaUrlResponse?> GetUrlAsync(
@@ -92,6 +97,7 @@ public class MediaService : IMediaService
 
         var mediaType = ResolveMediaType(contentType);
         ValidateFileSize(sizeInBytes, mediaType);
+        var stopwatch = Stopwatch.StartNew();
         var tempSourceFilePath = await SaveToTemporaryFileAsync(content, fileName, cancellationToken);
         string? tempProcessedFilePath = null;
         string? tempThumbnailFilePath = null;
@@ -163,7 +169,7 @@ public class MediaService : IMediaService
             var mediaUrl = _objectStorageService.GetReadUrl(media.StorageKey);
             var responseType = ResolveResponseType(media.ContentType, media.Type);
 
-            return new UploadMediaResponse
+            var response = new UploadMediaResponse
             {
                 Id = media.Id,
                 Type = responseType,
@@ -177,6 +183,15 @@ public class MediaService : IMediaService
                 FileName = media.FileName,
                 SizeInBytes = media.SizeInBytes
             };
+
+            _logger.LogInformation(
+                "Media {MediaId} uploaded by user {UserId} as {ContentType} with size {SizeInBytes} bytes in {ElapsedMilliseconds} ms",
+                media.Id,
+                uploadedByUserId,
+                media.ContentType,
+                media.SizeInBytes,
+                stopwatch.ElapsedMilliseconds);
+            return response;
         }
         finally
         {
@@ -306,13 +321,16 @@ public class MediaService : IMediaService
         {
             await _objectStorageService.DeleteAsync(objectKey, cancellationToken);
         }
-        catch
+        catch (Exception exception)
         {
-            // Best-effort cleanup after a failed metadata write.
+            _logger.LogWarning(
+                exception,
+                "Failed to delete object {ObjectKey} during media upload cleanup",
+                objectKey);
         }
     }
 
-    private static void TryDeleteLocalFile(string? filePath)
+    private void TryDeleteLocalFile(string? filePath)
     {
         if (string.IsNullOrWhiteSpace(filePath))
         {
@@ -326,9 +344,12 @@ public class MediaService : IMediaService
                 File.Delete(filePath);
             }
         }
-        catch
+        catch (Exception exception)
         {
-            // Best-effort cleanup for temporary files.
+            _logger.LogWarning(
+                exception,
+                "Failed to delete temporary media file {FileName}",
+                Path.GetFileName(filePath));
         }
     }
 }

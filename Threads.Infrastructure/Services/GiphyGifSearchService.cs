@@ -1,8 +1,10 @@
+using System.Diagnostics;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Threads.Application.DTOs.Gifs;
 using Threads.Application.Exceptions;
 using Threads.Application.Interfaces.Gifs;
@@ -19,15 +21,18 @@ public class GiphyGifSearchService : IGifSearchService
     private readonly HttpClient _httpClient;
     private readonly IConfiguration _configuration;
     private readonly HybridCache _cache;
+    private readonly ILogger<GiphyGifSearchService> _logger;
 
     public GiphyGifSearchService(
         HttpClient httpClient,
         IConfiguration configuration,
-        HybridCache cache)
+        HybridCache cache,
+        ILogger<GiphyGifSearchService> logger)
     {
         _httpClient = httpClient;
         _configuration = configuration;
         _cache = cache;
+        _logger = logger;
     }
 
     public async Task<IReadOnlyCollection<GifResponse>> SearchAsync(
@@ -63,6 +68,7 @@ public class GiphyGifSearchService : IGifSearchService
                     $"&q={Uri.EscapeDataString(normalizedQuery)}" +
                     $"&limit={DefaultLimit}" +
                     $"&rating={Uri.EscapeDataString(effectiveRating)}";
+                var stopwatch = Stopwatch.StartNew();
 
                 try
                 {
@@ -70,6 +76,10 @@ public class GiphyGifSearchService : IGifSearchService
 
                     if (!response.IsSuccessStatusCode)
                     {
+                        _logger.LogWarning(
+                            "GIPHY request returned status code {StatusCode} after {ElapsedMilliseconds} ms",
+                            (int)response.StatusCode,
+                            stopwatch.ElapsedMilliseconds);
                         throw new ExternalServiceException(
                             $"GIPHY returned status code {(int)response.StatusCode}.");
                     }
@@ -77,19 +87,33 @@ public class GiphyGifSearchService : IGifSearchService
                     var payload = await response.Content.ReadFromJsonAsync<GiphySearchResponse>(
                         cancellationToken: token);
 
-                    return payload?.Data?
+                    var gifs = payload?.Data?
                         .Where(item =>
                             !string.IsNullOrWhiteSpace(item.Id) &&
                             !string.IsNullOrWhiteSpace(item.Images?.Original?.Url))
                         .Select(MapGifResponse)
                         .ToList() ?? [];
+
+                    _logger.LogDebug(
+                        "GIPHY request returned {ResultCount} results in {ElapsedMilliseconds} ms",
+                        gifs.Count,
+                        stopwatch.ElapsedMilliseconds);
+                    return gifs;
                 }
                 catch (HttpRequestException exception)
                 {
+                    _logger.LogWarning(
+                        exception,
+                        "GIPHY request failed after {ElapsedMilliseconds} ms",
+                        stopwatch.ElapsedMilliseconds);
                     throw new ExternalServiceException("Unable to communicate with GIPHY.", exception);
                 }
                 catch (JsonException exception)
                 {
+                    _logger.LogWarning(
+                        exception,
+                        "GIPHY returned invalid JSON after {ElapsedMilliseconds} ms",
+                        stopwatch.ElapsedMilliseconds);
                     throw new ExternalServiceException("GIPHY returned an invalid response.", exception);
                 }
             },

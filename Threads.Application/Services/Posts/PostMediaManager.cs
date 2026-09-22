@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Threads.Application.Exceptions;
 using Threads.Application.Interfaces.Media;
 using Threads.Domain.Entities;
@@ -9,13 +10,16 @@ public sealed class PostMediaManager
 {
     private readonly IMediaRepository _mediaRepository;
     private readonly IObjectStorageService _objectStorageService;
+    private readonly ILogger<PostMediaManager> _logger;
 
     public PostMediaManager(
         IMediaRepository mediaRepository,
-        IObjectStorageService objectStorageService)
+        IObjectStorageService objectStorageService,
+        ILogger<PostMediaManager> logger)
     {
         _mediaRepository = mediaRepository;
         _objectStorageService = objectStorageService;
+        _logger = logger;
     }
 
     public async Task ApplyAsync(
@@ -79,8 +83,12 @@ public sealed class PostMediaManager
             {
                 await _objectStorageService.DeleteAsync(storageKey, cancellationToken);
             }
-            catch
+            catch (Exception exception)
             {
+                _logger.LogWarning(
+                    exception,
+                    "Failed to delete post media object {ObjectKey}",
+                    storageKey);
             }
         }
     }
