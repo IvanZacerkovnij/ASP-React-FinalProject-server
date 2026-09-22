@@ -73,21 +73,18 @@ public sealed class PostResponseFactory
         };
     }
 
-    public PostResponse Create(
-        PostReadModel post,
-        PostStateReadModel state,
-        UserResponse author)
+    public PostResponse Create(PostSummaryReadModel post)
     {
         return new PostResponse
         {
             Id = post.Id,
             Content = post.Content ?? string.Empty,
-            Author = MapUser(author),
+            Author = _userResponseFactory.CreateShort(post.Author),
             Media = post.Media
                 .OrderBy(media => media.SortOrder)
                 .Select(MapMedia)
                 .ToList(),
-            Poll = MapPoll(post, state),
+            Poll = MapPoll(post.Id, post.Poll),
             Location = MapLocation(
                 post.LocationPlaceId,
                 post.LocationName,
@@ -99,17 +96,57 @@ public sealed class PostResponseFactory
                 post.EmbedTitle,
                 post.EmbedDescription,
                 post.EmbedThumbnailUrl),
-            LikesCount = state.LikesCount,
-            CommentsCount = state.CommentsCount,
-            RepostsCount = state.RepostsCount,
-            BookmarksCount = state.BookmarksCount,
-            ViewsCount = state.ViewsCount,
-            IsLikedByCurrentUser = state.IsLikedByCurrentUser,
-            IsRepostedByCurrentUser = state.IsRepostedByCurrentUser,
-            IsBookmarkedByCurrentUser = state.IsBookmarkedByCurrentUser,
+            LikesCount = post.LikesCount,
+            CommentsCount = post.CommentsCount,
+            RepostsCount = post.RepostsCount,
+            BookmarksCount = post.BookmarksCount,
+            ViewsCount = post.ViewsCount,
+            IsLikedByCurrentUser = post.IsLikedByCurrentUser,
+            IsRepostedByCurrentUser = post.IsRepostedByCurrentUser,
+            IsBookmarkedByCurrentUser = post.IsBookmarkedByCurrentUser,
+            ActionAt = post.ActionAt,
+            CreatedAt = post.CreatedAt,
+            UpdatedAt = post.UpdatedAt
+        };
+    }
+
+    public PostResponse Create(
+        PostContentReadModel post,
+        PostEngagementReadModel engagement,
+        UserResponse author)
+    {
+        return new PostResponse
+        {
+            Id = post.Id,
+            Content = post.Content ?? string.Empty,
+            Author = MapUser(author),
+            Media = post.Media
+                .OrderBy(media => media.SortOrder)
+                .Select(MapMedia)
+                .ToList(),
+            Poll = MapPoll(post, engagement),
+            Location = MapLocation(
+                post.LocationPlaceId,
+                post.LocationName,
+                post.LocationCountry,
+                post.LocationLatitude,
+                post.LocationLongitude),
+            Embed = MapEmbed(
+                post.EmbedUrl,
+                post.EmbedTitle,
+                post.EmbedDescription,
+                post.EmbedThumbnailUrl),
+            LikesCount = engagement.LikesCount,
+            CommentsCount = engagement.CommentsCount,
+            RepostsCount = engagement.RepostsCount,
+            BookmarksCount = engagement.BookmarksCount,
+            ViewsCount = engagement.ViewsCount,
+            IsLikedByCurrentUser = engagement.IsLikedByCurrentUser,
+            IsRepostedByCurrentUser = engagement.IsRepostedByCurrentUser,
+            IsBookmarkedByCurrentUser = engagement.IsBookmarkedByCurrentUser,
             ActionAt = null,
-            CreatedAt = post.CreatedAt.UtcDateTime,
-            UpdatedAt = post.UpdatedAt?.UtcDateTime
+            CreatedAt = post.CreatedAt,
+            UpdatedAt = post.UpdatedAt
         };
     }
 
@@ -185,7 +222,7 @@ public sealed class PostResponseFactory
         {
             Id = poll.Id,
             PostId = poll.PostId,
-            EndsAt = poll.EndsAt?.UtcDateTime,
+            EndsAt = poll.EndsAt,
             TotalVotes = poll.Votes.Count,
             HasVotedByCurrentUser = currentVote is not null,
             SelectedOptionId = currentVote?.PollOptionId,
@@ -202,25 +239,27 @@ public sealed class PostResponseFactory
         };
     }
 
-    private static PollResponse? MapPoll(PostReadModel post, PostStateReadModel state)
+    private static PollResponse? MapPoll(
+        PostContentReadModel post,
+        PostEngagementReadModel engagement)
     {
         if (post.Poll is null)
         {
             return null;
         }
 
-        var pollState = state.Poll;
-        var optionStates = pollState?.Options.ToDictionary(option => option.Id)
-            ?? new Dictionary<Guid, PostPollOptionStateReadModel>();
+        var pollEngagement = engagement.Poll;
+        var optionEngagement = pollEngagement?.Options.ToDictionary(option => option.Id)
+            ?? new Dictionary<Guid, PostPollOptionEngagementReadModel>();
 
         return new PollResponse
         {
             Id = post.Poll.Id,
             PostId = post.Id,
-            EndsAt = post.Poll.EndsAt?.UtcDateTime,
-            TotalVotes = pollState?.TotalVotes ?? 0,
-            HasVotedByCurrentUser = pollState?.SelectedOptionId.HasValue == true,
-            SelectedOptionId = pollState?.SelectedOptionId,
+            EndsAt = post.Poll.EndsAt,
+            TotalVotes = pollEngagement?.TotalVotes ?? 0,
+            HasVotedByCurrentUser = pollEngagement?.SelectedOptionId.HasValue == true,
+            SelectedOptionId = pollEngagement?.SelectedOptionId,
             Options = post.Poll.Options
                 .OrderBy(option => option.Position)
                 .Select(option => new PollOptionResponse
@@ -228,9 +267,37 @@ public sealed class PostResponseFactory
                     Id = option.Id,
                     Text = option.Text,
                     Position = option.Position,
-                    VotesCount = optionStates.TryGetValue(option.Id, out var optionState)
-                        ? optionState.VotesCount
+                    VotesCount = optionEngagement.TryGetValue(option.Id, out var optionEngagementState)
+                        ? optionEngagementState.VotesCount
                         : 0
+                })
+                .ToList()
+        };
+    }
+
+    private static PollResponse? MapPoll(Guid postId, PostPollSummaryReadModel? poll)
+    {
+        if (poll is null)
+        {
+            return null;
+        }
+
+        return new PollResponse
+        {
+            Id = poll.Id,
+            PostId = postId,
+            EndsAt = poll.EndsAt,
+            TotalVotes = poll.TotalVotes,
+            HasVotedByCurrentUser = poll.SelectedOptionId.HasValue,
+            SelectedOptionId = poll.SelectedOptionId,
+            Options = poll.Options
+                .OrderBy(option => option.Position)
+                .Select(option => new PollOptionResponse
+                {
+                    Id = option.Id,
+                    Text = option.Text,
+                    Position = option.Position,
+                    VotesCount = option.VotesCount
                 })
                 .ToList()
         };

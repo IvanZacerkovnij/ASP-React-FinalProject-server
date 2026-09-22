@@ -12,6 +12,7 @@ public sealed class FutureDateTimeAttribute : ValidationAttribute
 
     public override bool IsValid(object? value)
     {
-        return value is null || value is DateTime dateTime && dateTime > DateTime.UtcNow;
+        return value is null ||
+               value is DateTimeOffset dateTime && dateTime > DateTimeOffset.UtcNow;
     }
 }

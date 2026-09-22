@@ -51,7 +51,7 @@ public class JwtTokenService : ITokenService
             audience: _audience,
             claims: claims,
             notBefore: DateTime.UtcNow,
-            expires: expiresAt,
+            expires: expiresAt.UtcDateTime,
             signingCredentials: signingCredentials);
 
         return new JwtSecurityTokenHandler().WriteToken(token);
@@ -62,9 +62,9 @@ public class JwtTokenService : ITokenService
         return Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
     }
 
-    public DateTime GetAccessTokenExpiresAtUtc()
+    public DateTimeOffset GetAccessTokenExpiresAtUtc()
     {
-        return DateTime.UtcNow.AddMinutes(_accessTokenLifetimeMinutes);
+        return DateTimeOffset.UtcNow.AddMinutes(_accessTokenLifetimeMinutes);
     }
 
     private static string GetRequiredConfigurationValue(

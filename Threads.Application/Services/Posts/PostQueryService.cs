@@ -5,7 +5,6 @@ using Threads.Application.DTOs.Posts.Responses;
 using Threads.Application.Interfaces.Posts;
 using Threads.Application.Interfaces.Users;
 using Threads.Application.Services.Common;
-using Threads.Domain.Entities;
 
 namespace Threads.Application.Services.Posts;
 
@@ -34,14 +33,13 @@ public sealed class PostQueryService
         CancellationToken cancellationToken = default,
         Guid? currentUserId = null)
     {
-        var posts = await _postRepository.GetRandomAsync(FeedSize, cancellationToken);
-        var viewCounts = await GetViewCountsAsync(posts, cancellationToken);
+        var posts = await _postRepository.GetRandomAsync(
+            FeedSize,
+            currentUserId,
+            cancellationToken);
 
         return posts
-            .Select(post => _responseFactory.Create(
-                post,
-                currentUserId,
-                viewCounts.GetValueOrDefault(post.Id)))
+            .Select(_responseFactory.Create)
             .ToList();
     }
 
@@ -56,15 +54,12 @@ public sealed class PostQueryService
             authorId,
             pagination.Limit,
             cursor,
+            currentUserId,
             cancellationToken);
         var hasMore = posts.Count > pagination.Limit;
         var pagePosts = posts.Take(pagination.Limit).ToList();
-        var viewCounts = await GetViewCountsAsync(pagePosts, cancellationToken);
         var items = pagePosts
-            .Select(post => _responseFactory.Create(
-                post,
-                currentUserId,
-                viewCounts.GetValueOrDefault(post.Id)))
+            .Select(_responseFactory.Create)
             .ToList();
 
         return new CursorPageResponse<PostResponse>
@@ -88,15 +83,11 @@ public sealed class PostQueryService
             userId,
             limit,
             cursor,
+            currentUserId,
             cancellationToken);
-        var viewCounts = await GetViewCountsAsync(posts, cancellationToken);
 
         return posts
-            .Select(post => _responseFactory.Create(
-                post,
-                currentUserId,
-                viewCounts.GetValueOrDefault(post.Id),
-                post.PostLikes.FirstOrDefault(like => like.UserId == userId)?.CreatedAt))
+            .Select(_responseFactory.Create)
             .ToList();
     }
 
@@ -111,15 +102,11 @@ public sealed class PostQueryService
             userId,
             limit,
             cursor,
+            currentUserId,
             cancellationToken);
-        var viewCounts = await GetViewCountsAsync(posts, cancellationToken);
 
         return posts
-            .Select(post => _responseFactory.Create(
-                post,
-                currentUserId,
-                viewCounts.GetValueOrDefault(post.Id),
-                post.PostBookmarks.FirstOrDefault(bookmark => bookmark.UserId == userId)?.CreatedAt))
+            .Select(_responseFactory.Create)
             .ToList();
     }
 
@@ -134,15 +121,11 @@ public sealed class PostQueryService
             userId,
             limit,
             cursor,
+            currentUserId,
             cancellationToken);
-        var viewCounts = await GetViewCountsAsync(posts, cancellationToken);
 
         return posts
-            .Select(post => _responseFactory.Create(
-                post,
-                currentUserId,
-                viewCounts.GetValueOrDefault(post.Id),
-                post.PostReposts.FirstOrDefault(repost => repost.UserId == userId)?.CreatedAt))
+            .Select(_responseFactory.Create)
             .ToList();
     }
 
@@ -167,18 +150,15 @@ public sealed class PostQueryService
             query.Trim(),
             pagination.Limit,
             cursor,
+            currentUserId,
             cancellationToken);
         var hasMore = posts.Count > pagination.Limit;
         var pagePosts = posts.Take(pagination.Limit).ToList();
-        var viewCounts = await GetViewCountsAsync(pagePosts, cancellationToken);
 
         return new CursorPageResponse<PostResponse>
         {
             Items = pagePosts
-                .Select(post => _responseFactory.Create(
-                    post,
-                    currentUserId,
-                    viewCounts.GetValueOrDefault(post.Id)))
+                .Select(_responseFactory.Create)
                 .ToList(),
             HasMore = hasMore,
             NextCursor = hasMore
@@ -193,9 +173,9 @@ public sealed class PostQueryService
         Guid? currentUserId = null)
     {
         var cacheKey = PostCache.GetKey(id);
-        var post = await _cache.GetOrCreateAsync<PostReadModel?>(
+        var post = await _cache.GetOrCreateAsync<PostContentReadModel?>(
             cacheKey,
-            async token => await _postRepository.GetReadModelByIdAsync(id, token),
+            async token => await _postRepository.GetContentByIdAsync(id, token),
             PostCache.EntryOptions,
             cancellationToken: cancellationToken);
 
@@ -205,20 +185,20 @@ public sealed class PostQueryService
             return null;
         }
 
-        var state = await _postRepository.GetStateByIdAsync(
+        var engagement = await _postRepository.GetEngagementByIdAsync(
             id,
             currentUserId,
             cancellationToken);
 
-        if (state is null)
+        if (engagement is null)
         {
             await CacheInvalidation.TryRemoveAsync(_cache, cacheKey);
             return null;
         }
 
-        if (post.UpdatedAt != state.UpdatedAt)
+        if (post.UpdatedAt != engagement.UpdatedAt)
         {
-            var refreshedPost = await _postRepository.GetReadModelByIdAsync(id, cancellationToken);
+            var refreshedPost = await _postRepository.GetContentByIdAsync(id, cancellationToken);
 
             if (refreshedPost is null)
             {
@@ -238,7 +218,7 @@ public sealed class PostQueryService
             return null;
         }
 
-        return _responseFactory.Create(post, state, author);
+        return _responseFactory.Create(post, engagement, author);
     }
 
     public async Task<int> GetViewCountAsync(
@@ -250,12 +230,4 @@ public sealed class PostQueryService
         return viewCounts.GetValueOrDefault(postId);
     }
 
-    private async Task<IReadOnlyDictionary<Guid, int>> GetViewCountsAsync(
-        IReadOnlyCollection<Post> posts,
-        CancellationToken cancellationToken)
-    {
-        return await _postRepository.GetViewCountsAsync(
-            posts.Select(post => post.Id).ToArray(),
-            cancellationToken);
-    }
 }

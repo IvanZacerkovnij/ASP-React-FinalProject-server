@@ -22,9 +22,7 @@ public class PollService : IPollService
         VotePollRequest request,
         CancellationToken cancellationToken = default)
     {
-        var post = await _postRepository.GetByIdAsync(postId, cancellationToken);
-
-        if (post is null)
+        if (!await _postRepository.ExistsAsync(postId, cancellationToken))
         {
             return new PollVoteResult
             {
@@ -80,11 +78,9 @@ public class PollService : IPollService
             UserId = userId
         };
 
-        try
-        {
-            await _pollRepository.AddVoteAsync(vote, cancellationToken);
-        }
-        catch (Exception exception) when (IsDuplicateWriteException(exception))
+        var wasAdded = await _pollRepository.TryAddVoteAsync(vote, cancellationToken);
+
+        if (!wasAdded)
         {
             var persistedPoll = await _pollRepository.GetByPostIdAsync(postId, cancellationToken) ?? poll;
 
@@ -113,7 +109,7 @@ public class PollService : IPollService
         {
             Id = poll.Id,
             PostId = poll.PostId,
-            EndsAt = poll.EndsAt?.UtcDateTime,
+            EndsAt = poll.EndsAt,
             TotalVotes = poll.Votes.Count,
             HasVotedByCurrentUser = currentVote is not null,
             SelectedOptionId = currentVote?.PollOptionId,
@@ -130,8 +126,4 @@ public class PollService : IPollService
         };
     }
 
-    private static bool IsDuplicateWriteException(Exception exception)
-    {
-        return exception.GetType().Name == "DbUpdateException";
-    }
 }

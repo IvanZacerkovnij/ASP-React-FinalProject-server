@@ -6,7 +6,7 @@ public class PollResponse
 
     public Guid PostId { get; init; }
 
-    public DateTime? EndsAt { get; init; }
+    public DateTimeOffset? EndsAt { get; init; }
 
     public int TotalVotes { get; init; }
 

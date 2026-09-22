@@ -32,5 +32,5 @@ public class UserResponse
 
     public bool IsVerified { get; init; }
 
-    public DateTime CreatedAt { get; init; }
+    public DateTimeOffset CreatedAt { get; init; }
 }

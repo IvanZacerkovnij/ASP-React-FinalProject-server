@@ -1,10 +1,10 @@
 namespace Threads.Application.DTOs.Posts.Models;
 
-public sealed class PostPollStateReadModel
+public sealed class PostPollEngagementReadModel
 {
     public int TotalVotes { get; init; }
 
     public Guid? SelectedOptionId { get; init; }
 
-    public IReadOnlyCollection<PostPollOptionStateReadModel> Options { get; init; } = [];
+    public IReadOnlyCollection<PostPollOptionEngagementReadModel> Options { get; init; } = [];
 }

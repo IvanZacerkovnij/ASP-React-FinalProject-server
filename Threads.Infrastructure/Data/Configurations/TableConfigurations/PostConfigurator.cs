@@ -39,7 +39,7 @@ public class PostConfigurator : IEntityTypeConfiguration<Post>
         builder.Property(post => post.CreatedAt)
             .IsRequired();
 
-        builder.HasIndex(post => post.AuthorId);
+        builder.HasIndex(post => new { post.AuthorId, post.CreatedAt, post.Id });
 
         builder.HasOne(post => post.Author)
             .WithMany(user => user.Posts)

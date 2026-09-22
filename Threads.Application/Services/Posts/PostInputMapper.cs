@@ -245,16 +245,14 @@ internal static class PostInputMapper
             throw new RequestValidationException("Poll options must be unique.");
         }
 
-        if (poll.EndsAt.HasValue && poll.EndsAt.Value <= DateTime.UtcNow)
+        if (poll.EndsAt.HasValue && poll.EndsAt.Value <= DateTimeOffset.UtcNow)
         {
             throw new RequestValidationException("Poll end date must be in the future.");
         }
 
         return new Poll
         {
-            EndsAt = poll.EndsAt.HasValue
-                ? new DateTimeOffset(DateTime.SpecifyKind(poll.EndsAt.Value, DateTimeKind.Utc))
-                : null,
+            EndsAt = poll.EndsAt,
             Options = normalizedOptions
                 .Select((option, index) => new PollOption
                 {

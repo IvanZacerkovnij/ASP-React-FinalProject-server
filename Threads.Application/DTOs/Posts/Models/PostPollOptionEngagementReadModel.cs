@@ -1,6 +1,6 @@
 namespace Threads.Application.DTOs.Posts.Models;
 
-public sealed class PostPollOptionStateReadModel
+public sealed class PostPollOptionEngagementReadModel
 {
     public Guid Id { get; init; }
 

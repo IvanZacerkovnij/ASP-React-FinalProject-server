@@ -39,6 +39,24 @@ public sealed class UserResponseFactory
         };
     }
 
+    public UserShortResponse CreateShort(UserSummaryReadModel user)
+    {
+        return new UserShortResponse
+        {
+            Id = user.Id,
+            Username = user.Username,
+            DisplayName = user.DisplayName,
+            Location = CreateLocation(
+                user.LocationPlaceId,
+                user.LocationName,
+                user.LocationCountry,
+                user.LocationLatitude,
+                user.LocationLongitude),
+            AvatarUrl = GetReadUrl(user.AvatarObjectKey),
+            IsVerified = user.IsVerified
+        };
+    }
+
     public UserResponse Create(User user, Guid? currentUserId)
     {
         var response = _mapper.Map<UserResponse>(user);
@@ -94,7 +112,7 @@ public sealed class UserResponseFactory
             PostsCount = publicProfile.PostsCount,
             IsFollowedByCurrentUser = isFollowedByCurrentUser,
             IsVerified = publicProfile.IsVerified,
-            CreatedAt = publicProfile.CreatedAt.UtcDateTime
+            CreatedAt = publicProfile.CreatedAt
         };
     }
 

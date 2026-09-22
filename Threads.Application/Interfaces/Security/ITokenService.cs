@@ -6,5 +6,5 @@ public interface ITokenService
 {
     string GenerateAccessToken(User user);
     string GenerateRefreshToken();
-    DateTime GetAccessTokenExpiresAtUtc();
+    DateTimeOffset GetAccessTokenExpiresAtUtc();
 }

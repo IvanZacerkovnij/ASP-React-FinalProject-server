@@ -21,7 +21,7 @@ internal static class PostCache
     public static async Task<bool> TrySetAsync(
         HybridCache cache,
         string cacheKey,
-        PostReadModel post)
+        PostContentReadModel post)
     {
         using var timeout = new CancellationTokenSource(OperationTimeout);
 

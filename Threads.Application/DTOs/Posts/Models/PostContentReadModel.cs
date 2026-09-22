@@ -1,6 +1,6 @@
 namespace Threads.Application.DTOs.Posts.Models;
 
-public sealed class PostReadModel
+public sealed class PostContentReadModel
 {
     public Guid Id { get; init; }
 
@@ -10,7 +10,7 @@ public sealed class PostReadModel
 
     public IReadOnlyCollection<PostMediaReadModel> Media { get; init; } = [];
 
-    public PostPollReadModel? Poll { get; init; }
+    public PostPollContentReadModel? Poll { get; init; }
 
     public string? LocationPlaceId { get; init; }
 

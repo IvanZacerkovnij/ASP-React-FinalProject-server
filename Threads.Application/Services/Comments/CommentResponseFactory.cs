@@ -1,51 +1,36 @@
-using AutoMapper;
 using Threads.Application.DTOs.Comments;
 using Threads.Application.Services.Users;
-using Threads.Domain.Entities;
 
 namespace Threads.Application.Services.Comments;
 
 public sealed class CommentResponseFactory
 {
     private readonly UserResponseFactory _userResponseFactory;
-    private readonly IMapper _mapper;
 
-    public CommentResponseFactory(
-        UserResponseFactory userResponseFactory,
-        IMapper mapper)
+    public CommentResponseFactory(UserResponseFactory userResponseFactory)
     {
         _userResponseFactory = userResponseFactory;
-        _mapper = mapper;
     }
 
-    public CommentResponse Create(
-        Comment comment,
-        Guid? currentUserId,
-        int viewsCount,
-        DateTimeOffset? actionAt = null)
+    public CommentResponse Create(CommentSummaryReadModel comment)
     {
-        var response = _mapper.Map<CommentResponse>(comment);
-
         return new CommentResponse
         {
-            Id = response.Id,
-            PostId = response.PostId,
-            ParentCommentId = response.ParentCommentId,
-            Content = response.Content,
+            Id = comment.Id,
+            PostId = comment.PostId,
+            ParentCommentId = comment.ParentCommentId,
+            Content = comment.Content,
             Author = _userResponseFactory.CreateShort(comment.Author),
-            LikesCount = response.LikesCount,
-            IsLikedByCurrentUser = currentUserId.HasValue &&
-                comment.CommentLikes.Any(like => like.UserId == currentUserId.Value),
-            RepliesCount = response.RepliesCount,
-            IsBookmarkedByCurrentUser = currentUserId.HasValue &&
-                comment.CommentBookmarks.Any(bookmark => bookmark.UserId == currentUserId.Value),
-            RepostsCount = response.RepostsCount,
-            IsRepostedByCurrentUser = currentUserId.HasValue &&
-                comment.CommentReposts.Any(repost => repost.UserId == currentUserId.Value),
-            ViewsCount = viewsCount,
-            ActionAt = actionAt,
-            CreatedAt = response.CreatedAt,
-            UpdatedAt = response.UpdatedAt
+            LikesCount = comment.LikesCount,
+            IsLikedByCurrentUser = comment.IsLikedByCurrentUser,
+            RepliesCount = comment.RepliesCount,
+            IsBookmarkedByCurrentUser = comment.IsBookmarkedByCurrentUser,
+            RepostsCount = comment.RepostsCount,
+            IsRepostedByCurrentUser = comment.IsRepostedByCurrentUser,
+            ViewsCount = comment.ViewsCount,
+            ActionAt = comment.ActionAt,
+            CreatedAt = comment.CreatedAt,
+            UpdatedAt = comment.UpdatedAt
         };
     }
 }

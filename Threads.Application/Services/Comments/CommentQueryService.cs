@@ -2,7 +2,6 @@ using Threads.Application.DTOs.Comments;
 using Threads.Application.DTOs.Pagination;
 using Threads.Application.Interfaces.Comments;
 using Threads.Application.Services.Common;
-using Threads.Domain.Entities;
 
 namespace Threads.Application.Services.Comments;
 
@@ -30,15 +29,12 @@ public sealed class CommentQueryService
             postId,
             pagination.Limit,
             cursor,
+            currentUserId,
             cancellationToken);
         var hasMore = comments.Count > pagination.Limit;
         var pageComments = comments.Take(pagination.Limit).ToList();
-        var viewCounts = await GetViewCountsAsync(pageComments, cancellationToken);
         var items = pageComments
-            .Select(comment => _responseFactory.Create(
-                comment,
-                currentUserId,
-                viewCounts.GetValueOrDefault(comment.Id)))
+            .Select(_responseFactory.Create)
             .ToList();
 
         return new CursorPageResponse<CommentResponse>
@@ -56,19 +52,17 @@ public sealed class CommentQueryService
         CancellationToken cancellationToken = default,
         Guid? currentUserId = null)
     {
-        var comment = await _commentRepository.GetByIdAsync(
+        var comment = await _commentRepository.GetSummaryByIdAsync(
             id,
-            cancellationToken,
-            trackChanges: false);
+            currentUserId,
+            cancellationToken);
 
         if (comment is null)
         {
             return null;
         }
 
-        var viewsCount = await GetViewCountAsync(id, cancellationToken);
-
-        return _responseFactory.Create(comment, currentUserId, viewsCount);
+        return _responseFactory.Create(comment);
     }
 
     public async Task<IReadOnlyCollection<CommentResponse>> GetBookmarkedByUserIdAsync(
@@ -82,15 +76,11 @@ public sealed class CommentQueryService
             userId,
             limit,
             cursor,
+            currentUserId,
             cancellationToken);
-        var viewCounts = await GetViewCountsAsync(comments, cancellationToken);
 
         return comments
-            .Select(comment => _responseFactory.Create(
-                comment,
-                currentUserId,
-                viewCounts.GetValueOrDefault(comment.Id),
-                comment.CommentBookmarks.FirstOrDefault(bookmark => bookmark.UserId == userId)?.CreatedAt))
+            .Select(_responseFactory.Create)
             .ToList();
     }
 
@@ -105,15 +95,11 @@ public sealed class CommentQueryService
             userId,
             limit,
             cursor,
+            currentUserId,
             cancellationToken);
-        var viewCounts = await GetViewCountsAsync(comments, cancellationToken);
 
         return comments
-            .Select(comment => _responseFactory.Create(
-                comment,
-                currentUserId,
-                viewCounts.GetValueOrDefault(comment.Id),
-                comment.CommentLikes.FirstOrDefault(like => like.UserId == userId)?.CreatedAt))
+            .Select(_responseFactory.Create)
             .ToList();
     }
 
@@ -128,33 +114,12 @@ public sealed class CommentQueryService
             userId,
             limit,
             cursor,
+            currentUserId,
             cancellationToken);
-        var viewCounts = await GetViewCountsAsync(comments, cancellationToken);
 
         return comments
-            .Select(comment => _responseFactory.Create(
-                comment,
-                currentUserId,
-                viewCounts.GetValueOrDefault(comment.Id),
-                comment.CommentReposts.FirstOrDefault(repost => repost.UserId == userId)?.CreatedAt))
+            .Select(_responseFactory.Create)
             .ToList();
     }
 
-    public async Task<int> GetViewCountAsync(
-        Guid commentId,
-        CancellationToken cancellationToken = default)
-    {
-        var viewCounts = await _commentRepository.GetViewCountsAsync([commentId], cancellationToken);
-
-        return viewCounts.GetValueOrDefault(commentId);
-    }
-
-    private async Task<IReadOnlyDictionary<Guid, int>> GetViewCountsAsync(
-        IReadOnlyCollection<Comment> comments,
-        CancellationToken cancellationToken)
-    {
-        return await _commentRepository.GetViewCountsAsync(
-            comments.Select(comment => comment.Id).ToArray(),
-            cancellationToken);
-    }
 }

@@ -20,7 +20,7 @@ public class UserProfile : Profile
             .ForMember(destination => destination.FollowingCount, options => options.MapFrom(source => source.FollowingRelations.Count))
             .ForMember(destination => destination.PostsCount, options => options.MapFrom(source => source.Posts.Count))
             .ForMember(destination => destination.IsFollowedByCurrentUser, options => options.Ignore())
-            .ForMember(destination => destination.CreatedAt, options => options.MapFrom(source => source.CreatedAt.UtcDateTime));
+            .ForMember(destination => destination.CreatedAt, options => options.MapFrom(source => source.CreatedAt));
 
         CreateMap<UpdateUserRequest, User>()
             .ForMember(destination => destination.Id, options => options.Ignore())

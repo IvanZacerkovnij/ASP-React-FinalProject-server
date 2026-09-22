@@ -15,13 +15,14 @@ public class UserRepository : IUserRepository
         _dbContext = dbContext;
     }
 
-    public async Task<IReadOnlyCollection<User>> SearchAsync(
+    public async Task<IReadOnlyCollection<UserSummaryReadModel>> SearchAsync(
         string query,
         int limit,
         TextCursorPosition? cursor = null,
         CancellationToken cancellationToken = default)
     {
-        var users = BuildUserQuery(trackChanges: false)
+        var users = _dbContext.Users
+            .AsNoTracking()
             .Where(user =>
                 EF.Functions.ILike(user.Username, $"%{query}%") ||
                 (user.DisplayName != null && EF.Functions.ILike(user.DisplayName, $"%{query}%")) ||
@@ -39,12 +40,25 @@ public class UserRepository : IUserRepository
             .OrderBy(user => user.Username)
             .ThenBy(user => user.Id)
             .Take(limit + 1)
+            .Select(user => new UserSummaryReadModel
+            {
+                Id = user.Id,
+                Username = user.Username,
+                DisplayName = user.DisplayName,
+                LocationPlaceId = user.LocationPlaceId,
+                LocationName = user.Location,
+                LocationCountry = user.LocationCountry,
+                LocationLatitude = user.LocationLatitude,
+                LocationLongitude = user.LocationLongitude,
+                AvatarObjectKey = user.AvatarObjectKey,
+                IsVerified = user.IsVerified
+            })
             .ToListAsync(cancellationToken);
     }
 
     public async Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        return await BuildUserQuery(trackChanges: true)
+        return await BuildUserWithRelationsQuery()
             .FirstOrDefaultAsync(user => user.Id == id, cancellationToken);
     }
 
@@ -90,7 +104,8 @@ public class UserRepository : IUserRepository
     {
         var normalizedUsername = username.ToLower();
 
-        return await BuildUserQuery(trackChanges: false)
+        return await _dbContext.Users
+            .AsNoTracking()
             .FirstOrDefaultAsync(user => user.Username.ToLower() == normalizedUsername, cancellationToken);
     }
 
@@ -123,13 +138,9 @@ public class UserRepository : IUserRepository
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    private IQueryable<User> BuildUserQuery(bool trackChanges)
+    private IQueryable<User> BuildUserWithRelationsQuery()
     {
-        var query = trackChanges
-            ? _dbContext.Users.AsQueryable()
-            : _dbContext.Users.AsNoTracking();
-
-        return query
+        return _dbContext.Users
             .AsSplitQuery()
             .Include(user => user.Posts)
             .Include(user => user.FollowingRelations)

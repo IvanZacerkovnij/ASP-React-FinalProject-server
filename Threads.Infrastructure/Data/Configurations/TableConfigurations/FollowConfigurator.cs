@@ -18,6 +18,10 @@ public class FollowConfigurator : IEntityTypeConfiguration<Follow>
         builder.HasIndex(follow => new { follow.FollowerId, follow.FollowingId })
             .IsUnique();
 
+        builder.HasIndex(follow => new { follow.FollowerId, follow.CreatedAt, follow.Id });
+
+        builder.HasIndex(follow => new { follow.FollowingId, follow.CreatedAt, follow.Id });
+
         builder.ToTable(table =>
             table.HasCheckConstraint(
                 "CK_Follows_FollowerId_FollowingId",

@@ -12,20 +12,17 @@ public sealed class CommentManagementService
     private readonly ICommentRepository _commentRepository;
     private readonly IPostRepository _postRepository;
     private readonly CommentQueryService _commentQueryService;
-    private readonly CommentResponseFactory _responseFactory;
     private readonly IMapper _mapper;
 
     public CommentManagementService(
         ICommentRepository commentRepository,
         IPostRepository postRepository,
         CommentQueryService commentQueryService,
-        CommentResponseFactory responseFactory,
         IMapper mapper)
     {
         _commentRepository = commentRepository;
         _postRepository = postRepository;
         _commentQueryService = commentQueryService;
-        _responseFactory = responseFactory;
         _mapper = mapper;
     }
 
@@ -36,27 +33,23 @@ public sealed class CommentManagementService
     {
         ValidateContent(request.Content);
 
-        var post = await _postRepository.GetByIdAsync(request.PostId, cancellationToken);
-
-        if (post is null)
+        if (!await _postRepository.ExistsAsync(request.PostId, cancellationToken))
         {
             throw new NotFoundException("Post was not found.");
         }
 
-        Comment? parentComment = null;
-
         if (request.ParentCommentId.HasValue)
         {
-            parentComment = await _commentRepository.GetByIdAsync(
+            var parentPostId = await _commentRepository.GetPostIdByIdAsync(
                 request.ParentCommentId.Value,
                 cancellationToken);
 
-            if (parentComment is null)
+            if (!parentPostId.HasValue)
             {
                 throw new NotFoundException("Parent comment was not found.");
             }
 
-            if (parentComment.PostId != request.PostId)
+            if (parentPostId.Value != request.PostId)
             {
                 throw new RequestValidationException(
                     "Parent comment does not belong to the specified post.");
@@ -66,13 +59,16 @@ public sealed class CommentManagementService
         var comment = _mapper.Map<Comment>(request);
         comment.AuthorId = authorId;
         comment.Content = request.Content.Trim();
-        comment.ParentCommentId = parentComment?.Id;
+        comment.ParentCommentId = request.ParentCommentId;
 
         await _commentRepository.AddAsync(comment, cancellationToken);
 
-        var createdComment = await _commentRepository.GetByIdAsync(comment.Id, cancellationToken);
+        var createdComment = await _commentQueryService.GetByIdAsync(
+            comment.Id,
+            cancellationToken,
+            authorId);
 
-        return _responseFactory.Create(createdComment ?? comment, authorId, viewsCount: 0);
+        return createdComment ?? throw new InvalidOperationException("Created comment was not found.");
     }
 
     public async Task<CommentResponse> UpdateAsync(
@@ -100,10 +96,12 @@ public sealed class CommentManagementService
 
         await _commentRepository.UpdateAsync(comment, cancellationToken);
 
-        var updatedComment = await _commentRepository.GetByIdAsync(comment.Id, cancellationToken);
-        var viewsCount = await _commentQueryService.GetViewCountAsync(comment.Id, cancellationToken);
+        var updatedComment = await _commentQueryService.GetByIdAsync(
+            comment.Id,
+            cancellationToken,
+            currentUserId);
 
-        return _responseFactory.Create(updatedComment ?? comment, currentUserId, viewsCount);
+        return updatedComment ?? throw new InvalidOperationException("Updated comment was not found.");
     }
 
     public async Task DeleteAsync(

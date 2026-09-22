@@ -6,5 +6,5 @@ public class AuthResponse
     public required string Username { get; init; }
     public required string AccessToken { get; init; }
     public required string RefreshToken { get; init; }
-    public DateTime AccessTokenExpiresAt { get; init; }
+    public DateTimeOffset AccessTokenExpiresAt { get; init; }
 }

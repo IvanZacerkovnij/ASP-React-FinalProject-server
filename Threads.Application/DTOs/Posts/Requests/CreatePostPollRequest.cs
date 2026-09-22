@@ -9,5 +9,5 @@ public class CreatePostPollRequest
     public IReadOnlyCollection<string> Options { get; init; } = [];
 
     [FutureDateTime]
-    public DateTime? EndsAt { get; init; }
+    public DateTimeOffset? EndsAt { get; init; }
 }

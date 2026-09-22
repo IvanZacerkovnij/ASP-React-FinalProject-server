@@ -2,7 +2,7 @@ using Threads.Application.DTOs.Users;
 
 namespace Threads.Application.DTOs.Comments;
 
-public class CommentResponse
+public sealed class CommentSummaryReadModel
 {
     public Guid Id { get; init; }
 
@@ -12,7 +12,7 @@ public class CommentResponse
 
     public required string Content { get; init; }
 
-    public required UserShortResponse Author { get; init; }
+    public required UserSummaryReadModel Author { get; init; }
 
     public int LikesCount { get; init; }
 
@@ -28,7 +28,7 @@ public class CommentResponse
 
     public int ViewsCount { get; init; }
 
-    public DateTimeOffset? ActionAt { get; init; }
+    public DateTimeOffset? ActionAt { get; set; }
 
     public DateTimeOffset CreatedAt { get; init; }
 

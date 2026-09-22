@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using Threads.Application.DTOs.Comments;
 using Threads.Application.DTOs.Pagination;
+using Threads.Application.DTOs.Users;
 using Threads.Application.Interfaces.Comments;
 using Threads.Domain.Entities;
 
@@ -14,20 +16,15 @@ public class CommentRepository : ICommentRepository
         _dbContext = dbContext;
     }
 
-    public async Task<IReadOnlyCollection<Comment>> GetByPostIdAsync(
+    public async Task<IReadOnlyCollection<CommentSummaryReadModel>> GetByPostIdAsync(
         Guid postId,
         int limit,
         CursorPosition? cursor = null,
+        Guid? currentUserId = null,
         CancellationToken cancellationToken = default)
     {
         var query = _dbContext.Comments
             .AsNoTracking()
-            .AsSplitQuery()
-            .Include(comment => comment.Author)
-            .Include(comment => comment.Replies)
-            .Include(comment => comment.CommentLikes)
-            .Include(comment => comment.CommentBookmarks)
-            .Include(comment => comment.CommentReposts)
             .Where(comment => comment.PostId == postId);
 
         if (cursor is not null)
@@ -37,30 +34,45 @@ public class CommentRepository : ICommentRepository
                 ValueTuple.Create(cursor.CreatedAt, cursor.Id)));
         }
 
-        return await query
+        var pageQuery = query
             .OrderBy(comment => comment.CreatedAt)
             .ThenBy(comment => comment.Id)
-            .Take(limit + 1)
+            .Take(limit + 1);
+
+        return await ProjectToSummaryReadModel(pageQuery, currentUserId)
             .ToListAsync(cancellationToken);
     }
 
     public async Task<Comment?> GetByIdAsync(
         Guid id,
-        CancellationToken cancellationToken = default,
-        bool trackChanges = true)
+        CancellationToken cancellationToken = default)
     {
-        var query = trackChanges
-            ? _dbContext.Comments.AsQueryable()
-            : _dbContext.Comments.AsNoTracking();
-
-        return await query
-            .AsSplitQuery()
-            .Include(comment => comment.Author)
-            .Include(comment => comment.Replies)
-            .Include(comment => comment.CommentLikes)
-            .Include(comment => comment.CommentBookmarks)
-            .Include(comment => comment.CommentReposts)
+        return await _dbContext.Comments
             .FirstOrDefaultAsync(comment => comment.Id == id, cancellationToken);
+    }
+
+    public async Task<CommentSummaryReadModel?> GetSummaryByIdAsync(
+        Guid id,
+        Guid? currentUserId = null,
+        CancellationToken cancellationToken = default)
+    {
+        return await ProjectToSummaryReadModel(
+                _dbContext.Comments
+                    .AsNoTracking()
+                    .Where(comment => comment.Id == id),
+                currentUserId)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<Guid?> GetPostIdByIdAsync(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Comments
+            .AsNoTracking()
+            .Where(comment => comment.Id == id)
+            .Select(comment => (Guid?)comment.PostId)
+            .FirstOrDefaultAsync(cancellationToken);
     }
 
     public Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken = default)
@@ -70,10 +82,11 @@ public class CommentRepository : ICommentRepository
             .AnyAsync(comment => comment.Id == id, cancellationToken);
     }
 
-    public async Task<IReadOnlyCollection<Comment>> GetBookmarkedByUserIdAsync(
+    public async Task<IReadOnlyCollection<CommentSummaryReadModel>> GetBookmarkedByUserIdAsync(
         Guid userId,
         int limit,
         CursorPosition? cursor = null,
+        Guid? currentUserId = null,
         CancellationToken cancellationToken = default)
     {
         var query = _dbContext.CommentBookmarks
@@ -87,20 +100,25 @@ public class CommentRepository : ICommentRepository
                 ValueTuple.Create(cursor.CreatedAt, cursor.Id)));
         }
 
-        var bookmarkedCommentIds = await query
+        var bookmarkedComments = await query
             .OrderByDescending(bookmark => bookmark.CreatedAt)
             .ThenByDescending(bookmark => bookmark.CommentId)
-            .Select(bookmark => bookmark.CommentId)
+            .Select(bookmark => new OrderedCommentReference
+            {
+                Id = bookmark.CommentId,
+                ActionAt = bookmark.CreatedAt
+            })
             .Take(limit + 1)
             .ToListAsync(cancellationToken);
 
-        return await GetByOrderedIdsAsync(bookmarkedCommentIds, cancellationToken);
+        return await GetByOrderedIdsAsync(bookmarkedComments, currentUserId, cancellationToken);
     }
 
-    public async Task<IReadOnlyCollection<Comment>> GetLikedByUserIdAsync(
+    public async Task<IReadOnlyCollection<CommentSummaryReadModel>> GetLikedByUserIdAsync(
         Guid userId,
         int limit,
         CursorPosition? cursor = null,
+        Guid? currentUserId = null,
         CancellationToken cancellationToken = default)
     {
         var query = _dbContext.CommentLikes
@@ -114,20 +132,25 @@ public class CommentRepository : ICommentRepository
                 ValueTuple.Create(cursor.CreatedAt, cursor.Id)));
         }
 
-        var likedCommentIds = await query
+        var likedComments = await query
             .OrderByDescending(like => like.CreatedAt)
             .ThenByDescending(like => like.CommentId)
-            .Select(like => like.CommentId)
+            .Select(like => new OrderedCommentReference
+            {
+                Id = like.CommentId,
+                ActionAt = like.CreatedAt
+            })
             .Take(limit + 1)
             .ToListAsync(cancellationToken);
 
-        return await GetByOrderedIdsAsync(likedCommentIds, cancellationToken);
+        return await GetByOrderedIdsAsync(likedComments, currentUserId, cancellationToken);
     }
 
-    public async Task<IReadOnlyCollection<Comment>> GetRepostedByUserIdAsync(
+    public async Task<IReadOnlyCollection<CommentSummaryReadModel>> GetRepostedByUserIdAsync(
         Guid userId,
         int limit,
         CursorPosition? cursor = null,
+        Guid? currentUserId = null,
         CancellationToken cancellationToken = default)
     {
         var query = _dbContext.CommentReposts
@@ -141,65 +164,100 @@ public class CommentRepository : ICommentRepository
                 ValueTuple.Create(cursor.CreatedAt, cursor.Id)));
         }
 
-        var repostedCommentIds = await query
+        var repostedComments = await query
             .OrderByDescending(repost => repost.CreatedAt)
             .ThenByDescending(repost => repost.CommentId)
-            .Select(repost => repost.CommentId)
+            .Select(repost => new OrderedCommentReference
+            {
+                Id = repost.CommentId,
+                ActionAt = repost.CreatedAt
+            })
             .Take(limit + 1)
             .ToListAsync(cancellationToken);
 
-        return await GetByOrderedIdsAsync(repostedCommentIds, cancellationToken);
+        return await GetByOrderedIdsAsync(repostedComments, currentUserId, cancellationToken);
     }
 
-    private async Task<IReadOnlyCollection<Comment>> GetByOrderedIdsAsync(
-        IReadOnlyCollection<Guid> commentIds,
+    private async Task<IReadOnlyCollection<CommentSummaryReadModel>> GetByOrderedIdsAsync(
+        IReadOnlyCollection<OrderedCommentReference> commentReferences,
+        Guid? currentUserId,
         CancellationToken cancellationToken)
     {
-        if (commentIds.Count == 0)
+        if (commentReferences.Count == 0)
         {
             return [];
         }
 
-        var comments = await _dbContext.Comments
-            .AsNoTracking()
-            .AsSplitQuery()
-            .Include(comment => comment.Author)
-            .Include(comment => comment.Replies)
-            .Include(comment => comment.CommentLikes)
-            .Include(comment => comment.CommentBookmarks)
-            .Include(comment => comment.CommentReposts)
-            .Where(comment => commentIds.Contains(comment.Id))
+        var commentIds = commentReferences.Select(reference => reference.Id).ToArray();
+        var comments = await ProjectToSummaryReadModel(
+                _dbContext.Comments
+                    .AsNoTracking()
+                    .Where(comment => commentIds.Contains(comment.Id)),
+                currentUserId)
             .ToListAsync(cancellationToken);
 
-        var commentOrder = commentIds
-            .Select((id, index) => new { id, index })
-            .ToDictionary(item => item.id, item => item.index);
+        var commentOrder = commentReferences
+            .Select((reference, index) => new { reference.Id, index })
+            .ToDictionary(item => item.Id, item => item.index);
+        var actionTimes = commentReferences.ToDictionary(reference => reference.Id, reference => reference.ActionAt);
 
-        return comments
+        var orderedComments = comments
             .OrderBy(comment => commentOrder[comment.Id])
             .ToList();
+
+        foreach (var comment in orderedComments)
+        {
+            comment.ActionAt = actionTimes[comment.Id];
+        }
+
+        return orderedComments;
+    }
+
+    private static IQueryable<CommentSummaryReadModel> ProjectToSummaryReadModel(
+        IQueryable<Comment> query,
+        Guid? currentUserId)
+    {
+        var hasCurrentUser = currentUserId.HasValue;
+        var effectiveCurrentUserId = currentUserId ?? Guid.Empty;
+
+        return query.Select(comment => new CommentSummaryReadModel
+        {
+            Id = comment.Id,
+            PostId = comment.PostId,
+            ParentCommentId = comment.ParentCommentId,
+            Content = comment.Content,
+            Author = new UserSummaryReadModel
+            {
+                Id = comment.Author.Id,
+                Username = comment.Author.Username,
+                DisplayName = comment.Author.DisplayName,
+                LocationPlaceId = comment.Author.LocationPlaceId,
+                LocationName = comment.Author.Location,
+                LocationCountry = comment.Author.LocationCountry,
+                LocationLatitude = comment.Author.LocationLatitude,
+                LocationLongitude = comment.Author.LocationLongitude,
+                AvatarObjectKey = comment.Author.AvatarObjectKey,
+                IsVerified = comment.Author.IsVerified
+            },
+            LikesCount = comment.CommentLikes.Count,
+            IsLikedByCurrentUser = hasCurrentUser &&
+                comment.CommentLikes.Any(like => like.UserId == effectiveCurrentUserId),
+            RepliesCount = comment.Replies.Count,
+            IsBookmarkedByCurrentUser = hasCurrentUser &&
+                comment.CommentBookmarks.Any(bookmark => bookmark.UserId == effectiveCurrentUserId),
+            RepostsCount = comment.CommentReposts.Count,
+            IsRepostedByCurrentUser = hasCurrentUser &&
+                comment.CommentReposts.Any(repost => repost.UserId == effectiveCurrentUserId),
+            ViewsCount = comment.CommentViews.Count,
+            CreatedAt = comment.CreatedAt,
+            UpdatedAt = comment.UpdatedAt
+        });
     }
 
     public async Task AddAsync(Comment comment, CancellationToken cancellationToken = default)
     {
         await _dbContext.Comments.AddAsync(comment, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
-    }
-
-    public async Task<IReadOnlyDictionary<Guid, int>> GetViewCountsAsync(
-        IReadOnlyCollection<Guid> commentIds,
-        CancellationToken cancellationToken = default)
-    {
-        if (commentIds.Count == 0)
-        {
-            return new Dictionary<Guid, int>();
-        }
-
-        return await _dbContext.CommentViews
-            .AsNoTracking()
-            .Where(view => commentIds.Contains(view.CommentId))
-            .GroupBy(view => view.CommentId)
-            .ToDictionaryAsync(group => group.Key, group => group.Count(), cancellationToken);
     }
 
     public async Task<int?> RecordViewAsync(
@@ -232,7 +290,6 @@ public class CommentRepository : ICommentRepository
 
     public async Task UpdateAsync(Comment comment, CancellationToken cancellationToken = default)
     {
-        _dbContext.Comments.Update(comment);
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
@@ -240,5 +297,12 @@ public class CommentRepository : ICommentRepository
     {
         _dbContext.Comments.Remove(comment);
         await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private sealed class OrderedCommentReference
+    {
+        public Guid Id { get; init; }
+
+        public DateTimeOffset ActionAt { get; init; }
     }
 }

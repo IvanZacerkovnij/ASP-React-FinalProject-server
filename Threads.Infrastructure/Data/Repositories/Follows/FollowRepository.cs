@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Threads.Application.DTOs.Pagination;
 using Threads.Application.Interfaces.Follows;
 using Threads.Domain.Entities;
@@ -75,10 +76,27 @@ public class FollowRepository : IFollowRepository
             .ToListAsync(cancellationToken);
     }
 
-    public async Task AddAsync(Follow follow, CancellationToken cancellationToken = default)
+    public async Task<bool> TryAddAsync(
+        Follow follow,
+        CancellationToken cancellationToken = default)
     {
         await _dbContext.Follows.AddAsync(follow, cancellationToken);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+        catch (DbUpdateException exception)
+            when (exception.InnerException is PostgresException
+                  {
+                      SqlState: PostgresErrorCodes.UniqueViolation,
+                      ConstraintName: "IX_Follows_FollowerId_FollowingId"
+                  })
+        {
+            _dbContext.Entry(follow).State = EntityState.Detached;
+            return false;
+        }
     }
 
     public async Task DeleteAsync(Follow follow, CancellationToken cancellationToken = default)

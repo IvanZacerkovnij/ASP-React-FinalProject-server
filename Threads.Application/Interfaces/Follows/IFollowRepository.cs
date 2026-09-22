@@ -21,6 +21,6 @@ public interface IFollowRepository
         CursorPosition? cursor = null,
         CancellationToken cancellationToken = default);
 
-    Task AddAsync(Follow follow, CancellationToken cancellationToken = default);
+    Task<bool> TryAddAsync(Follow follow, CancellationToken cancellationToken = default);
     Task DeleteAsync(Follow follow, CancellationToken cancellationToken = default);
 }

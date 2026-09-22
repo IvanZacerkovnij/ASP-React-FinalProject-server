@@ -66,11 +66,9 @@ public class FollowService : IFollowService
             FollowingId = followingId
         };
 
-        try
-        {
-            await _followRepository.AddAsync(follow, cancellationToken);
-        }
-        catch (Exception exception) when (IsDuplicateWriteException(exception))
+        var wasAdded = await _followRepository.TryAddAsync(follow, cancellationToken);
+
+        if (!wasAdded)
         {
             return false;
         }
@@ -224,8 +222,4 @@ public class FollowService : IFollowService
         };
     }
 
-    private static bool IsDuplicateWriteException(Exception exception)
-    {
-        return exception.GetType().Name == "DbUpdateException";
-    }
 }

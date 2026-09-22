@@ -46,7 +46,7 @@ public class MediaConfigurator : IEntityTypeConfiguration<Media>
             .IsUnique();
 
         builder.HasIndex(media => media.UploadedByUserId);
-        builder.HasIndex(media => media.PostId);
+        builder.HasIndex(media => new { media.PostId, media.SortOrder });
 
         builder.ToTable(table =>
             table.HasCheckConstraint(

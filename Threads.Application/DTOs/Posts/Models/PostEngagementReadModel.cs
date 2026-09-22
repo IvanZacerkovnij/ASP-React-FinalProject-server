@@ -1,6 +1,6 @@
 namespace Threads.Application.DTOs.Posts.Models;
 
-public sealed class PostStateReadModel
+public sealed class PostEngagementReadModel
 {
     public DateTimeOffset? UpdatedAt { get; init; }
 
@@ -20,5 +20,5 @@ public sealed class PostStateReadModel
 
     public bool IsBookmarkedByCurrentUser { get; init; }
 
-    public PostPollStateReadModel? Poll { get; init; }
+    public PostPollEngagementReadModel? Poll { get; init; }
 }

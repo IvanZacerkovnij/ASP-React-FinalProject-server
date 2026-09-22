@@ -1,3 +1,4 @@
+using Threads.Application.DTOs.Comments;
 using Threads.Application.DTOs.Pagination;
 using Threads.Domain.Entities;
 
@@ -5,40 +6,49 @@ namespace Threads.Application.Interfaces.Comments;
 
 public interface ICommentRepository
 {
-    Task<IReadOnlyCollection<Comment>> GetByPostIdAsync(
+    Task<IReadOnlyCollection<CommentSummaryReadModel>> GetByPostIdAsync(
         Guid postId,
         int limit,
         CursorPosition? cursor = null,
+        Guid? currentUserId = null,
         CancellationToken cancellationToken = default);
 
     Task<Comment?> GetByIdAsync(
         Guid id,
-        CancellationToken cancellationToken = default,
-        bool trackChanges = true);
+        CancellationToken cancellationToken = default);
+
+    Task<CommentSummaryReadModel?> GetSummaryByIdAsync(
+        Guid id,
+        Guid? currentUserId = null,
+        CancellationToken cancellationToken = default);
+
+    Task<Guid?> GetPostIdByIdAsync(
+        Guid id,
+        CancellationToken cancellationToken = default);
 
     Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyCollection<Comment>> GetLikedByUserIdAsync(
+    Task<IReadOnlyCollection<CommentSummaryReadModel>> GetLikedByUserIdAsync(
         Guid userId,
         int limit,
         CursorPosition? cursor = null,
+        Guid? currentUserId = null,
         CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyCollection<Comment>> GetBookmarkedByUserIdAsync(
+    Task<IReadOnlyCollection<CommentSummaryReadModel>> GetBookmarkedByUserIdAsync(
         Guid userId,
         int limit,
         CursorPosition? cursor = null,
+        Guid? currentUserId = null,
         CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyCollection<Comment>> GetRepostedByUserIdAsync(
+    Task<IReadOnlyCollection<CommentSummaryReadModel>> GetRepostedByUserIdAsync(
         Guid userId,
         int limit,
         CursorPosition? cursor = null,
+        Guid? currentUserId = null,
         CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyDictionary<Guid, int>> GetViewCountsAsync(
-        IReadOnlyCollection<Guid> commentIds,
-        CancellationToken cancellationToken = default);
     Task<int?> RecordViewAsync(
         Guid id,
         Guid userId,

@@ -7,36 +7,44 @@ namespace Threads.Application.Interfaces.Posts;
 
 public interface IPostRepository
 {
-    Task<IReadOnlyCollection<Post>> GetRandomAsync(int count, CancellationToken cancellationToken = default);
-    Task<IReadOnlyCollection<Post>> GetByAuthorIdAsync(
+    Task<IReadOnlyCollection<PostSummaryReadModel>> GetRandomAsync(
+        int count,
+        Guid? currentUserId = null,
+        CancellationToken cancellationToken = default);
+    Task<IReadOnlyCollection<PostSummaryReadModel>> GetByAuthorIdAsync(
         Guid authorId,
         int limit,
         CursorPosition? cursor = null,
+        Guid? currentUserId = null,
         CancellationToken cancellationToken = default);
-    Task<IReadOnlyCollection<Post>> GetLikedByUserIdAsync(
+    Task<IReadOnlyCollection<PostSummaryReadModel>> GetLikedByUserIdAsync(
         Guid userId,
         int limit,
         CursorPosition? cursor = null,
+        Guid? currentUserId = null,
         CancellationToken cancellationToken = default);
-    Task<IReadOnlyCollection<Post>> GetBookmarkedByUserIdAsync(
+    Task<IReadOnlyCollection<PostSummaryReadModel>> GetBookmarkedByUserIdAsync(
         Guid userId,
         int limit,
         CursorPosition? cursor = null,
+        Guid? currentUserId = null,
         CancellationToken cancellationToken = default);
-    Task<IReadOnlyCollection<Post>> GetRepostedByUserIdAsync(
+    Task<IReadOnlyCollection<PostSummaryReadModel>> GetRepostedByUserIdAsync(
         Guid userId,
         int limit,
         CursorPosition? cursor = null,
+        Guid? currentUserId = null,
         CancellationToken cancellationToken = default);
-    Task<IReadOnlyCollection<Post>> SearchAsync(
+    Task<IReadOnlyCollection<PostSummaryReadModel>> SearchAsync(
         string query,
         int limit,
         CursorPosition? cursor = null,
+        Guid? currentUserId = null,
         CancellationToken cancellationToken = default);
     Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken = default);
     Task<Post?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
-    Task<PostReadModel?> GetReadModelByIdAsync(Guid id, CancellationToken cancellationToken = default);
-    Task<PostStateReadModel?> GetStateByIdAsync(
+    Task<PostContentReadModel?> GetContentByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<PostEngagementReadModel?> GetEngagementByIdAsync(
         Guid id,
         Guid? currentUserId = null,
         CancellationToken cancellationToken = default);
