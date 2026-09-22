@@ -11,6 +11,7 @@ namespace Threads.Application.Services.Posts;
 public sealed class PostQueryService
 {
     private const int FeedSize = 10;
+    private const int MaximumSearchQueryLength = 100;
 
     private readonly IPostRepository _postRepository;
     private readonly IUserService _userService;
@@ -135,7 +136,12 @@ public sealed class PostQueryService
         CancellationToken cancellationToken = default,
         Guid? currentUserId = null)
     {
-        if (string.IsNullOrWhiteSpace(query))
+        var normalizedQuery = SearchQueryNormalizer.Normalize(
+            query,
+            MaximumSearchQueryLength,
+            "Post search query");
+
+        if (normalizedQuery is null)
         {
             return new CursorPageResponse<PostResponse>
             {
@@ -147,7 +153,7 @@ public sealed class PostQueryService
 
         var cursor = CursorCodec.Decode(pagination.Cursor);
         var posts = await _postRepository.SearchAsync(
-            query.Trim(),
+            normalizedQuery,
             pagination.Limit,
             cursor,
             currentUserId,

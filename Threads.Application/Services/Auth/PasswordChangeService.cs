@@ -13,6 +13,7 @@ public sealed class PasswordChangeService
     private readonly IRefreshTokenRepository _refreshTokenRepository;
     private readonly IAuthTransaction _authTransaction;
     private readonly IAuthEmailService _authEmailService;
+    private readonly IAuthCodeHasher _authCodeHasher;
     private readonly IPasswordHasher _passwordHasher;
 
     public PasswordChangeService(
@@ -20,12 +21,14 @@ public sealed class PasswordChangeService
         IRefreshTokenRepository refreshTokenRepository,
         IAuthTransaction authTransaction,
         IAuthEmailService authEmailService,
+        IAuthCodeHasher authCodeHasher,
         IPasswordHasher passwordHasher)
     {
         _userRepository = userRepository;
         _refreshTokenRepository = refreshTokenRepository;
         _authTransaction = authTransaction;
         _authEmailService = authEmailService;
+        _authCodeHasher = authCodeHasher;
         _passwordHasher = passwordHasher;
     }
 
@@ -59,7 +62,7 @@ public sealed class PasswordChangeService
 
         var code = AuthCode.Generate();
         user.PendingPasswordHash = _passwordHasher.HashPassword(normalizedNewPassword);
-        AuthCode.SetPasswordResetCode(user, code);
+        AuthCode.SetPasswordChangeCode(user, code, _authCodeHasher);
         user.UpdatedAt = DateTimeOffset.UtcNow;
 
         await _userRepository.UpdateAsync(user, cancellationToken);
@@ -85,7 +88,7 @@ public sealed class PasswordChangeService
             return CreateResult(ChangePasswordStatus.NoPendingPasswordChange);
         }
 
-        if (!AuthCode.IsPasswordResetCodeValid(user, request.Code))
+        if (!AuthCode.IsPasswordChangeCodeValid(user, request.Code, _authCodeHasher))
         {
             return CreateResult(ChangePasswordStatus.InvalidConfirmationCode);
         }

@@ -38,7 +38,7 @@ namespace Threads.Infrastructure.Migrations
                     Username = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
                     Email = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
                     PasswordHash = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
-                    PasswordResetCode = table.Column<string>(type: "character varying(6)", maxLength: 6, nullable: true),
+                    PasswordResetCodeHash = table.Column<string>(type: "character varying(44)", maxLength: 44, nullable: true),
                     PasswordResetCodeExpiresAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     PendingPasswordHash = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
                     DisplayName = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
@@ -498,19 +498,19 @@ namespace Threads.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_CommentBookmarks_UserId",
+                name: "IX_CommentBookmarks_UserId_CreatedAt_CommentId",
                 table: "CommentBookmarks",
-                column: "UserId");
+                columns: new[] { "UserId", "CreatedAt", "CommentId" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_CommentLikes_UserId",
+                name: "IX_CommentLikes_UserId_CreatedAt_CommentId",
                 table: "CommentLikes",
-                column: "UserId");
+                columns: new[] { "UserId", "CreatedAt", "CommentId" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_CommentReposts_UserId",
+                name: "IX_CommentReposts_UserId_CreatedAt_CommentId",
                 table: "CommentReposts",
-                column: "UserId");
+                columns: new[] { "UserId", "CreatedAt", "CommentId" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_Comments_AuthorId",
@@ -523,14 +523,19 @@ namespace Threads.Infrastructure.Migrations
                 column: "ParentCommentId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Comments_PostId",
+                name: "IX_Comments_PostId_CreatedAt_Id",
                 table: "Comments",
-                column: "PostId");
+                columns: new[] { "PostId", "CreatedAt", "Id" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_CommentViews_UserId",
                 table: "CommentViews",
                 column: "UserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Follows_FollowerId_CreatedAt_Id",
+                table: "Follows",
+                columns: new[] { "FollowerId", "CreatedAt", "Id" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_Follows_FollowerId_FollowingId",
@@ -539,14 +544,14 @@ namespace Threads.Infrastructure.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_Follows_FollowingId",
+                name: "IX_Follows_FollowingId_CreatedAt_Id",
                 table: "Follows",
-                column: "FollowingId");
+                columns: new[] { "FollowingId", "CreatedAt", "Id" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_Media_PostId",
+                name: "IX_Media_PostId_SortOrder",
                 table: "Media",
-                column: "PostId");
+                columns: new[] { "PostId", "SortOrder" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_Media_StorageKey",
@@ -600,24 +605,24 @@ namespace Threads.Infrastructure.Migrations
                 column: "UserId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_PostBookmarks_UserId",
+                name: "IX_PostBookmarks_UserId_CreatedAt_PostId",
                 table: "PostBookmarks",
-                column: "UserId");
+                columns: new[] { "UserId", "CreatedAt", "PostId" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_PostLikes_UserId",
+                name: "IX_PostLikes_UserId_CreatedAt_PostId",
                 table: "PostLikes",
-                column: "UserId");
+                columns: new[] { "UserId", "CreatedAt", "PostId" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_PostReposts_UserId",
+                name: "IX_PostReposts_UserId_CreatedAt_PostId",
                 table: "PostReposts",
-                column: "UserId");
+                columns: new[] { "UserId", "CreatedAt", "PostId" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_Posts_AuthorId",
+                name: "IX_Posts_AuthorId_CreatedAt_Id",
                 table: "Posts",
-                column: "AuthorId");
+                columns: new[] { "AuthorId", "CreatedAt", "Id" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_PostViews_UserId",

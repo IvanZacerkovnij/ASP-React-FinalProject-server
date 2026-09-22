@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using NpgsqlTypes;
 using Threads.Domain.Entities;
 using Threads.Domain.Enums;
 
@@ -30,8 +31,8 @@ public class UserConfigurator : IEntityTypeConfiguration<User>
             .HasConversion<int>()
             .HasDefaultValue(UserRole.User);
 
-        builder.Property(user => user.PasswordResetCode)
-            .HasMaxLength(6);
+        builder.Property(user => user.PasswordResetCodeHash)
+            .HasMaxLength(44);
 
         builder.Property(user => user.PendingPasswordHash)
             .HasMaxLength(512);
@@ -68,6 +69,18 @@ public class UserConfigurator : IEntityTypeConfiguration<User>
 
         builder.HasIndex(user => user.Email)
             .IsUnique();
+
+        builder.Property<NpgsqlTsVector>(PostgresSearch.VectorProperty)
+            .IsGeneratedTsVectorColumn(
+                PostgresSearch.Configuration,
+                nameof(User.Username),
+                nameof(User.DisplayName),
+                nameof(User.Location),
+                nameof(User.LocationCountry));
+
+        builder.HasIndex(PostgresSearch.VectorProperty)
+            .HasMethod("gin")
+            .HasDatabaseName("IX_Users_SearchVector");
 
         builder.HasMany(user => user.Posts)
             .WithOne(post => post.Author)

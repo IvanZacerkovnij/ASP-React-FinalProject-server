@@ -116,6 +116,7 @@ public class Program
 
     private static void AddSecurityServices(WebApplicationBuilder builder)
     {
+        builder.Services.AddSingleton<IAuthCodeHasher, AuthCodeHasher>();
         builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
         builder.Services.AddScoped<ITokenService, JwtTokenService>();
 
@@ -159,6 +160,14 @@ public class Program
 
     private static void ConfigureApplication(WebApplication app)
     {
+        app.MapOpenApi();
+        
+        app.UseSwaggerUI(options =>
+        {
+            options.SwaggerEndpoint("/openapi/v1.json", "Threads API v1");
+            options.RoutePrefix = "swagger";
+        });
+        
         app.UseForwardedHeaders();
         app.UseExceptionHandler();
         
@@ -193,6 +202,7 @@ public class Program
         AddRateLimit(builder);
 
         builder.Services.AddControllers();
+        builder.Services.AddOpenApi();
 
         var app = builder.Build();
 

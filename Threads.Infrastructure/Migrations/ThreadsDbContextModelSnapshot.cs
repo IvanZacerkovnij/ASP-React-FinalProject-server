@@ -54,7 +54,7 @@ namespace Threads.Infrastructure.Migrations
 
                     b.HasIndex("ParentCommentId");
 
-                    b.HasIndex("PostId");
+                    b.HasIndex("PostId", "CreatedAt", "Id");
 
                     b.ToTable("Comments", (string)null);
                 });
@@ -74,7 +74,7 @@ namespace Threads.Infrastructure.Migrations
 
                     b.HasKey("CommentId", "UserId");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("UserId", "CreatedAt", "CommentId");
 
                     b.ToTable("CommentBookmarks", (string)null);
                 });
@@ -94,7 +94,7 @@ namespace Threads.Infrastructure.Migrations
 
                     b.HasKey("CommentId", "UserId");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("UserId", "CreatedAt", "CommentId");
 
                     b.ToTable("CommentLikes", (string)null);
                 });
@@ -114,7 +114,7 @@ namespace Threads.Infrastructure.Migrations
 
                     b.HasKey("CommentId", "UserId");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("UserId", "CreatedAt", "CommentId");
 
                     b.ToTable("CommentReposts", (string)null);
                 });
@@ -159,10 +159,12 @@ namespace Threads.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("FollowingId");
-
                     b.HasIndex("FollowerId", "FollowingId")
                         .IsUnique();
+
+                    b.HasIndex("FollowerId", "CreatedAt", "Id");
+
+                    b.HasIndex("FollowingId", "CreatedAt", "Id");
 
                     b.ToTable("Follows", null, t =>
                         {
@@ -227,12 +229,12 @@ namespace Threads.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("PostId");
-
                     b.HasIndex("StorageKey")
                         .IsUnique();
 
                     b.HasIndex("UploadedByUserId");
+
+                    b.HasIndex("PostId", "SortOrder");
 
                     b.ToTable("Media", null, t =>
                         {
@@ -443,7 +445,7 @@ namespace Threads.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AuthorId");
+                    b.HasIndex("AuthorId", "CreatedAt", "Id");
 
                     b.ToTable("Posts", (string)null);
                 });
@@ -463,7 +465,7 @@ namespace Threads.Infrastructure.Migrations
 
                     b.HasKey("PostId", "UserId");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("UserId", "CreatedAt", "PostId");
 
                     b.ToTable("PostBookmarks", (string)null);
                 });
@@ -483,7 +485,7 @@ namespace Threads.Infrastructure.Migrations
 
                     b.HasKey("PostId", "UserId");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("UserId", "CreatedAt", "PostId");
 
                     b.ToTable("PostLikes", (string)null);
                 });
@@ -503,7 +505,7 @@ namespace Threads.Infrastructure.Migrations
 
                     b.HasKey("PostId", "UserId");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("UserId", "CreatedAt", "PostId");
 
                     b.ToTable("PostReposts", (string)null);
                 });
@@ -626,12 +628,12 @@ namespace Threads.Infrastructure.Migrations
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)");
 
-                    b.Property<string>("PasswordResetCode")
-                        .HasMaxLength(6)
-                        .HasColumnType("character varying(6)");
-
                     b.Property<DateTimeOffset?>("PasswordResetCodeExpiresAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PasswordResetCodeHash")
+                        .HasMaxLength(44)
+                        .HasColumnType("character varying(44)");
 
                     b.Property<string>("PendingPasswordHash")
                         .HasMaxLength(512)

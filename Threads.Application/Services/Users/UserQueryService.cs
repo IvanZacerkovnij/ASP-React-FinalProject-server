@@ -10,6 +10,7 @@ namespace Threads.Application.Services.Users;
 public sealed class UserQueryService
 {
     private const int MaxUsernameLength = 50;
+    private const int MaximumSearchQueryLength = 100;
 
     private readonly IUserRepository _userRepository;
     private readonly IFollowRepository _followRepository;
@@ -34,7 +35,12 @@ public sealed class UserQueryService
         CancellationToken cancellationToken = default,
         Guid? currentUserId = null)
     {
-        if (string.IsNullOrWhiteSpace(query))
+        var normalizedQuery = SearchQueryNormalizer.Normalize(
+            query,
+            MaximumSearchQueryLength,
+            "User search query");
+
+        if (normalizedQuery is null)
         {
             return new CursorPageResponse<UserShortResponse>
             {
@@ -46,7 +52,7 @@ public sealed class UserQueryService
 
         var cursor = CursorCodec.DecodeText(pagination.Cursor);
         var users = await _userRepository.SearchAsync(
-            query.Trim(),
+            normalizedQuery,
             pagination.Limit,
             cursor,
             cancellationToken);

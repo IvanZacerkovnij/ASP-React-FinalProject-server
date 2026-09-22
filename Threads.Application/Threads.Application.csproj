@@ -9,7 +9,6 @@
     <ItemGroup>
       <Folder Include="DTOs\Comments\" />
       <Folder Include="DTOs\Polls\" />
-      <Folder Include="Interfaces\Auth\" />
       <Folder Include="Interfaces\Comments\" />
       <Folder Include="Interfaces\Follows\" />
       <Folder Include="Interfaces\Likes\" />

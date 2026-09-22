@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using NpgsqlTypes;
 using Threads.Application.DTOs.Pagination;
 using Threads.Application.DTOs.Posts.Models;
 using Threads.Application.DTOs.Users;
@@ -215,14 +216,21 @@ public class PostRepository : IPostRepository
         Guid? currentUserId = null,
         CancellationToken cancellationToken = default)
     {
+        var searchQuery = EF.Functions.WebSearchToTsQuery(
+            PostgresSearch.Configuration,
+            query);
+        var matchingAuthorIds = _dbContext.Users
+            .AsNoTracking()
+            .Where(user => EF
+                .Property<NpgsqlTsVector>(user, PostgresSearch.VectorProperty)
+                .Matches(searchQuery))
+            .Select(user => user.Id);
         var posts = _dbContext.Posts
             .AsNoTracking()
             .Where(post =>
-                (post.Content != null && EF.Functions.ILike(post.Content, $"%{query}%")) ||
-                (post.LocationName != null && EF.Functions.ILike(post.LocationName, $"%{query}%")) ||
-                (post.EmbedTitle != null && EF.Functions.ILike(post.EmbedTitle, $"%{query}%")) ||
-                (post.Author.Username != null && EF.Functions.ILike(post.Author.Username, $"%{query}%")) ||
-                (post.Author.DisplayName != null && EF.Functions.ILike(post.Author.DisplayName, $"%{query}%")));
+                EF.Property<NpgsqlTsVector>(post, PostgresSearch.VectorProperty)
+                    .Matches(searchQuery) ||
+                matchingAuthorIds.Contains(post.AuthorId));
 
         if (cursor is not null)
         {

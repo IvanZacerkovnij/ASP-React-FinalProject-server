@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using NpgsqlTypes;
 using Threads.Domain.Entities;
 
 namespace Threads.Infrastructure.Data.Configurations.TableConfigurations;
@@ -40,6 +41,17 @@ public class PostConfigurator : IEntityTypeConfiguration<Post>
             .IsRequired();
 
         builder.HasIndex(post => new { post.AuthorId, post.CreatedAt, post.Id });
+
+        builder.Property<NpgsqlTsVector>(PostgresSearch.VectorProperty)
+            .IsGeneratedTsVectorColumn(
+                PostgresSearch.Configuration,
+                nameof(Post.Content),
+                nameof(Post.LocationName),
+                nameof(Post.EmbedTitle));
+
+        builder.HasIndex(PostgresSearch.VectorProperty)
+            .HasMethod("gin")
+            .HasDatabaseName("IX_Posts_SearchVector");
 
         builder.HasOne(post => post.Author)
             .WithMany(user => user.Posts)

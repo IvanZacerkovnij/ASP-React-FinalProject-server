@@ -11,7 +11,7 @@ public class User : BaseEntity
 
     public string PasswordHash { get; set; } = null!;
 
-    public string? PasswordResetCode { get; set; }
+    public string? PasswordResetCodeHash { get; set; }
 
     public DateTimeOffset? PasswordResetCodeExpiresAt { get; set; }
 

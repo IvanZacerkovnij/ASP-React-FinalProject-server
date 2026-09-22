@@ -10,17 +10,20 @@ public sealed class PasswordRecoveryService
 {
     private readonly IUserRepository _userRepository;
     private readonly IAuthEmailService _authEmailService;
+    private readonly IAuthCodeHasher _authCodeHasher;
     private readonly IPasswordHasher _passwordHasher;
     private readonly PasswordChangeService _passwordChangeService;
 
     public PasswordRecoveryService(
         IUserRepository userRepository,
         IAuthEmailService authEmailService,
+        IAuthCodeHasher authCodeHasher,
         IPasswordHasher passwordHasher,
         PasswordChangeService passwordChangeService)
     {
         _userRepository = userRepository;
         _authEmailService = authEmailService;
+        _authCodeHasher = authCodeHasher;
         _passwordHasher = passwordHasher;
         _passwordChangeService = passwordChangeService;
     }
@@ -38,7 +41,7 @@ public sealed class PasswordRecoveryService
 
         var code = AuthCode.Generate();
         user.PendingPasswordHash = null;
-        AuthCode.SetPasswordResetCode(user, code);
+        AuthCode.SetPasswordResetCode(user, code, _authCodeHasher);
         user.UpdatedAt = DateTimeOffset.UtcNow;
 
         await _userRepository.UpdateAsync(user, cancellationToken);
@@ -52,7 +55,7 @@ public sealed class PasswordRecoveryService
         var normalizedEmail = AuthInputNormalizer.NormalizeEmail(request.Email);
         var user = await _userRepository.GetByEmailAsync(normalizedEmail, cancellationToken);
 
-        return AuthCode.IsPasswordResetCodeValid(user, request.Code);
+        return AuthCode.IsPasswordResetCodeValid(user, request.Code, _authCodeHasher);
     }
 
     public async Task<bool> ResetPasswordAsync(
@@ -65,7 +68,7 @@ public sealed class PasswordRecoveryService
             nameof(request.NewPassword));
         var user = await _userRepository.GetByEmailAsync(normalizedEmail, cancellationToken);
 
-        if (!AuthCode.IsPasswordResetCodeValid(user, request.Code))
+        if (!AuthCode.IsPasswordResetCodeValid(user, request.Code, _authCodeHasher))
         {
             return false;
         }

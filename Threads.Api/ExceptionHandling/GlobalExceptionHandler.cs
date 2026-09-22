@@ -6,7 +6,8 @@ using Threads.Infrastructure.Exceptions;
 namespace Threads.Api.ExceptionHandling;
 
 public sealed class GlobalExceptionHandler(
-    IProblemDetailsService problemDetailsService) : IExceptionHandler
+    IProblemDetailsService problemDetailsService,
+    ILogger<GlobalExceptionHandler> logger) : IExceptionHandler
 {
     public async ValueTask<bool> TryHandleAsync(
         HttpContext httpContext,
@@ -55,6 +56,13 @@ public sealed class GlobalExceptionHandler(
                     "Internal server error",
                     "An unexpected error occurred")
         };
+
+        logger.LogError(
+            exception,
+            "Request {Method} {Path} failed with status code {StatusCode}",
+            httpContext.Request.Method,
+            httpContext.Request.Path,
+            statusCode);
         
         httpContext.Response.StatusCode = statusCode;
 

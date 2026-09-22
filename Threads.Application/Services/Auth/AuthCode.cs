@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using Threads.Application.Interfaces.Auth;
 using Threads.Domain.Entities;
 
 namespace Threads.Application.Services.Auth;
@@ -15,16 +16,35 @@ internal static class AuthCode
             .ToString("D6");
     }
 
-    public static void SetPasswordResetCode(User user, string code)
+    public static void SetPasswordResetCode(
+        User user,
+        string code,
+        IAuthCodeHasher authCodeHasher)
     {
-        user.PasswordResetCode = AuthInputNormalizer.NormalizeSixDigitCode(code, "Reset code");
+        var normalizedCode = AuthInputNormalizer.NormalizeSixDigitCode(code, "Reset code");
+        user.PasswordResetCodeHash = authCodeHasher.Hash(
+            normalizedCode,
+            GetPasswordResetContext(user.Id));
+        user.PasswordResetCodeExpiresAt = DateTimeOffset.UtcNow.AddMinutes(
+            PasswordResetCodeLifetimeMinutes);
+    }
+
+    public static void SetPasswordChangeCode(
+        User user,
+        string code,
+        IAuthCodeHasher authCodeHasher)
+    {
+        var normalizedCode = AuthInputNormalizer.NormalizeSixDigitCode(code, "Confirmation code");
+        user.PasswordResetCodeHash = authCodeHasher.Hash(
+            normalizedCode,
+            GetPasswordChangeContext(user.Id));
         user.PasswordResetCodeExpiresAt = DateTimeOffset.UtcNow.AddMinutes(
             PasswordResetCodeLifetimeMinutes);
     }
 
     public static void ClearPasswordResetCode(User user)
     {
-        user.PasswordResetCode = null;
+        user.PasswordResetCodeHash = null;
         user.PasswordResetCodeExpiresAt = null;
     }
 
@@ -39,11 +59,14 @@ internal static class AuthCode
             EmailVerificationCodeLifetimeMinutes);
     }
 
-    public static bool IsPasswordResetCodeValid(User? user, string code)
+    public static bool IsPasswordResetCodeValid(
+        User? user,
+        string code,
+        IAuthCodeHasher authCodeHasher)
     {
         if (user is null ||
             !user.IsActive ||
-            string.IsNullOrWhiteSpace(user.PasswordResetCode) ||
+            string.IsNullOrWhiteSpace(user.PasswordResetCodeHash) ||
             user.PasswordResetCodeExpiresAt is null ||
             user.PasswordResetCodeExpiresAt <= DateTimeOffset.UtcNow)
         {
@@ -51,7 +74,31 @@ internal static class AuthCode
         }
 
         var normalizedCode = AuthInputNormalizer.NormalizeSixDigitCode(code, "Reset code");
-        return user.PasswordResetCode == normalizedCode;
+        return authCodeHasher.Verify(
+            normalizedCode,
+            GetPasswordResetContext(user.Id),
+            user.PasswordResetCodeHash);
+    }
+
+    public static bool IsPasswordChangeCodeValid(
+        User? user,
+        string code,
+        IAuthCodeHasher authCodeHasher)
+    {
+        if (user is null ||
+            !user.IsActive ||
+            string.IsNullOrWhiteSpace(user.PasswordResetCodeHash) ||
+            user.PasswordResetCodeExpiresAt is null ||
+            user.PasswordResetCodeExpiresAt <= DateTimeOffset.UtcNow)
+        {
+            return false;
+        }
+
+        var normalizedCode = AuthInputNormalizer.NormalizeSixDigitCode(code, "Confirmation code");
+        return authCodeHasher.Verify(
+            normalizedCode,
+            GetPasswordChangeContext(user.Id),
+            user.PasswordResetCodeHash);
     }
 
     public static bool IsEmailVerificationCodeValid(
@@ -66,5 +113,15 @@ internal static class AuthCode
 
         var normalizedCode = AuthInputNormalizer.NormalizeSixDigitCode(code, "Verification code");
         return pendingRegistration.VerificationCode == normalizedCode;
+    }
+
+    private static string GetPasswordResetContext(Guid userId)
+    {
+        return $"password-reset:{userId:N}";
+    }
+
+    private static string GetPasswordChangeContext(Guid userId)
+    {
+        return $"password-change:{userId:N}";
     }
 }
