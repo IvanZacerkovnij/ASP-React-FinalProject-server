@@ -61,6 +61,8 @@ public class RegistrationServiceTests
             Password = "Password123!",
             DisplayName = "  Test User  "
         };
+        using var cancellationTokenSource = new CancellationTokenSource();
+        var cancellationToken = cancellationTokenSource.Token;
         PendingRegistration? savedRegistration = null;
         passwordHasher.HashPassword(request.Password).Returns("hashed-password");
         pendingRegistrationRepository
@@ -69,7 +71,7 @@ public class RegistrationServiceTests
                 Arg.Any<CancellationToken>())
             .Returns(Task.CompletedTask);
 
-        await registrationService.RegisterAsync(request);
+        await registrationService.RegisterAsync(request, cancellationToken);
 
         Assert.NotNull(savedRegistration);
         Assert.Equal("user@example.com", savedRegistration.Email);
@@ -80,14 +82,14 @@ public class RegistrationServiceTests
         Assert.True(savedRegistration.VerificationCodeExpiresAt > DateTimeOffset.UtcNow);
         await pendingRegistrationRepository.Received(1).AddAsync(
             savedRegistration,
-            Arg.Any<CancellationToken>());
+            cancellationToken);
         await pendingRegistrationRepository.DidNotReceive().UpdateAsync(
             Arg.Any<PendingRegistration>(),
             Arg.Any<CancellationToken>());
         await authEmailService.Received(1).SendEmailVerificationCodeAsync(
             "user@example.com",
             savedRegistration.VerificationCode,
-            Arg.Any<CancellationToken>());
+            cancellationToken);
     }
 
     [Fact]
@@ -373,6 +375,53 @@ public class RegistrationServiceTests
             Arg.Any<CancellationToken>());
     }
 
+    [Theory]
+    [InlineData(" ", "username")]
+    [InlineData("user@example.com", " ")]
+    public async Task RegisterAsync_WhenRequiredIdentityFieldIsBlank_ThrowsRequestValidationException(
+        string email,
+        string username)
+    {
+        var request = new RegisterRequest
+        {
+            Email = email,
+            Username = username,
+            Password = "Password123!"
+        };
+
+        await Assert.ThrowsAsync<RequestValidationException>(
+            () => registrationService.RegisterAsync(request));
+
+        await userRepository.DidNotReceive().GetByEmailAsync(
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+        await pendingRegistrationRepository.DidNotReceive().AddAsync(
+            Arg.Any<PendingRegistration>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData(7)]
+    [InlineData(65)]
+    public async Task RegisterAsync_WhenPasswordLengthIsInvalid_ThrowsRequestValidationException(
+        int passwordLength)
+    {
+        var request = new RegisterRequest
+        {
+            Email = "user@example.com",
+            Username = "username",
+            Password = new string('p', passwordLength)
+        };
+
+        await Assert.ThrowsAsync<RequestValidationException>(
+            () => registrationService.RegisterAsync(request));
+
+        await userRepository.DidNotReceive().GetByEmailAsync(
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+        passwordHasher.DidNotReceive().HashPassword(Arg.Any<string>());
+    }
+
     [Fact]
     public async Task RegisterAsync_WhenPendingRegistrationExistsByUsername_UpdatesRegistrationInsteadOfAdding()
     {
@@ -519,6 +568,37 @@ public class RegistrationServiceTests
             Arg.Any<CancellationToken>());
         await pendingRegistrationRepository.DidNotReceive().DeleteAsync(
             Arg.Any<PendingRegistration>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task VerifyEmailAsync_WhenCodeFormatIsInvalid_ThrowsRequestValidationException()
+    {
+        var request = new VerifyEmailRequest
+        {
+            Email = "user@example.com",
+            Code = "12345x"
+        };
+        var pendingRegistration = new PendingRegistration
+        {
+            Email = request.Email,
+            Username = "username",
+            PasswordHash = "password-hash",
+            VerificationCode = "123456",
+            VerificationCodeExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5)
+        };
+        pendingRegistrationRepository
+            .GetByEmailAsync(request.Email, Arg.Any<CancellationToken>())
+            .Returns(pendingRegistration);
+
+        await Assert.ThrowsAsync<RequestValidationException>(
+            () => registrationService.VerifyEmailAsync(request));
+
+        await authTransaction.DidNotReceive().ExecuteAsync(
+            Arg.Any<Func<CancellationToken, Task<AuthResponse>>>(),
+            Arg.Any<CancellationToken>());
+        await userRepository.DidNotReceive().AddAsync(
+            Arg.Any<User>(),
             Arg.Any<CancellationToken>());
     }
 

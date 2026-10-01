@@ -1,6 +1,9 @@
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 using Threads.Application.DTOs.Auth.Requests;
+using Threads.Application.Exceptions;
 using Threads.Application.Interfaces.Auth;
 using Threads.Application.Interfaces.Security;
 using Threads.Application.Interfaces.Users;
@@ -33,6 +36,25 @@ public class SessionServiceTests
     }
 
     [Fact]
+    public async Task LoginAsync_WhenIdentityIsBlank_ThrowsRequestValidationException()
+    {
+        var request = new LoginRequest
+        {
+            EmailOrUsername = " ",
+            Password = "Password123!"
+        };
+
+        await Assert.ThrowsAsync<RequestValidationException>(() => _service.LoginAsync(request));
+
+        await _userRepository.DidNotReceive().GetByEmailAsync(
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+        await _userRepository.DidNotReceive().GetByUsernameAsync(
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task LoginAsync_WhenCredentialsAreValid_ReturnsAuthResponse()
     {
         var user = CreateUser();
@@ -42,6 +64,8 @@ public class SessionServiceTests
             Password = "Password123!"
         };
         var accessTokenExpiresAt = DateTimeOffset.UtcNow.AddMinutes(15);
+        using var cancellationTokenSource = new CancellationTokenSource();
+        var cancellationToken = cancellationTokenSource.Token;
 
         _userRepository
             .GetByEmailAsync("user@example.com", Arg.Any<CancellationToken>())
@@ -53,7 +77,7 @@ public class SessionServiceTests
         _tokenService.GenerateAccessToken(user).Returns("access-token");
         _tokenService.GetAccessTokenExpiresAtUtc().Returns(accessTokenExpiresAt);
 
-        var result = await _service.LoginAsync(request);
+        var result = await _service.LoginAsync(request, cancellationToken);
 
         Assert.NotNull(result);
         Assert.Equal(user.Id, result.UserId);
@@ -61,12 +85,15 @@ public class SessionServiceTests
         Assert.Equal("access-token", result.AccessToken);
         Assert.Equal("refresh-token", result.RefreshToken);
         Assert.Equal(accessTokenExpiresAt, result.AccessTokenExpiresAt);
+        await _userRepository.Received(1).GetByEmailAsync(
+            "user@example.com",
+            cancellationToken);
         await _refreshTokenRepository.Received(1).AddAsync(
             Arg.Is<RefreshToken>(token =>
                 token.UserId == user.Id &&
                 !string.IsNullOrWhiteSpace(token.TokenHash) &&
                 token.TokenHash != "refresh-token"),
-            Arg.Any<CancellationToken>());
+            cancellationToken);
     }
 
     [Fact]
@@ -141,6 +168,134 @@ public class SessionServiceTests
         _tokenService.DidNotReceive().GenerateAccessToken(Arg.Any<User>());
     }
 
+    [Fact]
+    public async Task RefreshTokenAsync_WhenTokenIsInvalid_ReturnsNull()
+    {
+        var request = new RefreshTokenRequest { RefreshToken = "missing-refresh-token" };
+
+        var result = await _service.RefreshTokenAsync(request);
+
+        Assert.Null(result);
+        await _refreshTokenRepository.DidNotReceive().TryRotateAsync(
+            Arg.Any<Guid>(),
+            Arg.Any<RefreshToken>(),
+            Arg.Any<DateTimeOffset>(),
+            Arg.Any<CancellationToken>());
+        _tokenService.DidNotReceive().GenerateAccessToken(Arg.Any<User>());
+    }
+
+    [Fact]
+    public async Task RefreshTokenAsync_WhenRotationFails_ReturnsNull()
+    {
+        const string rawToken = "current-refresh-token";
+        var refreshToken = CreateRefreshToken();
+        _refreshTokenRepository
+            .GetByTokenHashAsync(Hash(rawToken), Arg.Any<CancellationToken>())
+            .Returns(refreshToken);
+        _tokenService.GenerateRefreshToken().Returns("new-refresh-token");
+        _refreshTokenRepository
+            .TryRotateAsync(
+                refreshToken.Id,
+                Arg.Any<RefreshToken>(),
+                Arg.Any<DateTimeOffset>(),
+                Arg.Any<CancellationToken>())
+            .Returns(false);
+
+        var result = await _service.RefreshTokenAsync(
+            new RefreshTokenRequest { RefreshToken = rawToken });
+
+        Assert.Null(result);
+        _tokenService.DidNotReceive().GenerateAccessToken(Arg.Any<User>());
+    }
+
+    [Fact]
+    public async Task RefreshTokenAsync_WhenRotationSucceeds_ReturnsNewAuthResponse()
+    {
+        const string rawToken = "current-refresh-token";
+        var refreshToken = CreateRefreshToken();
+        var accessTokenExpiresAt = DateTimeOffset.UtcNow.AddMinutes(15);
+        _refreshTokenRepository
+            .GetByTokenHashAsync(Hash(rawToken), Arg.Any<CancellationToken>())
+            .Returns(refreshToken);
+        _tokenService.GenerateRefreshToken().Returns("new-refresh-token");
+        _refreshTokenRepository
+            .TryRotateAsync(
+                refreshToken.Id,
+                Arg.Is<RefreshToken>(token =>
+                    token.UserId == refreshToken.UserId &&
+                    token.TokenHash == Hash("new-refresh-token")),
+                Arg.Any<DateTimeOffset>(),
+                Arg.Any<CancellationToken>())
+            .Returns(true);
+        _tokenService.GenerateAccessToken(refreshToken.User).Returns("new-access-token");
+        _tokenService.GetAccessTokenExpiresAtUtc().Returns(accessTokenExpiresAt);
+
+        var result = await _service.RefreshTokenAsync(
+            new RefreshTokenRequest { RefreshToken = rawToken });
+
+        Assert.NotNull(result);
+        Assert.Equal(refreshToken.UserId, result.UserId);
+        Assert.Equal(refreshToken.User.Username, result.Username);
+        Assert.Equal("new-access-token", result.AccessToken);
+        Assert.Equal("new-refresh-token", result.RefreshToken);
+        Assert.Equal(accessTokenExpiresAt, result.AccessTokenExpiresAt);
+    }
+
+    [Fact]
+    public async Task LogoutAsync_WhenTokenIsInactive_ReturnsFalse()
+    {
+        const string rawToken = "inactive-refresh-token";
+        var refreshToken = CreateRefreshToken();
+        refreshToken.RevokedAt = DateTimeOffset.UtcNow;
+        _refreshTokenRepository
+            .GetByTokenHashAsync(Hash(rawToken), Arg.Any<CancellationToken>())
+            .Returns(refreshToken);
+
+        var result = await _service.LogoutAsync(
+            new LogoutRequest { RefreshToken = rawToken });
+
+        Assert.False(result);
+        await _refreshTokenRepository.DidNotReceive().UpdateAsync(
+            Arg.Any<RefreshToken>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task LogoutAsync_WhenTokenDoesNotExist_ReturnsFalse()
+    {
+        const string rawToken = "missing-refresh-token";
+
+        var result = await _service.LogoutAsync(
+            new LogoutRequest { RefreshToken = rawToken });
+
+        Assert.False(result);
+        await _refreshTokenRepository.Received(1).GetByTokenHashAsync(
+            Hash(rawToken),
+            Arg.Any<CancellationToken>());
+        await _refreshTokenRepository.DidNotReceive().UpdateAsync(
+            Arg.Any<RefreshToken>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task LogoutAsync_WhenTokenIsActive_RevokesTokenAndReturnsTrue()
+    {
+        const string rawToken = "active-refresh-token";
+        var refreshToken = CreateRefreshToken();
+        _refreshTokenRepository
+            .GetByTokenHashAsync(Hash(rawToken), Arg.Any<CancellationToken>())
+            .Returns(refreshToken);
+
+        var result = await _service.LogoutAsync(
+            new LogoutRequest { RefreshToken = rawToken });
+
+        Assert.True(result);
+        Assert.NotNull(refreshToken.RevokedAt);
+        await _refreshTokenRepository.Received(1).UpdateAsync(
+            refreshToken,
+            Arg.Any<CancellationToken>());
+    }
+
     private static User CreateUser(bool isActive = true, bool isVerified = true)
     {
         return new User
@@ -152,5 +307,23 @@ public class SessionServiceTests
             IsActive = isActive,
             IsVerified = isVerified
         };
+    }
+
+    private static RefreshToken CreateRefreshToken()
+    {
+        var user = CreateUser();
+        return new RefreshToken
+        {
+            Id = Guid.NewGuid(),
+            UserId = user.Id,
+            User = user,
+            TokenHash = "stored-token-hash",
+            ExpiresAt = DateTimeOffset.UtcNow.AddDays(1)
+        };
+    }
+
+    private static string Hash(string value)
+    {
+        return Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
     }
 }
