@@ -112,9 +112,16 @@ public sealed class UserQueryService
     {
         var user = await _userRepository.GetByIdAsync(id, cancellationToken);
 
-        return user is null
+        if (user is null)
+        {
+            return null;
+        }
+
+        var profile = await _userRepository.GetProfileByIdAsync(id, cancellationToken);
+
+        return profile is null
             ? null
-            : _responseFactory.Create(user, id);
+            : _responseFactory.CreateCurrent(user, profile);
     }
 
     public async Task<UserResponse?> GetByUsernameAsync(

@@ -25,7 +25,8 @@ public class PollVoteConfigurator : IEntityTypeConfiguration<PollVote>
 
         builder.HasOne(vote => vote.PollOption)
             .WithMany(option => option.Votes)
-            .HasForeignKey(vote => vote.PollOptionId)
+            .HasForeignKey(vote => new { vote.PollId, vote.PollOptionId })
+            .HasPrincipalKey(option => new { option.PollId, option.Id })
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasOne(vote => vote.User)

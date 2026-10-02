@@ -290,6 +290,11 @@ public class CommentRepository : ICommentRepository
 
     public async Task UpdateAsync(Comment comment, CancellationToken cancellationToken = default)
     {
+        if (_dbContext.Entry(comment).State == EntityState.Detached)
+        {
+            _dbContext.Comments.Update(comment);
+        }
+
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 

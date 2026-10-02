@@ -12,6 +12,7 @@ public interface IUserRepository
         TextCursorPosition? cursor = null,
         CancellationToken cancellationToken = default);
     Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<User?> GetWithRelationsByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<UserProfileReadModel?> GetProfileByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default);
     Task<User?> GetByUsernameAsync(string username, CancellationToken cancellationToken = default);

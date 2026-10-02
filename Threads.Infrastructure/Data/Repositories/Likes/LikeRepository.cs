@@ -33,11 +33,19 @@ public class LikeRepository : ILikeRepository
             _dbContext.Entry(like).State = EntityState.Detached;
             return false;
         }
+        catch (DbUpdateException exception)
+            when (exception.InnerException is PostgresException
+                  {
+                      SqlState: PostgresErrorCodes.ForeignKeyViolation
+                  })
+        {
+            _dbContext.Entry(like).State = EntityState.Detached;
+            return false;
+        }
     }
 
     public async Task<bool> TryAddAsync(CommentLike like, CancellationToken cancellationToken = default)
     {
-        
         await _dbContext.CommentLikes.AddAsync(like, cancellationToken);
 
         try
@@ -50,6 +58,15 @@ public class LikeRepository : ILikeRepository
                   {
                       SqlState: PostgresErrorCodes.UniqueViolation,
                       ConstraintName: "PK_CommentLikes"
+                  })
+        {
+            _dbContext.Entry(like).State = EntityState.Detached;
+            return false;
+        }
+        catch (DbUpdateException exception)
+            when (exception.InnerException is PostgresException
+                  {
+                      SqlState: PostgresErrorCodes.ForeignKeyViolation
                   })
         {
             _dbContext.Entry(like).State = EntityState.Detached;

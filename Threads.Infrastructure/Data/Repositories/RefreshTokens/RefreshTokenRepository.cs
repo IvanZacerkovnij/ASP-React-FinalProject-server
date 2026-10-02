@@ -57,7 +57,11 @@ public class RefreshTokenRepository : IRefreshTokenRepository
 
     public async Task UpdateAsync(RefreshToken refreshToken, CancellationToken cancellationToken = default)
     {
-        _dbContext.RefreshTokens.Update(refreshToken);
+        if (_dbContext.Entry(refreshToken).State == EntityState.Detached)
+        {
+            _dbContext.RefreshTokens.Update(refreshToken);
+        }
+
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
@@ -89,6 +93,19 @@ public class RefreshTokenRepository : IRefreshTokenRepository
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+
+        var trackedTokenEntry = _dbContext.ChangeTracker
+            .Entries<RefreshToken>()
+            .FirstOrDefault(entry => entry.Entity.Id == currentRefreshTokenId);
+
+        if (trackedTokenEntry is not null)
+        {
+            var revokedAtProperty = trackedTokenEntry.Property(token => token.RevokedAt);
+            revokedAtProperty.CurrentValue = revokedAt;
+            revokedAtProperty.OriginalValue = revokedAt;
+            revokedAtProperty.IsModified = false;
+        }
+
         return true;
     }
 }

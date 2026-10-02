@@ -91,11 +91,24 @@ public sealed class UserResponseFactory
         UserProfileReadModel publicProfile,
         bool isFollowedByCurrentUser)
     {
+        return Create(publicProfile, isFollowedByCurrentUser, email: null);
+    }
+
+    public UserResponse CreateCurrent(User user, UserProfileReadModel profile)
+    {
+        return Create(profile, isFollowedByCurrentUser: false, email: user.Email);
+    }
+
+    private UserResponse Create(
+        UserProfileReadModel publicProfile,
+        bool isFollowedByCurrentUser,
+        string? email)
+    {
         return new UserResponse
         {
             Id = publicProfile.Id,
             Username = publicProfile.Username,
-            Email = null,
+            Email = email,
             DisplayName = publicProfile.DisplayName,
             Bio = publicProfile.Bio,
             DateOfBirth = publicProfile.DateOfBirth,

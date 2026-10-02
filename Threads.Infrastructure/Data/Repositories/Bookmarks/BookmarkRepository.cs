@@ -32,6 +32,15 @@ public class BookmarkRepository : IBookmarkRepository
             _dbContext.Entry(bookmark).State = EntityState.Detached;
             return false;
         }
+        catch (DbUpdateException exception)
+            when (exception.InnerException is PostgresException
+                  {
+                      SqlState: PostgresErrorCodes.ForeignKeyViolation
+                  })
+        {
+            _dbContext.Entry(bookmark).State = EntityState.Detached;
+            return false;
+        }
     }
 
     public async Task<bool> TryAddAsync(CommentBookmark bookmark, CancellationToken cancellationToken = default)
@@ -48,6 +57,15 @@ public class BookmarkRepository : IBookmarkRepository
                   {
                       SqlState: PostgresErrorCodes.UniqueViolation,
                       ConstraintName: "PK_CommentBookmarks"
+                  })
+        {
+            _dbContext.Entry(bookmark).State = EntityState.Detached;
+            return false;
+        }
+        catch (DbUpdateException exception)
+            when (exception.InnerException is PostgresException
+                  {
+                      SqlState: PostgresErrorCodes.ForeignKeyViolation
                   })
         {
             _dbContext.Entry(bookmark).State = EntityState.Detached;

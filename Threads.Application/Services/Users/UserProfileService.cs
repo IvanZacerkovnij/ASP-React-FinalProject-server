@@ -99,7 +99,10 @@ public sealed class UserProfileService
 
         await CacheInvalidation.TryRemoveAsync(_cache, _logger, UserProfileCache.GetProfileKey(id));
 
-        return _responseFactory.Create(user, id);
+        var profile = await _userRepository.GetProfileByIdAsync(id, cancellationToken)
+            ?? throw new InvalidOperationException("Updated user profile was not found.");
+
+        return _responseFactory.CreateCurrent(user, profile);
     }
 
     private static void ApplyProfileChanges(User user, UpdateUserRequest request)

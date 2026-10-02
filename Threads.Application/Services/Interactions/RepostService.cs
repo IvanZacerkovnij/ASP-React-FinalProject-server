@@ -57,14 +57,14 @@ public class RepostService : IRepostService
         var repostedItems = posts
             .Where(post => post.ActionAt.HasValue)
             .Select(post => new RepostedItem(
-                post.ActionAt.Value,
+                post.ActionAt.GetValueOrDefault(),
                 post.Id,
                 post,
                 Comment: null))
             .Concat(comments
                 .Where(comment => comment.ActionAt.HasValue)
                 .Select(comment => new RepostedItem(
-                    comment.ActionAt.Value,
+                    comment.ActionAt.GetValueOrDefault(),
                     comment.Id,
                     Post: null,
                     Comment: comment)))

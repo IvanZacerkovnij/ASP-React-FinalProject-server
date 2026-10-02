@@ -57,14 +57,14 @@ public class BookmarkService : IBookmarkService
         var bookmarkedItems = posts
             .Where(post => post.ActionAt.HasValue)
             .Select(post => new BookmarkedItem(
-                post.ActionAt.Value,
+                post.ActionAt.GetValueOrDefault(),
                 post.Id,
                 post,
                 Comment: null))
             .Concat(comments
                 .Where(comment => comment.ActionAt.HasValue)
                 .Select(comment => new BookmarkedItem(
-                    comment.ActionAt.Value,
+                    comment.ActionAt.GetValueOrDefault(),
                     comment.Id,
                     Post: null,
                     Comment: comment)))

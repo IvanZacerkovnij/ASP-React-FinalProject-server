@@ -5,6 +5,8 @@ namespace Threads.Domain.Entities;
 
 public class Media : BaseEntity
 {
+    public uint Version { get; set; }
+
     public string StorageKey { get; set; } = null!;
 
     public string FileName { get; set; } = null!;

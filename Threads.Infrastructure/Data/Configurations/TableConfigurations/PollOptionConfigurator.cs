@@ -12,6 +12,8 @@ public class PollOptionConfigurator : IEntityTypeConfiguration<PollOption>
 
         builder.HasKey(option => option.Id);
 
+        builder.HasAlternateKey(option => new { option.PollId, option.Id });
+
         builder.Property(option => option.Text)
             .IsRequired()
             .HasMaxLength(280);

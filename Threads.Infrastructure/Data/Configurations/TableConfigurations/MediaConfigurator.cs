@@ -12,6 +12,9 @@ public class MediaConfigurator : IEntityTypeConfiguration<Media>
 
         builder.HasKey(media => media.Id);
 
+        builder.Property(media => media.Version)
+            .IsRowVersion();
+
         builder.Property(media => media.StorageKey)
             .IsRequired()
             .HasMaxLength(512);

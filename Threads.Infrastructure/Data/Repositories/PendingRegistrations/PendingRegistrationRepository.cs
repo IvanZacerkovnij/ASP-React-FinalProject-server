@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
+using Threads.Application.Exceptions;
 using Threads.Application.Interfaces.Auth;
 using Threads.Domain.Entities;
 
@@ -40,14 +42,32 @@ public class PendingRegistrationRepository : IPendingRegistrationRepository
         CancellationToken cancellationToken = default)
     {
         await _dbContext.PendingRegistrations.AddAsync(pendingRegistration, cancellationToken);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception)
+            when (exception.InnerException is PostgresException
+                  {
+                      SqlState: PostgresErrorCodes.UniqueViolation,
+                      ConstraintName: "IX_PendingRegistrations_Email" or "IX_PendingRegistrations_Username"
+                  })
+        {
+            _dbContext.Entry(pendingRegistration).State = EntityState.Detached;
+            throw new ConflictException("Pending registration with this email or username already exists.");
+        }
     }
 
     public async Task UpdateAsync(
         PendingRegistration pendingRegistration,
         CancellationToken cancellationToken = default)
     {
-        _dbContext.PendingRegistrations.Update(pendingRegistration);
+        if (_dbContext.Entry(pendingRegistration).State == EntityState.Detached)
+        {
+            _dbContext.PendingRegistrations.Update(pendingRegistration);
+        }
+
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 

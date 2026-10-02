@@ -3,6 +3,7 @@ using NpgsqlTypes;
 using Threads.Application.DTOs.Pagination;
 using Threads.Application.DTOs.Posts.Models;
 using Threads.Application.DTOs.Users;
+using Threads.Application.Exceptions;
 using Threads.Application.Interfaces.Posts;
 using Threads.Domain.Entities;
 
@@ -216,20 +217,21 @@ public class PostRepository : IPostRepository
         Guid? currentUserId = null,
         CancellationToken cancellationToken = default)
     {
-        var searchQuery = EF.Functions.WebSearchToTsQuery(
-            PostgresSearch.Configuration,
-            query);
         var matchingAuthorIds = _dbContext.Users
             .AsNoTracking()
             .Where(user => EF
                 .Property<NpgsqlTsVector>(user, PostgresSearch.VectorProperty)
-                .Matches(searchQuery))
+                .Matches(EF.Functions.WebSearchToTsQuery(
+                    PostgresSearch.Configuration,
+                    query)))
             .Select(user => user.Id);
         var posts = _dbContext.Posts
             .AsNoTracking()
             .Where(post =>
                 EF.Property<NpgsqlTsVector>(post, PostgresSearch.VectorProperty)
-                    .Matches(searchQuery) ||
+                    .Matches(EF.Functions.WebSearchToTsQuery(
+                        PostgresSearch.Configuration,
+                        query)) ||
                 matchingAuthorIds.Contains(post.AuthorId));
 
         if (cursor is not null)
@@ -414,13 +416,32 @@ public class PostRepository : IPostRepository
     public async Task AddAsync(Post post, CancellationToken cancellationToken = default)
     {
         await _dbContext.Posts.AddAsync(post, cancellationToken);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new ConflictException("One or more media items were modified by another request.");
+        }
     }
 
     public async Task UpdateAsync(Post post, CancellationToken cancellationToken = default)
     {
-        _dbContext.Posts.Update(post);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        if (_dbContext.Entry(post).State == EntityState.Detached)
+        {
+            _dbContext.Posts.Update(post);
+        }
+
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new ConflictException("One or more media items were modified by another request.");
+        }
     }
 
     public async Task DeleteAsync(Post post, CancellationToken cancellationToken = default)

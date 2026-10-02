@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using NpgsqlTypes;
 using Threads.Application.DTOs.Pagination;
 using Threads.Application.DTOs.Users;
+using Threads.Application.Exceptions;
 using Threads.Application.Interfaces.Users;
 using Threads.Domain.Entities;
 
@@ -22,14 +24,13 @@ public class UserRepository : IUserRepository
         TextCursorPosition? cursor = null,
         CancellationToken cancellationToken = default)
     {
-        var searchQuery = EF.Functions.WebSearchToTsQuery(
-            PostgresSearch.Configuration,
-            query);
         var users = _dbContext.Users
             .AsNoTracking()
             .Where(user => EF
                 .Property<NpgsqlTsVector>(user, PostgresSearch.VectorProperty)
-                .Matches(searchQuery));
+                .Matches(EF.Functions.WebSearchToTsQuery(
+                    PostgresSearch.Configuration,
+                    query)));
 
         if (cursor is not null)
         {
@@ -59,6 +60,14 @@ public class UserRepository : IUserRepository
     }
 
     public async Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Users
+            .FirstOrDefaultAsync(user => user.Id == id, cancellationToken);
+    }
+
+    public async Task<User?> GetWithRelationsByIdAsync(
+        Guid id,
+        CancellationToken cancellationToken = default)
     {
         return await BuildUserWithRelationsQuery()
             .FirstOrDefaultAsync(user => user.Id == id, cancellationToken);
@@ -96,7 +105,7 @@ public class UserRepository : IUserRepository
 
     public async Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
-        var normalizedEmail = email.ToLower();
+        var normalizedEmail = email.ToLowerInvariant();
 
         return await _dbContext.Users
             .FirstOrDefaultAsync(user => user.Email.ToLower() == normalizedEmail, cancellationToken);
@@ -104,7 +113,7 @@ public class UserRepository : IUserRepository
 
     public async Task<User?> GetByUsernameAsync(string username, CancellationToken cancellationToken = default)
     {
-        var normalizedUsername = username.ToLower();
+        var normalizedUsername = username.ToLowerInvariant();
 
         return await _dbContext.Users
             .AsNoTracking()
@@ -125,12 +134,30 @@ public class UserRepository : IUserRepository
     public async Task AddAsync(User user, CancellationToken cancellationToken = default)
     {
         await _dbContext.Users.AddAsync(user, cancellationToken);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception)
+            when (exception.InnerException is PostgresException
+                  {
+                      SqlState: PostgresErrorCodes.UniqueViolation,
+                      ConstraintName: "IX_Users_Email" or "IX_Users_Username"
+                  })
+        {
+            _dbContext.Entry(user).State = EntityState.Detached;
+            throw new ConflictException("User with this email or username already exists.");
+        }
     }
 
     public async Task UpdateAsync(User user, CancellationToken cancellationToken = default)
     {
-        _dbContext.Users.Update(user);
+        if (_dbContext.Entry(user).State == EntityState.Detached)
+        {
+            _dbContext.Users.Update(user);
+        }
+
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 

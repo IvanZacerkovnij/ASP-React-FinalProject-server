@@ -33,7 +33,7 @@ public sealed class UserDeletionService
         Guid id,
         CancellationToken cancellationToken = default)
     {
-        var user = await _userRepository.GetByIdAsync(id, cancellationToken);
+        var user = await _userRepository.GetWithRelationsByIdAsync(id, cancellationToken);
 
         if (user is null)
         {

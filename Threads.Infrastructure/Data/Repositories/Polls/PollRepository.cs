@@ -18,6 +18,7 @@ public class PollRepository : IPollRepository
     {
         return await _dbContext.Polls
             .AsNoTracking()
+            .AsSplitQuery()
             .Include(poll => poll.Options.OrderBy(option => option.Position))
             .ThenInclude(option => option.Votes)
             .Include(poll => poll.Votes)

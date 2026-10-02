@@ -46,9 +46,10 @@ public sealed class PostManagementService
         await _postRepository.AddAsync(post, cancellationToken);
         await CacheInvalidation.TryRemoveAsync(_cache, _logger, UserProfileCache.GetProfileKey(authorId));
 
-        var createdPost = await _postRepository.GetByIdAsync(post.Id, cancellationToken);
+        var createdPost = await _postRepository.GetByIdAsync(post.Id, cancellationToken)
+            ?? throw new InvalidOperationException("Created post was not found.");
 
-        return _responseFactory.Create(createdPost ?? post, authorId, viewsCount: 0);
+        return _responseFactory.Create(createdPost, authorId, viewsCount: 0);
     }
 
     public async Task<PostResponse> UpdateAsync(

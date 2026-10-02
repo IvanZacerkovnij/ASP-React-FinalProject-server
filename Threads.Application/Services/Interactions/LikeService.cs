@@ -57,14 +57,14 @@ public class LikeService : ILikeService
         var likedItems = posts
             .Where(post => post.ActionAt.HasValue)
             .Select(post => new LikedItem(
-                post.ActionAt.Value,
+                post.ActionAt.GetValueOrDefault(),
                 post.Id,
                 post,
                 Comment: null))
             .Concat(comments
                 .Where(comment => comment.ActionAt.HasValue)
                 .Select(comment => new LikedItem(
-                    comment.ActionAt.Value,
+                    comment.ActionAt.GetValueOrDefault(),
                     comment.Id,
                     Post: null,
                     Comment: comment)))

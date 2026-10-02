@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
+using NpgsqlTypes;
 using Threads.Infrastructure.Data;
 
 #nullable disable
@@ -224,6 +225,12 @@ namespace Threads.Infrastructure.Migrations
                     b.Property<Guid>("UploadedByUserId")
                         .HasColumnType("uuid");
 
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
                     b.Property<int?>("Width")
                         .HasColumnType("integer");
 
@@ -380,9 +387,9 @@ namespace Threads.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("PollOptionId");
-
                     b.HasIndex("UserId");
+
+                    b.HasIndex("PollId", "PollOptionId");
 
                     b.HasIndex("PollId", "UserId")
                         .IsUnique();
@@ -440,10 +447,21 @@ namespace Threads.Infrastructure.Migrations
                         .HasMaxLength(1024)
                         .HasColumnType("character varying(1024)");
 
+                    b.Property<NpgsqlTsVector>("SearchVector")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("tsvector")
+                        .HasAnnotation("Npgsql:TsVectorConfig", "simple")
+                        .HasAnnotation("Npgsql:TsVectorProperties", new[] { "Content", "LocationName", "EmbedTitle" });
+
                     b.Property<DateTimeOffset?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("SearchVector")
+                        .HasDatabaseName("IX_Posts_SearchVector");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("SearchVector"), "gin");
 
                     b.HasIndex("AuthorId", "CreatedAt", "Id");
 
@@ -644,6 +662,12 @@ namespace Threads.Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasDefaultValue(0);
 
+                    b.Property<NpgsqlTsVector>("SearchVector")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("tsvector")
+                        .HasAnnotation("Npgsql:TsVectorConfig", "simple")
+                        .HasAnnotation("Npgsql:TsVectorProperties", new[] { "Username", "DisplayName", "Location", "LocationCountry" });
+
                     b.Property<DateTimeOffset?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -656,6 +680,11 @@ namespace Threads.Infrastructure.Migrations
 
                     b.HasIndex("Email")
                         .IsUnique();
+
+                    b.HasIndex("SearchVector")
+                        .HasDatabaseName("IX_Users_SearchVector");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("SearchVector"), "gin");
 
                     b.HasIndex("Username")
                         .IsUnique();
@@ -832,15 +861,16 @@ namespace Threads.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Threads.Domain.Entities.PollOption", "PollOption")
-                        .WithMany("Votes")
-                        .HasForeignKey("PollOptionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.HasOne("Threads.Domain.Entities.User", "User")
                         .WithMany("PollVotes")
                         .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Threads.Domain.Entities.PollOption", "PollOption")
+                        .WithMany("Votes")
+                        .HasForeignKey("PollId", "PollOptionId")
+                        .HasPrincipalKey("PollId", "Id")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 

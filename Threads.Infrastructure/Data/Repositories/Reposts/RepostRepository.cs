@@ -32,6 +32,15 @@ public class RepostRepository : IRepostRepository
             _dbContext.Entry(repost).State = EntityState.Detached;
             return false;
         }
+        catch (DbUpdateException exception)
+            when (exception.InnerException is PostgresException
+                  {
+                      SqlState: PostgresErrorCodes.ForeignKeyViolation
+                  })
+        {
+            _dbContext.Entry(repost).State = EntityState.Detached;
+            return false;
+        }
     }
 
     public async Task<bool> TryAddAsync(CommentRepost repost, CancellationToken cancellationToken = default)
@@ -48,6 +57,15 @@ public class RepostRepository : IRepostRepository
                   {
                       SqlState: PostgresErrorCodes.UniqueViolation,
                       ConstraintName: "PK_CommentReposts"
+                  })
+        {
+            _dbContext.Entry(repost).State = EntityState.Detached;
+            return false;
+        }
+        catch (DbUpdateException exception)
+            when (exception.InnerException is PostgresException
+                  {
+                      SqlState: PostgresErrorCodes.ForeignKeyViolation
                   })
         {
             _dbContext.Entry(repost).State = EntityState.Detached;
