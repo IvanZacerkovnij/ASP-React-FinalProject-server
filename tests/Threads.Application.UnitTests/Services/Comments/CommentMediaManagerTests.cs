@@ -34,6 +34,29 @@ public sealed class CommentMediaManagerTests
     }
 
     [Fact]
+    public async Task ApplyAsync_WhenMediaIsUnchanged_DoesNotReloadOrReattachMedia()
+    {
+        var authorId = Guid.NewGuid();
+        var comment = CommentServiceTestContext.CreateComment(authorId);
+        var first = CreateMedia(Guid.NewGuid(), authorId);
+        first.CommentId = comment.Id;
+        first.SortOrder = 0;
+        var second = CreateMedia(Guid.NewGuid(), authorId);
+        second.CommentId = comment.Id;
+        second.SortOrder = 1;
+        comment.Media.Add(first);
+        comment.Media.Add(second);
+
+        await _context.MediaManager.ApplyAsync(comment, authorId, [first.Id, second.Id]);
+
+        await _context.MediaRepository.DidNotReceive().GetByIdsAsync(
+            Arg.Any<IReadOnlyCollection<Guid>>(),
+            Arg.Any<CancellationToken>());
+        Assert.Same(first, comment.Media.ElementAt(0));
+        Assert.Same(second, comment.Media.ElementAt(1));
+    }
+
+    [Fact]
     public async Task ApplyAsync_WhenMediaIsAttachedToPost_ThrowsConflictException()
     {
         var authorId = Guid.NewGuid();

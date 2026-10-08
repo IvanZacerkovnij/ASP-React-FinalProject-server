@@ -56,6 +56,7 @@ namespace Threads.Infrastructure.Migrations
                     BannerObjectKey = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
                     IsVerified = table.Column<bool>(type: "boolean", nullable: false),
                     IsActive = table.Column<bool>(type: "boolean", nullable: false),
+                    DeletedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     Role = table.Column<int>(type: "integer", nullable: false, defaultValue: 0),
                     SearchVector = table.Column<NpgsqlTsVector>(type: "tsvector", nullable: true)
                         .Annotation("Npgsql:TsVectorConfig", "simple")
@@ -101,6 +102,7 @@ namespace Threads.Infrastructure.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    DeletedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     Content = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
                     CurrentVersionId = table.Column<Guid>(type: "uuid", nullable: false),
                     LocationName = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
@@ -154,6 +156,42 @@ namespace Threads.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "Reports",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    TargetType = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
+                    TargetId = table.Column<Guid>(type: "uuid", nullable: false),
+                    Source = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
+                    Status = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
+                    Decision = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: true),
+                    Reason = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    ReporterId = table.Column<Guid>(type: "uuid", nullable: true),
+                    SystemCode = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    SystemLabel = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
+                    ResolvedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    ResolvedById = table.Column<Guid>(type: "uuid", nullable: true),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Reports", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Reports_Users_ReporterId",
+                        column: x => x.ReporterId,
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_Reports_Users_ResolvedById",
+                        column: x => x.ResolvedById,
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "ScheduledPosts",
                 columns: table => new
                 {
@@ -184,6 +222,7 @@ namespace Threads.Infrastructure.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    DeletedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     Content = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: false),
                     LinkPreviewUrl = table.Column<string>(type: "character varying(2048)", maxLength: 2048, nullable: true),
                     LinkPreviewTitle = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
@@ -662,6 +701,11 @@ namespace Threads.Infrastructure.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_Comments_DeletedAt",
+                table: "Comments",
+                column: "DeletedAt");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Comments_ParentCommentId",
                 table: "Comments",
                 column: "ParentCommentId");
@@ -801,6 +845,11 @@ namespace Threads.Infrastructure.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_Posts_DeletedAt",
+                table: "Posts",
+                column: "DeletedAt");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Posts_SearchVector",
                 table: "Posts",
                 column: "SearchVector")
@@ -828,6 +877,41 @@ namespace Threads.Infrastructure.Migrations
                 columns: new[] { "UserId", "ExpiresAt" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_Reports_CreatedAt",
+                table: "Reports",
+                column: "CreatedAt");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Reports_Decision",
+                table: "Reports",
+                column: "Decision");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Reports_ReporterId",
+                table: "Reports",
+                column: "ReporterId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Reports_ResolvedById",
+                table: "Reports",
+                column: "ResolvedById");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Reports_Source",
+                table: "Reports",
+                column: "Source");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Reports_Status",
+                table: "Reports",
+                column: "Status");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Reports_TargetType_TargetId",
+                table: "Reports",
+                columns: new[] { "TargetType", "TargetId" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_ScheduledPosts_AuthorId_ScheduledAt_Id",
                 table: "ScheduledPosts",
                 columns: new[] { "AuthorId", "ScheduledAt", "Id" });
@@ -838,10 +922,20 @@ namespace Threads.Infrastructure.Migrations
                 columns: new[] { "ScheduledAt", "Id" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_Users_DeletedAt",
+                table: "Users",
+                column: "DeletedAt");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Users_Email",
                 table: "Users",
                 column: "Email",
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Users_IsActive_CreatedAt_Id",
+                table: "Users",
+                columns: new[] { "IsActive", "CreatedAt", "Id" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_Users_SearchVector",
@@ -906,6 +1000,9 @@ namespace Threads.Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "RefreshTokens");
+
+            migrationBuilder.DropTable(
+                name: "Reports");
 
             migrationBuilder.DropTable(
                 name: "ScheduledPosts");

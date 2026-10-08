@@ -100,6 +100,29 @@ public class PostMediaManagerTests
     }
 
     [Fact]
+    public async Task ApplyAsync_WhenMediaIsUnchanged_DoesNotReloadOrReattachMedia()
+    {
+        var authorId = Guid.NewGuid();
+        var post = new Post { Id = Guid.NewGuid(), AuthorId = authorId };
+        var first = CreateMedia(Guid.NewGuid(), authorId);
+        first.PostId = post.Id;
+        first.SortOrder = 0;
+        var second = CreateMedia(Guid.NewGuid(), authorId);
+        second.PostId = post.Id;
+        second.SortOrder = 1;
+        post.Media.Add(first);
+        post.Media.Add(second);
+
+        await _manager.ApplyAsync(post, authorId, [first.Id, second.Id]);
+
+        await _mediaRepository.DidNotReceive().GetByIdsAsync(
+            Arg.Any<IReadOnlyCollection<Guid>>(),
+            Arg.Any<CancellationToken>());
+        Assert.Same(first, post.Media.ElementAt(0));
+        Assert.Same(second, post.Media.ElementAt(1));
+    }
+
+    [Fact]
     public async Task TryDeleteAsync_ContinuesDeletingAfterStorageFailure()
     {
         _objectStorageService

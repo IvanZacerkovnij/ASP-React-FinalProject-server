@@ -37,6 +37,16 @@ public sealed class PostMediaManager
             throw new RequestValidationException("Media ids must be unique.");
         }
 
+        var existingMediaIds = post.Media
+            .OrderBy(item => item.SortOrder)
+            .Select(item => item.Id)
+            .ToArray();
+
+        if (existingMediaIds.SequenceEqual(distinctMediaIds))
+        {
+            return;
+        }
+
         IReadOnlyCollection<MediaEntity> media = distinctMediaIds.Length == 0
             ? Array.Empty<MediaEntity>()
             : await _mediaRepository.GetByIdsAsync(distinctMediaIds, cancellationToken);

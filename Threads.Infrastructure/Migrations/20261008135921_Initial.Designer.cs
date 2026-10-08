@@ -13,8 +13,8 @@ using Threads.Infrastructure.Data;
 namespace Threads.Infrastructure.Migrations
 {
     [DbContext(typeof(ThreadsDbContext))]
-    [Migration("20261008090458_AddAdministrationAndReports")]
-    partial class AddAdministrationAndReports
+    [Migration("20261008135921_Initial")]
+    partial class Initial
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
