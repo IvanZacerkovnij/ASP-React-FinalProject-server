@@ -209,10 +209,10 @@ docker compose up --build -d
 ### 3. API буде доступне тут
 
 ```text
-http://127.0.0.1:7000
+http://127.0.0.1:7001
 ```
 
-`docker-compose.yml` мапить контейнерний порт `8080` на локальний `7000`.
+`docker-compose.yml` мапить контейнерний порт `8080` на локальний `7001`.
 
 API стартує після успішного healthcheck Redis. Для Redis автоматично формується connection string `redis:6379` із паролем із `REDIS_PASSWORD`.
 
@@ -291,7 +291,7 @@ OpenAPI і Swagger UI підключені для всіх середовищ:
 - OpenAPI JSON: `/openapi/v1.json`
 - Swagger UI: `/swagger`
 
-Після запуску через `docker compose` вони доступні за адресами `http://127.0.0.1:7000/openapi/v1.json` і `http://127.0.0.1:7000/swagger`.
+Після запуску через `docker compose` вони доступні за адресами `http://127.0.0.1:7001/openapi/v1.json` і `http://127.0.0.1:7001/swagger`.
 
 ## Рольова авторизація
 
@@ -864,10 +864,10 @@ dotnet test tests/Threads.Application.UnitTests
 
 - Docker image вже містить `ffmpeg`
 - API слухає `8080` всередині контейнера
-- `docker-compose.yml` публікує його на `127.0.0.1:7000`
+- `docker-compose.yml` публікує його на `127.0.0.1:7001`
 - Redis працює в окремому контейнері `threads-redis`, захищений паролем і має healthcheck
 - API залежить від успішного Redis healthcheck
-- конфіг `deploy/nginx/threads.conf` проксіює трафік на `127.0.0.1:7000`
+- конфіг `deploy/nginx/threads.conf` проксіює трафік на `127.0.0.1:7001`
 - Nginx передає `X-Forwarded-For` і `X-Forwarded-Proto`; API довіряє лише proxy з `ReverseProxy__KnownProxy`
 - forwarded headers обробляються до authentication та rate limiting, тому IP-based policies використовують адресу клієнта, а не Docker gateway
 - GitHub Actions workflow `.github/workflows/build-deploy.yaml` запускається на push у `main` (або вручну): підключається до сервера по SSH, робить `git pull`, оновлює nginx, записує `.env` із secret `APP_ENV_FILE` і перезбирає контейнери через `docker compose up -d --build`
