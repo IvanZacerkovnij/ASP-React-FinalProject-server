@@ -1,4 +1,5 @@
 using Threads.Domain.Entities;
+using Threads.Domain.Enums;
 
 namespace Threads.Infrastructure.IntegrationTests.Infrastructure;
 
@@ -28,6 +29,17 @@ internal static class TestEntityFactory
             IsActive = true,
             CreatedAt = createdAt ?? new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
         };
+    }
+
+    public static User CreateAdmin(
+        string username = "admin",
+        string? email = null,
+        DateTimeOffset? createdAt = null,
+        Guid? id = null)
+    {
+        var user = CreateUser(username, email, createdAt, id);
+        user.Role = UserRole.Admin;
+        return user;
     }
 
     public static Post CreatePost(

@@ -106,12 +106,12 @@ public static class RateLimiterConfigurator
                 httpContext.TraceIdentifier,
                 httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "anonymous");
 
-            await httpContext.Response.WriteAsJsonAsync(
-                new
-                {
-                    message = "Too many requests. Please try again later."
-                },
-                cancellationToken);
+            await Results.Problem(
+                    statusCode: StatusCodes.Status429TooManyRequests,
+                    title: "Too many requests",
+                    detail: "Too many requests. Please try again later.",
+                    instance: httpContext.Request.Path)
+                .ExecuteAsync(httpContext);
         };
     }
     

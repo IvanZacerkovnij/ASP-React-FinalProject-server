@@ -19,6 +19,10 @@ public sealed class LinkPreviewsController : ControllerBase
 
     [HttpPost("resolve")]
     [EnableRateLimiting(RateLimiterConfigurator.ExternalSearchPolicyName)]
+    [ProducesResponseType<LinkPreviewResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status429TooManyRequests)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status502BadGateway)]
     public async Task<ActionResult<LinkPreviewResponse>> Resolve(
         [FromBody] ResolveLinkPreviewRequest request,
         CancellationToken cancellationToken)

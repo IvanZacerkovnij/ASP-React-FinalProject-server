@@ -170,6 +170,45 @@ public class UserRepository : IUserRepository
             .FirstOrDefaultAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyCollection<UserProfileReadModel>> GetProfilesByIdsAsync(
+        IReadOnlyCollection<Guid> ids,
+        CancellationToken cancellationToken = default)
+    {
+        var distinctIds = ids.Distinct().ToArray();
+
+        if (distinctIds.Length == 0)
+        {
+            return [];
+        }
+
+        return await _dbContext.Users
+            .AsNoTracking()
+            .Where(user => distinctIds.Contains(user.Id))
+            .Select(user => new UserProfileReadModel
+            {
+                Id = user.Id,
+                Username = user.Username,
+                DisplayName = user.DisplayName,
+                Bio = user.Bio,
+                DateOfBirth = user.DateOfBirth,
+                BirthDateVisibility = user.BirthDateVisibility,
+                BirthYearVisibility = user.BirthYearVisibility,
+                LocationPlaceId = user.LocationPlaceId,
+                LocationName = user.Location,
+                LocationCountry = user.LocationCountry,
+                LocationLatitude = user.LocationLatitude,
+                LocationLongitude = user.LocationLongitude,
+                AvatarObjectKey = user.AvatarObjectKey,
+                BannerObjectKey = user.BannerObjectKey,
+                FollowersCount = user.FollowerRelations.Count,
+                FollowingCount = user.FollowingRelations.Count,
+                PostsCount = user.Posts.Count,
+                IsVerified = user.IsVerified,
+                CreatedAt = user.CreatedAt
+            })
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
         var normalizedEmail = email.ToLowerInvariant();
@@ -230,7 +269,9 @@ public class UserRepository : IUserRepository
 
     public async Task DeleteAsync(User user, CancellationToken cancellationToken = default)
     {
-        _dbContext.Users.Remove(user);
+        user.IsActive = false;
+        user.DeletedAt ??= DateTimeOffset.UtcNow;
+        user.UpdatedAt = DateTimeOffset.UtcNow;
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 

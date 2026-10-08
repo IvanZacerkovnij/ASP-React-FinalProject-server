@@ -27,6 +27,7 @@ public class ThreadsDbContext : DbContext
     public DbSet<CommentView> CommentViews { get; set; }
     public DbSet<RefreshToken> RefreshTokens { get; set; }
     public DbSet<PendingRegistration> PendingRegistrations { get; set; }
+    public DbSet<Report> Reports { get; set; }
 
     public ThreadsDbContext(DbContextOptions<ThreadsDbContext> options)
         : base(options)
@@ -36,6 +37,20 @@ public class ThreadsDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ThreadsDbContext).Assembly);
+
+        modelBuilder.Entity<User>().HasQueryFilter(user =>
+            user.DeletedAt == null && user.IsActive);
+        modelBuilder.Entity<Post>().HasQueryFilter(post =>
+            post.DeletedAt == null &&
+            post.Author.DeletedAt == null &&
+            post.Author.IsActive);
+        modelBuilder.Entity<Comment>().HasQueryFilter(comment =>
+            comment.DeletedAt == null &&
+            comment.Post.DeletedAt == null &&
+            comment.Post.Author.DeletedAt == null &&
+            comment.Post.Author.IsActive &&
+            comment.Author.DeletedAt == null &&
+            comment.Author.IsActive);
 
         base.OnModelCreating(modelBuilder);
     }

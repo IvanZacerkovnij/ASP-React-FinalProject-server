@@ -21,6 +21,7 @@ public class UserProfile : Profile
             .ForMember(destination => destination.FollowingCount, options => options.MapFrom(source => source.FollowingRelations.Count))
             .ForMember(destination => destination.PostsCount, options => options.MapFrom(source => source.Posts.Count))
             .ForMember(destination => destination.IsFollowedByCurrentUser, options => options.Ignore())
+            .ForMember(destination => destination.Role, options => options.Ignore())
             .ForMember(destination => destination.CreatedAt, options => options.MapFrom(source => source.CreatedAt));
 
         CreateMap<UpdateUserRequest, User>()
@@ -40,6 +41,7 @@ public class UserProfile : Profile
             .ForMember(destination => destination.LocationLongitude, options => options.Ignore())
             .ForMember(destination => destination.IsVerified, options => options.Ignore())
             .ForMember(destination => destination.IsActive, options => options.Ignore())
+            .ForMember(destination => destination.DeletedAt, options => options.Ignore())
             .ForMember(destination => destination.Posts, options => options.Ignore())
             .ForMember(destination => destination.Comments, options => options.Ignore())
             .ForMember(destination => destination.PostLikes, options => options.Ignore())
@@ -55,6 +57,8 @@ public class UserProfile : Profile
             .ForMember(destination => destination.FollowerRelations, options => options.Ignore())
             .ForMember(destination => destination.RefreshTokens, options => options.Ignore())
             .ForMember(destination => destination.UploadedMedia, options => options.Ignore())
+            .ForMember(destination => destination.SubmittedReports, options => options.Ignore())
+            .ForMember(destination => destination.ResolvedReports, options => options.Ignore())
             .ForMember(destination => destination.CreatedAt, options => options.Ignore())
             .ForMember(destination => destination.UpdatedAt, options => options.Ignore());
     }

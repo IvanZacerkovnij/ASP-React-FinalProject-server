@@ -78,6 +78,9 @@ public class UserConfigurator : IEntityTypeConfiguration<User>
         builder.Property(user => user.CreatedAt)
             .IsRequired();
 
+        builder.HasIndex(user => user.DeletedAt);
+        builder.HasIndex(user => new { user.IsActive, user.CreatedAt, user.Id });
+
         builder.HasIndex(user => user.Username)
             .IsUnique();
 

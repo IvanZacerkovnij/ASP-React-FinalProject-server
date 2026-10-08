@@ -3,7 +3,6 @@ using System.Security.Claims;
 using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
-using Threads.Domain.Enums;
 using Threads.Infrastructure.IntegrationTests.Infrastructure;
 using Threads.Infrastructure.Services;
 
@@ -19,8 +18,7 @@ public sealed class JwtTokenServiceTests
     public void GenerateAccessToken_ProducesValidConfiguredClaimsAndExpiration()
     {
         var service = CreateService();
-        var user = TestEntityFactory.CreateUser("admin-user", "admin@example.com");
-        user.Role = UserRole.Moderator;
+        var user = TestEntityFactory.CreateAdmin("admin-user", "admin@example.com");
         var beforeGeneration = DateTimeOffset.UtcNow;
 
         var encodedToken = service.GenerateAccessToken(user);
@@ -37,10 +35,10 @@ public sealed class JwtTokenServiceTests
         Assert.Equal(user.Id.ToString(), token.Subject);
         Assert.Contains(token.Claims, claim => claim.Type == JwtRegisteredClaimNames.UniqueName && claim.Value == user.Username);
         Assert.Contains(token.Claims, claim => claim.Type == JwtRegisteredClaimNames.Email && claim.Value == user.Email);
-        Assert.Contains(token.Claims, claim => claim.Type == ClaimTypes.Role && claim.Value == UserRole.Moderator.ToString());
+        Assert.Contains(token.Claims, claim => claim.Type == ClaimTypes.Role && claim.Value == user.Role.ToString());
         Assert.Contains(token.Claims, claim => claim.Type == JwtRegisteredClaimNames.Jti && Guid.TryParse(claim.Value, out _));
         Assert.Equal(user.Id.ToString(), principal.FindFirstValue(ClaimTypes.NameIdentifier));
-        Assert.True(principal.IsInRole(UserRole.Moderator.ToString()));
+        Assert.True(principal.IsInRole(user.Role.ToString()));
         Assert.IsType<JwtSecurityToken>(validatedToken);
         Assert.InRange(
             token.ValidTo,

@@ -4,6 +4,7 @@ using Resend;
 using Threads.Api.ExceptionHandling;
 using Threads.Api.Middleware;
 using Threads.Application.Interfaces.Auth;
+using Threads.Application.Interfaces.Admin;
 using Threads.Application.Interfaces.Bookmarks;
 using Threads.Application.Interfaces.Comments;
 using Threads.Application.Interfaces.Follows;
@@ -21,6 +22,7 @@ using Threads.Application.Interfaces.LinkPreviews;
 using Threads.Application.Interfaces.Versions;
 using Threads.Application.Mapping;
 using Threads.Application.Services.Auth;
+using Threads.Application.Services.Admin;
 using Threads.Application.Services.Comments;
 using Threads.Application.Services.Follows;
 using Threads.Application.Services.Interactions;
@@ -32,6 +34,7 @@ using Threads.Application.Services.Versions;
 using Threads.Infrastructure.Data;
 using Threads.Infrastructure.Data.Configurations;
 using Threads.Infrastructure.Data.Repositories.Bookmarks;
+using Threads.Infrastructure.Data.Repositories.Admin;
 using Threads.Infrastructure.Data.Repositories.Comments;
 using Threads.Infrastructure.Data.Repositories.Follows;
 using Threads.Infrastructure.Data.Repositories.Likes;
@@ -54,6 +57,7 @@ public class Program
     private static void AddRepositories(WebApplicationBuilder builder)
     {
         builder.Services.AddScoped<IUserRepository, UserRepository>();
+        builder.Services.AddScoped<IAdministrationRepository, AdministrationRepository>();
         builder.Services.AddScoped<IPostRepository, PostRepository>();
         builder.Services.AddScoped<ICommentRepository, CommentRepository>();
         builder.Services.AddScoped<IFollowRepository, FollowRepository>();
@@ -80,9 +84,11 @@ public class Program
     private static void AddServices(WebApplicationBuilder builder)
     {
         builder.Services.AddScoped<UserQueryService>();
+        builder.Services.AddScoped<IAdministrationService, AdministrationService>();
         builder.Services.AddScoped<UserProfileService>();
         builder.Services.AddScoped<UserDeletionService>();
         builder.Services.AddScoped<UserResponseFactory>();
+        builder.Services.AddScoped<ModerationResponseFactory>();
         builder.Services.AddScoped<ProfileImageManager>();
         builder.Services.AddScoped<IUserService, UserService>();
         builder.Services.AddScoped<PostQueryService>();
@@ -167,7 +173,7 @@ public class Program
 
     private static void AddGlobalExceptionHandler(WebApplicationBuilder builder)
     {
-        builder.Services.AddProblemDetails();
+        builder.Services.AddProblemDetails(ProblemDetailsConfigurator.Configure);
         builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
     }
 
@@ -187,21 +193,22 @@ public class Program
     private static void ConfigureApplication(WebApplication app)
     {
         app.MapOpenApi();
-        
+
         app.UseSwaggerUI(options =>
         {
             options.SwaggerEndpoint("/openapi/v1.json", "Threads API v1");
             options.RoutePrefix = "swagger";
         });
-        
+
         app.UseForwardedHeaders();
         app.UseMiddleware<SlowRequestLoggingMiddleware>();
         app.UseExceptionHandler();
-        
+        app.UseStatusCodePages();
+
         app.UseCors("AllowAll");
-        
+
         app.UseHttpsRedirection();
-        
+
         app.UseAuthentication();
         app.UseRateLimiter();
         app.UseAuthorization();

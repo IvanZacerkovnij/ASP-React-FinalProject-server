@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Threads.Api.Extensions;
+using Threads.Api.Responses;
 using Threads.Application.DTOs.Pagination;
 using Threads.Api.Requests.Users;
 using Threads.Application.DTOs.Auth.Requests;
@@ -24,6 +25,10 @@ namespace Threads.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/[controller]")]
+[ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+[ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+[ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+[ProducesResponseType<ProblemDetails>(StatusCodes.Status429TooManyRequests)]
 public class MeController : ControllerBase
 {
     private readonly IUserService _userService;
@@ -50,36 +55,28 @@ public class MeController : ControllerBase
     }
     
     [HttpGet]
+    [ProducesResponseType<UserResponse>(StatusCodes.Status200OK)]
     public async Task<ActionResult<UserResponse>> Me(CancellationToken cancellationToken)
     {
-        var currentUserId = User.GetCurrentUserId();
+        var currentUserId = User.GetRequiredCurrentUserId();
 
-        if (currentUserId is null)
-        {
-            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
-        }
-
-        var user = await _userService.GetMeAsync(currentUserId.Value, cancellationToken);
+        var user = await _userService.GetMeAsync(currentUserId, cancellationToken);
 
         if (user is null)
         {
-            return this.ProblemResponse(StatusCodes.Status404NotFound, "User was not found.");
+            return this.ProblemResponse(StatusCodes.Status404NotFound, ApiErrorMessages.UserNotFound);
         }
         return Ok(user);
     }
     
     [Consumes("multipart/form-data")]
     [HttpPut]
+    [ProducesResponseType<UserResponse>(StatusCodes.Status200OK)]
     public async Task<ActionResult<UserResponse>> UpdateMe(
         [FromForm] UpdateCurrentUserRequest request,
         CancellationToken cancellationToken)
     {
-        var currentUserId = User.GetCurrentUserId();
-
-        if (currentUserId is null)
-        {
-            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
-        }
+        var currentUserId = User.GetRequiredCurrentUserId();
 
         await using var avatarStream = request.Avatar?.OpenReadStream();
         await using var bannerStream = request.Banner?.OpenReadStream();
@@ -118,127 +115,103 @@ public class MeController : ControllerBase
                 SizeInBytes = request.Banner.Length
             };
 
-        var user = await _userService.UpdateAsync(currentUserId.Value, updateRequest, avatar, banner, cancellationToken);
+        var user = await _userService.UpdateAsync(currentUserId, updateRequest, avatar, banner, cancellationToken);
 
         return user is null
-            ? this.ProblemResponse(StatusCodes.Status404NotFound, "User was not found.")
+            ? this.ProblemResponse(StatusCodes.Status404NotFound, ApiErrorMessages.UserNotFound)
             : Ok(user);
     }
     
     [HttpDelete]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> DeleteMe(CancellationToken cancellationToken)
     {
-        var currentUserId = User.GetCurrentUserId();
+        var currentUserId = User.GetRequiredCurrentUserId();
 
-        if (currentUserId is null)
-        {
-            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
-        }
-
-        var wasDeleted = await _userService.DeleteAsync(currentUserId.Value, cancellationToken);
+        var wasDeleted = await _userService.DeleteAsync(currentUserId, cancellationToken);
 
         return wasDeleted
             ? NoContent()
-            : this.ProblemResponse(StatusCodes.Status404NotFound, "User was not found.");
+            : this.ProblemResponse(StatusCodes.Status404NotFound, ApiErrorMessages.UserNotFound);
     }
     
     [HttpGet("posts")]
+    [ProducesResponseType<CursorPageResponse<PostResponse>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<CursorPageResponse<PostResponse>>> GetPosted(
         [FromQuery] CursorPageRequest pagination,
         CancellationToken cancellationToken)
     {
-        var currentUserId = User.GetCurrentUserId();
-        
-        if (currentUserId is null)
-        {
-            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
-        }
+        var currentUserId = User.GetRequiredCurrentUserId();
         
         var posts = await _postService.GetByAuthorIdAsync(
-            currentUserId.Value,
+            currentUserId,
             pagination,
             cancellationToken,
-            currentUserId.Value);
+            currentUserId);
         return Ok(posts);
     }
     
     [HttpGet("likes")]
+    [ProducesResponseType<UserLikesPageResponse>(StatusCodes.Status200OK)]
     public async Task<ActionResult<UserLikesPageResponse>> GetLiked(
         [FromQuery] CursorPageRequest pagination,
         CancellationToken cancellationToken)
     {
-        var currentUserId = User.GetCurrentUserId();
-
-        if (currentUserId is null)
-        {
-            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
-        }
+        var currentUserId = User.GetRequiredCurrentUserId();
 
         var likes = await _likeService.GetByUserIdAsync(
-            currentUserId.Value,
+            currentUserId,
             pagination,
             cancellationToken,
-            currentUserId.Value);
+            currentUserId);
 
         return Ok(likes);
     }
     
     [HttpGet("bookmarks")]
+    [ProducesResponseType<UserBookmarksPageResponse>(StatusCodes.Status200OK)]
     public async Task<ActionResult<UserBookmarksPageResponse>> GetBookmarked(
         [FromQuery] CursorPageRequest pagination,
         CancellationToken cancellationToken)
     {
-        var currentUserId = User.GetCurrentUserId();
-
-        if (currentUserId is null)
-        {
-            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
-        }
+        var currentUserId = User.GetRequiredCurrentUserId();
 
         var bookmarks = await _bookmarkService.GetByUserIdAsync(
-            currentUserId.Value,
+            currentUserId,
             pagination,
             cancellationToken,
-            currentUserId.Value);
+            currentUserId);
 
         return Ok(bookmarks);
     }
     
     [HttpGet("reposts")]
+    [ProducesResponseType<UserRepostsPageResponse>(StatusCodes.Status200OK)]
     public async Task<ActionResult<UserRepostsPageResponse>> GetReposted(
         [FromQuery] CursorPageRequest pagination,
         CancellationToken cancellationToken)
     {
-        var currentUserId = User.GetCurrentUserId();
-
-        if (currentUserId is null)
-        {
-            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
-        }
+        var currentUserId = User.GetRequiredCurrentUserId();
 
         var reposts = await _repostService.GetByUserIdAsync(
-            currentUserId.Value,
+            currentUserId,
             pagination,
             cancellationToken,
-            currentUserId.Value);
+            currentUserId);
 
         return Ok(reposts);
     }
     
     [HttpPost("change-password/start")]
     [EnableRateLimiting(RateLimiterConfigurator.ChangePasswordStartPolicyName)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> StartPasswordChange(
         [FromBody] StartPasswordChangeRequest request,
         CancellationToken cancellationToken)
     {
-        var currentUserId = User.GetCurrentUserId();
+        var currentUserId = User.GetRequiredCurrentUserId();
         
-        if (currentUserId is null)
-        {
-            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
-        }
-        
-        var result = await _authService.StartPasswordChangeAsync(currentUserId.Value, request, cancellationToken);
+        var result = await _authService.StartPasswordChangeAsync(currentUserId, request, cancellationToken);
 
         return result.Status switch
         {
@@ -246,7 +219,7 @@ public class MeController : ControllerBase
             {
                 message = "Password change confirmation code has been sent to your email."
             }),
-            ChangePasswordStatus.UserNotFound => this.ProblemResponse(StatusCodes.Status404NotFound, "User was not found."),
+            ChangePasswordStatus.UserNotFound => this.ProblemResponse(StatusCodes.Status404NotFound, ApiErrorMessages.UserNotFound),
             ChangePasswordStatus.InvalidNewPassword => this.ProblemResponse(StatusCodes.Status400BadRequest, "New password must be different from the current password."),
             ChangePasswordStatus.InvalidCurrentPassword => this.ProblemResponse(StatusCodes.Status400BadRequest, "Current password is invalid."),
             _ => this.ProblemResponse(StatusCodes.Status400BadRequest, "Unable to change password.")
@@ -255,18 +228,15 @@ public class MeController : ControllerBase
 
     [HttpPost("change-password/confirm")]
     [EnableRateLimiting(RateLimiterConfigurator.ChangePasswordConfirmPolicyName)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> ConfirmPasswordChange(
         [FromBody] ConfirmPasswordChangeRequest request,
         CancellationToken cancellationToken)
     {
-        var currentUserId = User.GetCurrentUserId();
+        var currentUserId = User.GetRequiredCurrentUserId();
 
-        if (currentUserId is null)
-        {
-            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
-        }
-
-        var result = await _authService.ConfirmPasswordChangeAsync(currentUserId.Value, request, cancellationToken);
+        var result = await _authService.ConfirmPasswordChangeAsync(currentUserId, request, cancellationToken);
 
         return result.Status switch
         {
@@ -274,7 +244,7 @@ public class MeController : ControllerBase
             {
                 message = "Password changed successfully."
             }),
-            ChangePasswordStatus.UserNotFound => this.ProblemResponse(StatusCodes.Status404NotFound, "User was not found."),
+            ChangePasswordStatus.UserNotFound => this.ProblemResponse(StatusCodes.Status404NotFound, ApiErrorMessages.UserNotFound),
             ChangePasswordStatus.InvalidConfirmationCode => this.ProblemResponse(StatusCodes.Status400BadRequest, "Invalid confirmation code."),
             ChangePasswordStatus.NoPendingPasswordChange => this.ProblemResponse(StatusCodes.Status409Conflict, "There is no pending password change request."),
             _ => this.ProblemResponse(StatusCodes.Status400BadRequest, "Unable to change password.")

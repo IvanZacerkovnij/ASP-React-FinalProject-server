@@ -2,6 +2,6 @@ namespace Threads.Domain.Enums;
 
 public enum UserRole
 {
-    User,
-    Moderator
+    User = 0,
+    Admin = 1
 }

@@ -37,5 +37,7 @@ public class UserResponse
 
     public bool IsVerified { get; init; }
 
+    public string Role { get; init; } = UserRoleContract.User;
+
     public DateTimeOffset CreatedAt { get; init; }
 }

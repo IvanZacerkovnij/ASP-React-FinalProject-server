@@ -536,8 +536,25 @@ public class CommentRepository : ICommentRepository
 
     public async Task DeleteAsync(Comment comment, CancellationToken cancellationToken = default)
     {
-        _dbContext.Comments.Remove(comment);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        var deletedAt = DateTimeOffset.UtcNow;
+
+        await _dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            WITH RECURSIVE descendants AS (
+                SELECT "Id" FROM "Comments" WHERE "Id" = {comment.Id}
+                UNION ALL
+                SELECT child."Id"
+                FROM "Comments" child
+                INNER JOIN descendants parent ON child."ParentCommentId" = parent."Id"
+            )
+            UPDATE "Comments"
+            SET "DeletedAt" = {deletedAt}, "UpdatedAt" = {deletedAt}
+            WHERE "Id" IN (SELECT "Id" FROM descendants)
+              AND "DeletedAt" IS NULL
+            """,
+            cancellationToken);
+
+        _dbContext.ChangeTracker.Clear();
     }
 
     private sealed class OrderedCommentReference

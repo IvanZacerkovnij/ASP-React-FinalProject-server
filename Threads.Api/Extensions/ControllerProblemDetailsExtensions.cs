@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Threads.Api.Responses;
 
 namespace Threads.Api.Extensions;
 
@@ -28,12 +29,12 @@ public static class ControllerProblemDetailsExtensions
 
     private static string GetTitle(int statusCode) => statusCode switch
     {
-        StatusCodes.Status400BadRequest => "Invalid request",
-        StatusCodes.Status401Unauthorized => "Unauthorized",
-        StatusCodes.Status403Forbidden => "Forbidden",
-        StatusCodes.Status404NotFound => "Resource not found",
-        StatusCodes.Status409Conflict => "Conflict",
-        StatusCodes.Status500InternalServerError => "Internal server error",
+        StatusCodes.Status400BadRequest => ApiErrorTitles.InvalidRequest,
+        StatusCodes.Status401Unauthorized => ApiErrorTitles.Unauthorized,
+        StatusCodes.Status403Forbidden => ApiErrorTitles.Forbidden,
+        StatusCodes.Status404NotFound => ApiErrorTitles.ResourceNotFound,
+        StatusCodes.Status409Conflict => ApiErrorTitles.Conflict,
+        StatusCodes.Status500InternalServerError => ApiErrorTitles.InternalServerError,
         _ => throw new ArgumentOutOfRangeException(nameof(statusCode), statusCode, "Unsupported problem status code.")
     };
 }

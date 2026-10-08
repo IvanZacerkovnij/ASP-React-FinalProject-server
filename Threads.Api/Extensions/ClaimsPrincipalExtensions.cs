@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Threads.Api.Exceptions;
 
 namespace Threads.Api.Extensions;
 
@@ -11,5 +12,11 @@ public static class ClaimsPrincipalExtensions
         return Guid.TryParse(userId, out var parsedUserId)
             ? parsedUserId
             : null;
+    }
+
+    public static Guid GetRequiredCurrentUserId(this ClaimsPrincipal user)
+    {
+        return user.GetCurrentUserId()
+            ?? throw new InvalidUserClaimsException();
     }
 }

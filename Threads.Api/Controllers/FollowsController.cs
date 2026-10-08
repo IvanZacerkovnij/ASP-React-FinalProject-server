@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Threads.Api.Extensions;
+using Threads.Api.Responses;
 using Threads.Application.DTOs.Pagination;
 using Threads.Application.DTOs.Users;
 using Threads.Application.Interfaces.Follows;
@@ -12,6 +13,9 @@ namespace Threads.Api.Controllers;
 
 [ApiController]
 [Route("api/follows")]
+[ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+[ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+[ProducesResponseType<ProblemDetails>(StatusCodes.Status429TooManyRequests)]
 public class FollowsController : ControllerBase
 {
     private readonly IFollowService _followService;
@@ -26,25 +30,22 @@ public class FollowsController : ControllerBase
     [Authorize]
     [HttpPost("{userId:guid}")]
     [EnableRateLimiting(RateLimiterConfigurator.InteractionPolicyName)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public async Task<ActionResult> Follow(
         [FromRoute] Guid userId,
         CancellationToken cancellationToken)
     {
-        var currentUserId = User.GetCurrentUserId();
-
-        if (currentUserId is null)
-        {
-            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
-        }
+        var currentUserId = User.GetRequiredCurrentUserId();
 
         var user = await _userService.GetByIdAsync(userId, cancellationToken);
 
         if (user is null)
         {
-            return this.ProblemResponse(StatusCodes.Status404NotFound, "User was not found.");
+            return this.ProblemResponse(StatusCodes.Status404NotFound, ApiErrorMessages.UserNotFound);
         }
 
-        var wasAdded = await _followService.AddFollowAsync(currentUserId.Value, userId, cancellationToken);
+        var wasAdded = await _followService.AddFollowAsync(currentUserId, userId, cancellationToken);
 
         return wasAdded
             ? Ok(new { message = "User followed successfully." })
@@ -54,25 +55,21 @@ public class FollowsController : ControllerBase
     [Authorize]
     [HttpDelete("{userId:guid}")]
     [EnableRateLimiting(RateLimiterConfigurator.InteractionPolicyName)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<ActionResult> Unfollow(
         [FromRoute] Guid userId,
         CancellationToken cancellationToken)
     {
-        var currentUserId = User.GetCurrentUserId();
-
-        if (currentUserId is null)
-        {
-            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
-        }
+        var currentUserId = User.GetRequiredCurrentUserId();
 
         var user = await _userService.GetByIdAsync(userId, cancellationToken);
 
         if (user is null)
         {
-            return this.ProblemResponse(StatusCodes.Status404NotFound, "User was not found.");
+            return this.ProblemResponse(StatusCodes.Status404NotFound, ApiErrorMessages.UserNotFound);
         }
 
-        var wasRemoved = await _followService.RemoveFollowAsync(currentUserId.Value, userId, cancellationToken);
+        var wasRemoved = await _followService.RemoveFollowAsync(currentUserId, userId, cancellationToken);
 
         return wasRemoved
             ? NoContent()
@@ -80,6 +77,7 @@ public class FollowsController : ControllerBase
     }
 
     [HttpGet("{userId:guid}/followers")]
+    [ProducesResponseType<CursorPageResponse<UserShortResponse>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<CursorPageResponse<UserShortResponse>>> GetFollowers(
         [FromRoute] Guid userId,
         [FromQuery] CursorPageRequest pagination,
@@ -89,7 +87,7 @@ public class FollowsController : ControllerBase
 
         if (user is null)
         {
-            return this.ProblemResponse(StatusCodes.Status404NotFound, "User was not found.");
+            return this.ProblemResponse(StatusCodes.Status404NotFound, ApiErrorMessages.UserNotFound);
         }
 
         var followers = await _followService.GetFollowersAsync(userId, pagination, cancellationToken);
@@ -98,6 +96,7 @@ public class FollowsController : ControllerBase
     }
 
     [HttpGet("{userId:guid}/following")]
+    [ProducesResponseType<CursorPageResponse<UserShortResponse>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<CursorPageResponse<UserShortResponse>>> GetFollowing(
         [FromRoute] Guid userId,
         [FromQuery] CursorPageRequest pagination,
@@ -107,7 +106,7 @@ public class FollowsController : ControllerBase
 
         if (user is null)
         {
-            return this.ProblemResponse(StatusCodes.Status404NotFound, "User was not found.");
+            return this.ProblemResponse(StatusCodes.Status404NotFound, ApiErrorMessages.UserNotFound);
         }
 
         var following = await _followService.GetFollowingAsync(userId, pagination, cancellationToken);
@@ -118,20 +117,17 @@ public class FollowsController : ControllerBase
     [Authorize]
     [HttpDelete("{userId:guid}/followers/{followId:guid}")]
     [EnableRateLimiting(RateLimiterConfigurator.InteractionPolicyName)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     public async Task<ActionResult> RemoveFollower(
         [FromRoute] Guid userId,
         [FromRoute] Guid followId,
         CancellationToken cancellationToken)
     {
-        var currentUserId = User.GetCurrentUserId();
-
-        if (currentUserId is null)
-        {
-            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
-        }
+        var currentUserId = User.GetRequiredCurrentUserId();
 
         await _followService.RemoveFollowerAsync(
-            currentUserId.Value,
+            currentUserId,
             userId,
             followId,
             cancellationToken);

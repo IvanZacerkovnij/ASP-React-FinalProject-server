@@ -43,6 +43,8 @@ public class CommentConfigurator : IEntityTypeConfiguration<Comment>
         builder.Property(comment => comment.CreatedAt)
             .IsRequired();
 
+        builder.HasIndex(comment => comment.DeletedAt);
+
         builder.HasIndex(comment => new { comment.PostId, comment.CreatedAt, comment.Id });
         builder.HasIndex(comment => comment.AuthorId);
         builder.HasIndex(comment => comment.ParentCommentId);

@@ -1,6 +1,7 @@
 using AutoMapper;
 using Threads.Application.DTOs.Locations;
 using Threads.Application.DTOs.Users;
+using Threads.Application.DTOs.Admin;
 using Threads.Application.Interfaces.Media;
 using Threads.Domain.Entities;
 
@@ -87,6 +88,7 @@ public sealed class UserResponseFactory
             IsFollowedByCurrentUser = currentUserId.HasValue &&
                 user.FollowerRelations.Any(relation => relation.FollowerId == currentUserId.Value),
             IsVerified = response.IsVerified,
+            Role = UserRoleContract.Serialize(user.Role),
             CreatedAt = response.CreatedAt
         };
     }
@@ -101,14 +103,53 @@ public sealed class UserResponseFactory
 
     public UserResponse CreateCurrent(User user, UserProfileReadModel profile)
     {
-        return Create(profile, isFollowedByCurrentUser: false, canSeeBirthDate: true, email: user.Email);
+        return Create(
+            profile,
+            isFollowedByCurrentUser: false,
+            canSeeBirthDate: true,
+            email: user.Email,
+            role: UserRoleContract.Serialize(user.Role));
+    }
+
+    public AdminUserResponse CreateAdmin(User user)
+    {
+        var response = Create(user, currentUserId: null);
+
+        return new AdminUserResponse
+        {
+            Id = response.Id,
+            Username = response.Username,
+            Email = response.Email,
+            DisplayName = response.DisplayName,
+            Bio = response.Bio,
+            BirthDate = response.BirthDate,
+            BirthDateVisibility = response.BirthDateVisibility,
+            BirthYearVisibility = response.BirthYearVisibility,
+            Location = response.Location,
+            AvatarUrl = response.AvatarUrl,
+            BannerUrl = response.BannerUrl,
+            FollowersCount = response.FollowersCount,
+            FollowingCount = response.FollowingCount,
+            PostsCount = response.PostsCount,
+            IsFollowedByCurrentUser = false,
+            IsVerified = response.IsVerified,
+            Role = response.Role,
+            CreatedAt = response.CreatedAt,
+            IsBlocked = !user.IsActive
+        };
+    }
+
+    public UserResponse CreatePublic(UserProfileReadModel profile)
+    {
+        return Create(profile, isFollowedByCurrentUser: false, canSeeBirthDate: false, email: null);
     }
 
     private UserResponse Create(
         UserProfileReadModel publicProfile,
         bool isFollowedByCurrentUser,
         bool canSeeBirthDate,
-        string? email)
+        string? email,
+        string role = UserRoleContract.User)
     {
         return new UserResponse
         {
@@ -135,6 +176,7 @@ public sealed class UserResponseFactory
             PostsCount = publicProfile.PostsCount,
             IsFollowedByCurrentUser = isFollowedByCurrentUser,
             IsVerified = publicProfile.IsVerified,
+            Role = role,
             CreatedAt = publicProfile.CreatedAt
         };
     }

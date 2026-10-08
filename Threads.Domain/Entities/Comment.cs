@@ -4,6 +4,8 @@ namespace Threads.Domain.Entities;
 
 public class Comment : BaseEntity
 {
+    public DateTimeOffset? DeletedAt { get; set; }
+
     public string Content { get; set; } = null!;
 
     public string? LinkPreviewUrl { get; set; }

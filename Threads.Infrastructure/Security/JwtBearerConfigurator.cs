@@ -6,6 +6,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.EntityFrameworkCore;
+using Threads.Infrastructure.Data;
 
 namespace Threads.Infrastructure.Security;
 
@@ -39,6 +41,26 @@ public static class JwtBearerConfigurator
 
         options.Events = new JwtBearerEvents
         {
+            OnTokenValidated = async context =>
+            {
+                var userIdValue = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                if (!Guid.TryParse(userIdValue, out var userId))
+                {
+                    context.Fail("Invalid user claim.");
+                    return;
+                }
+
+                var dbContext = context.HttpContext.RequestServices.GetRequiredService<ThreadsDbContext>();
+                var isActive = await dbContext.Users
+                    .AsNoTracking()
+                    .AnyAsync(user => user.Id == userId, context.HttpContext.RequestAborted);
+
+                if (!isActive)
+                {
+                    context.Fail("User is blocked or deleted.");
+                }
+            },
             OnAuthenticationFailed = context =>
             {
                 var logger = context.HttpContext.RequestServices
@@ -59,7 +81,17 @@ public static class JwtBearerConfigurator
 
                 return Task.CompletedTask;
             },
-            OnForbidden = context =>
+            OnChallenge = async context =>
+            {
+                context.HandleResponse();
+                await Results.Problem(
+                        statusCode: StatusCodes.Status401Unauthorized,
+                        title: "Unauthorized",
+                        detail: "Authentication is required.",
+                        instance: context.Request.Path)
+                    .ExecuteAsync(context.HttpContext);
+            },
+            OnForbidden = async context =>
             {
                 var logger = context.HttpContext.RequestServices
                     .GetRequiredService<ILoggerFactory>()
@@ -73,7 +105,12 @@ public static class JwtBearerConfigurator
                     context.HttpContext.TraceIdentifier,
                     userId);
 
-                return Task.CompletedTask;
+                await Results.Problem(
+                        statusCode: StatusCodes.Status403Forbidden,
+                        title: "Forbidden",
+                        detail: "Administrator access is required.",
+                        instance: context.Request.Path)
+                    .ExecuteAsync(context.HttpContext);
             }
         };
     }

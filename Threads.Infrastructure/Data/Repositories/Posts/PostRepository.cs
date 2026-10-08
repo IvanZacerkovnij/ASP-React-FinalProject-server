@@ -675,7 +675,8 @@ public class PostRepository : IPostRepository
 
     public async Task DeleteAsync(Post post, CancellationToken cancellationToken = default)
     {
-        _dbContext.Posts.Remove(post);
+        post.DeletedAt ??= DateTimeOffset.UtcNow;
+        post.UpdatedAt = DateTimeOffset.UtcNow;
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 

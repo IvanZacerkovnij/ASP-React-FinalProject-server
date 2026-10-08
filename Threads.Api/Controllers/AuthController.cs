@@ -10,6 +10,9 @@ namespace Threads.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+[ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+[ProducesResponseType<ProblemDetails>(StatusCodes.Status429TooManyRequests)]
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
@@ -21,6 +24,7 @@ public class AuthController : ControllerBase
 
     [HttpPost("register")]
     [EnableRateLimiting(RateLimiterConfigurator.RegisterPolicyName)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> Register(
         [FromBody] RegisterRequest request,
         CancellationToken cancellationToken)
@@ -31,6 +35,7 @@ public class AuthController : ControllerBase
 
     [HttpPost("login")]
     [EnableRateLimiting(RateLimiterConfigurator.LoginPolicyName)]
+    [ProducesResponseType<AuthResponse>(StatusCodes.Status200OK)]
     public async Task<ActionResult<AuthResponse>> Login(
         [FromBody] LoginRequest request,
         CancellationToken cancellationToken)
@@ -44,6 +49,7 @@ public class AuthController : ControllerBase
 
     [HttpPost("refresh")]
     [EnableRateLimiting(RateLimiterConfigurator.RefreshPolicyName)]
+    [ProducesResponseType<AuthResponse>(StatusCodes.Status200OK)]
     public async Task<ActionResult<AuthResponse>> Refresh(
         [FromBody] RefreshTokenRequest request,
         CancellationToken cancellationToken)
@@ -56,6 +62,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("logout")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> Logout(
         [FromBody] LogoutRequest request,
         CancellationToken cancellationToken)
@@ -69,6 +76,7 @@ public class AuthController : ControllerBase
 
     [HttpPost("forgot-password")]
     [EnableRateLimiting(RateLimiterConfigurator.ForgotPasswordPolicyName)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> ForgotPassword(
         [FromBody] ForgotPasswordRequest request,
         CancellationToken cancellationToken)
@@ -79,6 +87,7 @@ public class AuthController : ControllerBase
 
     [HttpPost("verify-reset-code")]
     [EnableRateLimiting(RateLimiterConfigurator.VerificationPolicyName)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> VerifyResetCode(
         [FromBody] VerifyResetCodeRequest request,
         CancellationToken cancellationToken)
@@ -92,6 +101,7 @@ public class AuthController : ControllerBase
 
     [HttpPost("reset-password")]
     [EnableRateLimiting(RateLimiterConfigurator.VerificationPolicyName)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> ResetPassword(
         [FromBody] ResetPasswordRequest request,
         CancellationToken cancellationToken)
@@ -105,6 +115,7 @@ public class AuthController : ControllerBase
 
     [HttpPost("verify-email")]
     [EnableRateLimiting(RateLimiterConfigurator.VerificationPolicyName)]
+    [ProducesResponseType<AuthResponse>(StatusCodes.Status200OK)]
     public async Task<ActionResult<AuthResponse>> VerifyEmail(
         [FromBody] VerifyEmailRequest request,
         CancellationToken cancellationToken)
@@ -118,6 +129,7 @@ public class AuthController : ControllerBase
     
     [HttpPost("resend-verification-code")]
     [EnableRateLimiting(RateLimiterConfigurator.ResendVerificationPolicyName)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> ResendVerifyEmail(
         [FromBody] ResendVerificationCodeRequest request,
         CancellationToken cancellationToken)

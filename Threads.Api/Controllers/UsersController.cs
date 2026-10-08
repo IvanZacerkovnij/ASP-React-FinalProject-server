@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Threads.Api.Extensions;
+using Threads.Api.Responses;
 using Threads.Application.DTOs.Comments;
 using Threads.Application.DTOs.Pagination;
 using Threads.Application.DTOs.Likes;
@@ -16,6 +17,7 @@ namespace Threads.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
 public class UsersController : ControllerBase
 {
     private readonly IUserService _userService;
@@ -39,6 +41,7 @@ public class UsersController : ControllerBase
     }
 
     [HttpGet("by-id/{id:guid}")]
+    [ProducesResponseType<UserResponse>(StatusCodes.Status200OK)]
     public async Task<ActionResult<UserResponse>> GetById(
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
@@ -48,10 +51,11 @@ public class UsersController : ControllerBase
         var user = await _userService.GetByIdAsync(id, cancellationToken, currentUserId);
 
         return user is null
-            ? this.ProblemResponse(StatusCodes.Status404NotFound, "User was not found.")
+            ? this.ProblemResponse(StatusCodes.Status404NotFound, ApiErrorMessages.UserNotFound)
             : Ok(user);
     }
     [HttpGet("by-username/{username}")]
+    [ProducesResponseType<UserResponse>(StatusCodes.Status200OK)]
     public async Task<ActionResult<UserResponse>> GetByUsername(
         [FromRoute] string username,
         CancellationToken cancellationToken)
@@ -61,11 +65,12 @@ public class UsersController : ControllerBase
         var user = await _userService.GetByUsernameAsync(username, cancellationToken, currentUserId);
 
         return user is null
-            ? this.ProblemResponse(StatusCodes.Status404NotFound, "User was not found.")
+            ? this.ProblemResponse(StatusCodes.Status404NotFound, ApiErrorMessages.UserNotFound)
             : Ok(user);
     }
 
     [HttpGet("{username}/posts")]
+    [ProducesResponseType<CursorPageResponse<PostResponse>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<CursorPageResponse<PostResponse>>> GetPostsByUsername(
         [FromRoute] string username,
         [FromQuery] CursorPageRequest pagination,
@@ -77,7 +82,7 @@ public class UsersController : ControllerBase
         
         if (user is null)
         {
-            return this.ProblemResponse(StatusCodes.Status404NotFound, "User was not found.");
+            return this.ProblemResponse(StatusCodes.Status404NotFound, ApiErrorMessages.UserNotFound);
         }
 
         var posts = await _postService.GetByAuthorIdAsync(
@@ -89,6 +94,7 @@ public class UsersController : ControllerBase
     }
 
     [HttpGet("{username}/replies")]
+    [ProducesResponseType<CursorPageResponse<CommentResponse>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<CursorPageResponse<CommentResponse>>> GetRepliesByUsername(
         [FromRoute] string username,
         [FromQuery] CursorPageRequest pagination,
@@ -100,7 +106,7 @@ public class UsersController : ControllerBase
 
         if (user is null)
         {
-            return this.ProblemResponse(StatusCodes.Status404NotFound, "User was not found.");
+            return this.ProblemResponse(StatusCodes.Status404NotFound, ApiErrorMessages.UserNotFound);
         }
 
         var comments = await _commentService.GetByAuthorIdAsync(
@@ -112,6 +118,7 @@ public class UsersController : ControllerBase
     }
 
     [HttpGet("{username}/likes")]
+    [ProducesResponseType<UserLikesPageResponse>(StatusCodes.Status200OK)]
     public async Task<ActionResult<UserLikesPageResponse>> GetLikedByUsername(
         [FromRoute] string username,
         [FromQuery] CursorPageRequest pagination,
@@ -121,7 +128,7 @@ public class UsersController : ControllerBase
 
         if (user is null)
         {
-            return this.ProblemResponse(StatusCodes.Status404NotFound, "User was not found.");
+            return this.ProblemResponse(StatusCodes.Status404NotFound, ApiErrorMessages.UserNotFound);
         }
 
         var currentUserId = User.GetCurrentUserId();
@@ -135,6 +142,7 @@ public class UsersController : ControllerBase
     }
 
     [HttpGet("{username}/reposts")]
+    [ProducesResponseType<UserRepostsPageResponse>(StatusCodes.Status200OK)]
     public async Task<ActionResult<UserRepostsPageResponse>> GetRepostedByUsername(
         [FromRoute] string username,
         [FromQuery] CursorPageRequest pagination,
@@ -144,7 +152,7 @@ public class UsersController : ControllerBase
 
         if (user is null)
         {
-            return this.ProblemResponse(StatusCodes.Status404NotFound, "User was not found.");
+            return this.ProblemResponse(StatusCodes.Status404NotFound, ApiErrorMessages.UserNotFound);
         }
 
         var currentUserId = User.GetCurrentUserId();

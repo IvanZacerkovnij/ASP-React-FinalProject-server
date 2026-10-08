@@ -4,6 +4,8 @@ namespace Threads.Domain.Entities;
 
 public class Post : BaseEntity
 {
+    public DateTimeOffset? DeletedAt { get; set; }
+
     public string? Content { get; set; }
     
     public Guid CurrentVersionId { get; set; } = Guid.NewGuid();

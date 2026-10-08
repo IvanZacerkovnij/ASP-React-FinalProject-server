@@ -46,6 +46,8 @@ public class PostConfigurator : IEntityTypeConfiguration<Post>
         builder.Property(post => post.CreatedAt)
             .IsRequired();
 
+        builder.HasIndex(post => post.DeletedAt);
+
         builder.HasIndex(post => new { post.AuthorId, post.CreatedAt, post.Id });
 
         builder.Property<NpgsqlTsVector>(PostgresSearch.VectorProperty)

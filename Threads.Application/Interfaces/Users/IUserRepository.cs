@@ -22,6 +22,9 @@ public interface IUserRepository
     Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<User?> GetWithRelationsByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<UserProfileReadModel?> GetProfileByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<IReadOnlyCollection<UserProfileReadModel>> GetProfilesByIdsAsync(
+        IReadOnlyCollection<Guid> ids,
+        CancellationToken cancellationToken = default);
     Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default);
     Task<User?> GetByUsernameAsync(string username, CancellationToken cancellationToken = default);
     Task<Guid?> GetIdByUsernameAsync(string username, CancellationToken cancellationToken = default);

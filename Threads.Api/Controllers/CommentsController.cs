@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Threads.Api.Extensions;
+using Threads.Api.Responses;
 using Threads.Application.DTOs.Comments;
 using Threads.Application.DTOs.Pagination;
 using Threads.Application.DTOs.Polls;
@@ -17,6 +18,12 @@ namespace Threads.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+[ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+[ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+[ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+[ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+[ProducesResponseType<ProblemDetails>(StatusCodes.Status429TooManyRequests)]
 public class CommentsController : ControllerBase
 {
     private readonly ICommentService _commentService;
@@ -40,6 +47,7 @@ public class CommentsController : ControllerBase
     }
 
     [HttpGet("post/{postId:guid}")]
+    [ProducesResponseType<CursorPageResponse<CommentResponse>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<CursorPageResponse<CommentResponse>>> GetByPostId(
         [FromRoute] Guid postId,
         [FromQuery] CursorPageRequest pagination,
@@ -58,22 +66,19 @@ public class CommentsController : ControllerBase
     [Authorize]
     [HttpPost]
     [EnableRateLimiting(RateLimiterConfigurator.CommentCreationPolicyName)]
+    [ProducesResponseType<CommentResponse>(StatusCodes.Status201Created)]
     public async Task<ActionResult<CommentResponse>> Create(
         [FromBody] CreateCommentRequest request,
         CancellationToken cancellationToken)
     {
-        var currentUserId = User.GetCurrentUserId();
+        var currentUserId = User.GetRequiredCurrentUserId();
 
-        if (currentUserId is null)
-        {
-            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
-        }
-
-        var comment = await _commentService.CreateAsync(currentUserId.Value, request, cancellationToken);
+        var comment = await _commentService.CreateAsync(currentUserId, request, cancellationToken);
         return CreatedAtAction(nameof(GetById), new { id = comment.Id }, comment);
     }
 
     [HttpGet("{id:guid}")]
+    [ProducesResponseType<CommentResponse>(StatusCodes.Status200OK)]
     public async Task<ActionResult<CommentResponse>> GetById(
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
@@ -86,12 +91,13 @@ public class CommentsController : ControllerBase
             currentUserId);
         if (comment is null)
         {
-            return this.ProblemResponse(StatusCodes.Status404NotFound, "Comment was not found.");
+            return this.ProblemResponse(StatusCodes.Status404NotFound, ApiErrorMessages.CommentNotFound);
         }
         return Ok(comment);
     }
 
     [HttpGet("{id:guid}/thread")]
+    [ProducesResponseType<CommentThreadResponse>(StatusCodes.Status200OK)]
     public async Task<ActionResult<CommentThreadResponse>> GetThread(
         [FromRoute] Guid id,
         [FromQuery] CursorPageRequest pagination,
@@ -106,12 +112,13 @@ public class CommentsController : ControllerBase
             currentUserId);
 
         return thread is null
-            ? this.ProblemResponse(StatusCodes.Status404NotFound, "Comment was not found.")
+            ? this.ProblemResponse(StatusCodes.Status404NotFound, ApiErrorMessages.CommentNotFound)
             : Ok(thread);
     }
 
     [HttpGet("{id:guid}/edit-history")]
     [EnableRateLimiting(RateLimiterConfigurator.EditHistoryPolicyName)]
+    [ProducesResponseType<EditHistoryResponse<CommentResponse>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<EditHistoryResponse<CommentResponse>>> GetEditHistory(
         [FromRoute] Guid id,
         [FromQuery] CursorPageRequest pagination,
@@ -125,27 +132,23 @@ public class CommentsController : ControllerBase
             currentUserId);
 
         return history is null
-            ? this.ProblemResponse(StatusCodes.Status404NotFound, "Comment was not found.")
+            ? this.ProblemResponse(StatusCodes.Status404NotFound, ApiErrorMessages.CommentNotFound)
             : Ok(history);
     }
 
     [Authorize]
     [HttpPut("{id:guid}")]
+    [ProducesResponseType<CommentResponse>(StatusCodes.Status200OK)]
     public async Task<ActionResult<CommentResponse>> Update(
         [FromRoute] Guid id,
         [FromBody] UpdateCommentRequest request,
         CancellationToken cancellationToken)
     {
-        var currentUserId = User.GetCurrentUserId();
-
-        if (currentUserId is null)
-        {
-            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
-        }
+        var currentUserId = User.GetRequiredCurrentUserId();
 
         var updatedComment = await _commentService.UpdateAsync(
             id,
-            currentUserId.Value,
+            currentUserId,
             request,
             cancellationToken);
 
@@ -154,18 +157,14 @@ public class CommentsController : ControllerBase
 
     [Authorize]
     [HttpDelete("{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> Delete(
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
     {
-        var currentUserId = User.GetCurrentUserId();
+        var currentUserId = User.GetRequiredCurrentUserId();
 
-        if (currentUserId is null)
-        {
-            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
-        }
-
-        await _commentService.DeleteAsync(id, currentUserId.Value, cancellationToken);
+        await _commentService.DeleteAsync(id, currentUserId, cancellationToken);
 
         return NoContent();
     }
@@ -173,20 +172,16 @@ public class CommentsController : ControllerBase
     [Authorize]
     [HttpPost("{id:guid}/poll/vote")]
     [EnableRateLimiting(RateLimiterConfigurator.InteractionPolicyName)]
+    [ProducesResponseType<PollResponse>(StatusCodes.Status200OK)]
     public async Task<ActionResult<PollResponse>> VotePoll(
         [FromRoute] Guid id,
         [FromBody] VotePollRequest request,
         CancellationToken cancellationToken)
     {
-        var currentUserId = User.GetCurrentUserId();
-
-        if (currentUserId is null)
-        {
-            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
-        }
+        var currentUserId = User.GetRequiredCurrentUserId();
 
         var result = await _pollService.VoteCommentAsync(
-            currentUserId.Value,
+            currentUserId,
             id,
             request,
             cancellationToken);
@@ -194,8 +189,8 @@ public class CommentsController : ControllerBase
         return result.Status switch
         {
             PollVoteStatus.Success => Ok(result.Poll),
-            PollVoteStatus.CommentNotFound => this.ProblemResponse(StatusCodes.Status404NotFound, "Comment was not found."),
-            PollVoteStatus.PollNotFound => this.ProblemResponse(StatusCodes.Status404NotFound, "Poll was not found."),
+            PollVoteStatus.CommentNotFound => this.ProblemResponse(StatusCodes.Status404NotFound, ApiErrorMessages.CommentNotFound),
+            PollVoteStatus.PollNotFound => this.ProblemResponse(StatusCodes.Status404NotFound, ApiErrorMessages.PollNotFound),
             PollVoteStatus.InvalidOption => this.ProblemResponse(StatusCodes.Status400BadRequest, "Poll option is invalid."),
             PollVoteStatus.AlreadyVoted => this.ProblemResponse(StatusCodes.Status409Conflict, "You have already voted in this poll."),
             PollVoteStatus.PollClosed => this.ProblemResponse(StatusCodes.Status409Conflict, "Poll is already closed."),
@@ -206,120 +201,104 @@ public class CommentsController : ControllerBase
     [Authorize]
     [HttpPost("{id:guid}/like")]
     [EnableRateLimiting(RateLimiterConfigurator.InteractionPolicyName)]
+    [ProducesResponseType<CommentLikeStateResponse>(StatusCodes.Status200OK)]
     public async Task<ActionResult<CommentLikeStateResponse>> LikeComment(
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
     {
-        var currentUserId = User.GetCurrentUserId();
-
-        if (currentUserId is null)
-        {
-            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
-        }
+        var currentUserId = User.GetRequiredCurrentUserId();
 
         var currentComment = await _commentService.GetByIdAsync(
             id,
             cancellationToken,
-            currentUserId.Value);
+            currentUserId);
 
         if (currentComment is null)
         {
-            return this.ProblemResponse(StatusCodes.Status404NotFound, "Comment was not found.");
+            return this.ProblemResponse(StatusCodes.Status404NotFound, ApiErrorMessages.CommentNotFound);
         }
 
-        await _likeService.AddCommentLikeAsync(currentUserId.Value, id, cancellationToken);
+        await _likeService.AddCommentLikeAsync(currentUserId, id, cancellationToken);
         var updatedComment = await _commentService.GetByIdAsync(
             id,
             cancellationToken,
-            currentUserId.Value);
+            currentUserId);
 
         return updatedComment is null
-            ? this.ProblemResponse(StatusCodes.Status404NotFound, "Comment was not found.")
+            ? this.ProblemResponse(StatusCodes.Status404NotFound, ApiErrorMessages.CommentNotFound)
             : Ok(MapLikeStateResponse(updatedComment));
     }
 
     [Authorize]
     [HttpPost("{id:guid}/view")]
     [EnableRateLimiting(RateLimiterConfigurator.InteractionPolicyName)]
+    [ProducesResponseType<CommentViewResponse>(StatusCodes.Status200OK)]
     public async Task<ActionResult<CommentViewResponse>> RegisterView(
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
     {
-        var currentUserId = User.GetCurrentUserId();
+        var currentUserId = User.GetRequiredCurrentUserId();
 
-        if (currentUserId is null)
-        {
-            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
-        }
-
-        var result = await _commentService.RecordViewAsync(id, currentUserId.Value, cancellationToken);
+        var result = await _commentService.RecordViewAsync(id, currentUserId, cancellationToken);
 
         return result is null
-            ? this.ProblemResponse(StatusCodes.Status404NotFound, "Comment was not found.")
+            ? this.ProblemResponse(StatusCodes.Status404NotFound, ApiErrorMessages.CommentNotFound)
             : Ok(result);
     }
 
     [Authorize]
     [HttpDelete("{id:guid}/like")]
     [EnableRateLimiting(RateLimiterConfigurator.InteractionPolicyName)]
+    [ProducesResponseType<CommentLikeStateResponse>(StatusCodes.Status200OK)]
     public async Task<ActionResult<CommentLikeStateResponse>> UnlikeComment(
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
     {
-        var currentUserId = User.GetCurrentUserId();
-
-        if (currentUserId is null)
-        {
-            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
-        }
+        var currentUserId = User.GetRequiredCurrentUserId();
 
         var currentComment = await _commentService.GetByIdAsync(
             id,
             cancellationToken,
-            currentUserId.Value);
+            currentUserId);
 
         if (currentComment is null)
         {
-            return this.ProblemResponse(StatusCodes.Status404NotFound, "Comment was not found.");
+            return this.ProblemResponse(StatusCodes.Status404NotFound, ApiErrorMessages.CommentNotFound);
         }
 
-        await _likeService.RemoveCommentLikeAsync(currentUserId.Value, id, cancellationToken);
+        await _likeService.RemoveCommentLikeAsync(currentUserId, id, cancellationToken);
         var updatedComment = await _commentService.GetByIdAsync(
             id,
             cancellationToken,
-            currentUserId.Value);
+            currentUserId);
 
         return updatedComment is null
-            ? this.ProblemResponse(StatusCodes.Status404NotFound, "Comment was not found.")
+            ? this.ProblemResponse(StatusCodes.Status404NotFound, ApiErrorMessages.CommentNotFound)
             : Ok(MapLikeStateResponse(updatedComment));
     }
 
     [Authorize]
     [HttpPost("{id:guid}/bookmark")]
     [EnableRateLimiting(RateLimiterConfigurator.InteractionPolicyName)]
+    [ProducesResponseType<CommentBookmarkStateResponse>(StatusCodes.Status200OK)]
     public async Task<ActionResult<CommentBookmarkStateResponse>> BookmarkComment(
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
     {
-        var currentUserId = User.GetCurrentUserId();
-
-        if (currentUserId is null)
-        {
-            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
-        }
+        var currentUserId = User.GetRequiredCurrentUserId();
 
         var currentComment = await _commentService.GetByIdAsync(
             id,
             cancellationToken,
-            currentUserId.Value);
+            currentUserId);
 
         if (currentComment is null)
         {
-            return this.ProblemResponse(StatusCodes.Status404NotFound, "Comment was not found.");
+            return this.ProblemResponse(StatusCodes.Status404NotFound, ApiErrorMessages.CommentNotFound);
         }
 
         var wasAdded = await _bookmarkService.AddCommentBookmarkAsync(
-            currentUserId.Value,
+            currentUserId,
             id,
             cancellationToken);
 
@@ -328,49 +307,45 @@ public class CommentsController : ControllerBase
             var commentAfterFailedBookmark = await _commentService.GetByIdAsync(
                 id,
                 cancellationToken,
-                currentUserId.Value);
+                currentUserId);
 
             return commentAfterFailedBookmark is null
-                ? this.ProblemResponse(StatusCodes.Status404NotFound, "Comment was not found.")
+                ? this.ProblemResponse(StatusCodes.Status404NotFound, ApiErrorMessages.CommentNotFound)
                 : this.ProblemResponse(StatusCodes.Status409Conflict, "You have already bookmarked this comment.");
         }
 
         var updatedComment = await _commentService.GetByIdAsync(
             id,
             cancellationToken,
-            currentUserId.Value);
+            currentUserId);
 
         return updatedComment is null
-            ? this.ProblemResponse(StatusCodes.Status404NotFound, "Comment was not found.")
+            ? this.ProblemResponse(StatusCodes.Status404NotFound, ApiErrorMessages.CommentNotFound)
             : Ok(MapBookmarkStateResponse(updatedComment));
     }
 
     [Authorize]
     [HttpDelete("{id:guid}/bookmark")]
     [EnableRateLimiting(RateLimiterConfigurator.InteractionPolicyName)]
+    [ProducesResponseType<CommentBookmarkStateResponse>(StatusCodes.Status200OK)]
     public async Task<ActionResult<CommentBookmarkStateResponse>> UnbookmarkComment(
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
     {
-        var currentUserId = User.GetCurrentUserId();
-
-        if (currentUserId is null)
-        {
-            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
-        }
+        var currentUserId = User.GetRequiredCurrentUserId();
 
         var currentComment = await _commentService.GetByIdAsync(
             id,
             cancellationToken,
-            currentUserId.Value);
+            currentUserId);
 
         if (currentComment is null)
         {
-            return this.ProblemResponse(StatusCodes.Status404NotFound, "Comment was not found.");
+            return this.ProblemResponse(StatusCodes.Status404NotFound, ApiErrorMessages.CommentNotFound);
         }
 
         var wasRemoved = await _bookmarkService.RemoveCommentBookmarkAsync(
-            currentUserId.Value,
+            currentUserId,
             id,
             cancellationToken);
 
@@ -379,49 +354,45 @@ public class CommentsController : ControllerBase
             var commentAfterFailedUnbookmark = await _commentService.GetByIdAsync(
                 id,
                 cancellationToken,
-                currentUserId.Value);
+                currentUserId);
 
             return commentAfterFailedUnbookmark is null
-                ? this.ProblemResponse(StatusCodes.Status404NotFound, "Comment was not found.")
-                : this.ProblemResponse(StatusCodes.Status404NotFound, "Bookmark was not found.");
+                ? this.ProblemResponse(StatusCodes.Status404NotFound, ApiErrorMessages.CommentNotFound)
+                : this.ProblemResponse(StatusCodes.Status404NotFound, ApiErrorMessages.BookmarkNotFound);
         }
 
         var updatedComment = await _commentService.GetByIdAsync(
             id,
             cancellationToken,
-            currentUserId.Value);
+            currentUserId);
 
         return updatedComment is null
-            ? this.ProblemResponse(StatusCodes.Status404NotFound, "Comment was not found.")
+            ? this.ProblemResponse(StatusCodes.Status404NotFound, ApiErrorMessages.CommentNotFound)
             : Ok(MapBookmarkStateResponse(updatedComment));
     }
 
     [Authorize]
     [HttpPost("{id:guid}/repost")]
     [EnableRateLimiting(RateLimiterConfigurator.InteractionPolicyName)]
+    [ProducesResponseType<CommentRepostStateResponse>(StatusCodes.Status200OK)]
     public async Task<ActionResult<CommentRepostStateResponse>> RepostComment(
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
     {
-        var currentUserId = User.GetCurrentUserId();
-
-        if (currentUserId is null)
-        {
-            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
-        }
+        var currentUserId = User.GetRequiredCurrentUserId();
 
         var currentComment = await _commentService.GetByIdAsync(
             id,
             cancellationToken,
-            currentUserId.Value);
+            currentUserId);
 
         if (currentComment is null)
         {
-            return this.ProblemResponse(StatusCodes.Status404NotFound, "Comment was not found.");
+            return this.ProblemResponse(StatusCodes.Status404NotFound, ApiErrorMessages.CommentNotFound);
         }
 
         var wasAdded = await _repostService.AddCommentRepostAsync(
-            currentUserId.Value,
+            currentUserId,
             id,
             cancellationToken);
 
@@ -430,49 +401,45 @@ public class CommentsController : ControllerBase
             var commentAfterFailedRepost = await _commentService.GetByIdAsync(
                 id,
                 cancellationToken,
-                currentUserId.Value);
+                currentUserId);
 
             return commentAfterFailedRepost is null
-                ? this.ProblemResponse(StatusCodes.Status404NotFound, "Comment was not found.")
+                ? this.ProblemResponse(StatusCodes.Status404NotFound, ApiErrorMessages.CommentNotFound)
                 : this.ProblemResponse(StatusCodes.Status409Conflict, "You have already reposted this comment.");
         }
 
         var updatedComment = await _commentService.GetByIdAsync(
             id,
             cancellationToken,
-            currentUserId.Value);
+            currentUserId);
 
         return updatedComment is null
-            ? this.ProblemResponse(StatusCodes.Status404NotFound, "Comment was not found.")
+            ? this.ProblemResponse(StatusCodes.Status404NotFound, ApiErrorMessages.CommentNotFound)
             : Ok(MapRepostStateResponse(updatedComment));
     }
 
     [Authorize]
     [HttpDelete("{id:guid}/repost")]
     [EnableRateLimiting(RateLimiterConfigurator.InteractionPolicyName)]
+    [ProducesResponseType<CommentRepostStateResponse>(StatusCodes.Status200OK)]
     public async Task<ActionResult<CommentRepostStateResponse>> UnrepostComment(
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
     {
-        var currentUserId = User.GetCurrentUserId();
-
-        if (currentUserId is null)
-        {
-            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
-        }
+        var currentUserId = User.GetRequiredCurrentUserId();
 
         var currentComment = await _commentService.GetByIdAsync(
             id,
             cancellationToken,
-            currentUserId.Value);
+            currentUserId);
 
         if (currentComment is null)
         {
-            return this.ProblemResponse(StatusCodes.Status404NotFound, "Comment was not found.");
+            return this.ProblemResponse(StatusCodes.Status404NotFound, ApiErrorMessages.CommentNotFound);
         }
 
         var wasRemoved = await _repostService.RemoveCommentRepostAsync(
-            currentUserId.Value,
+            currentUserId,
             id,
             cancellationToken);
 
@@ -481,20 +448,20 @@ public class CommentsController : ControllerBase
             var commentAfterFailedUndo = await _commentService.GetByIdAsync(
                 id,
                 cancellationToken,
-                currentUserId.Value);
+                currentUserId);
 
             return commentAfterFailedUndo is null
-                ? this.ProblemResponse(StatusCodes.Status404NotFound, "Comment was not found.")
-                : this.ProblemResponse(StatusCodes.Status404NotFound, "Repost was not found.");
+                ? this.ProblemResponse(StatusCodes.Status404NotFound, ApiErrorMessages.CommentNotFound)
+                : this.ProblemResponse(StatusCodes.Status404NotFound, ApiErrorMessages.RepostNotFound);
         }
 
         var updatedComment = await _commentService.GetByIdAsync(
             id,
             cancellationToken,
-            currentUserId.Value);
+            currentUserId);
 
         return updatedComment is null
-            ? this.ProblemResponse(StatusCodes.Status404NotFound, "Comment was not found.")
+            ? this.ProblemResponse(StatusCodes.Status404NotFound, ApiErrorMessages.CommentNotFound)
             : Ok(MapRepostStateResponse(updatedComment));
     }
 

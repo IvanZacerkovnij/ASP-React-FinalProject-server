@@ -17,6 +17,9 @@ namespace Threads.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+[ProducesResponseType<ProblemDetails>(StatusCodes.Status429TooManyRequests)]
+[ProducesResponseType<ProblemDetails>(StatusCodes.Status502BadGateway)]
 public class SearchController : ControllerBase
 {
     private readonly IUserService _userService;
@@ -37,6 +40,7 @@ public class SearchController : ControllerBase
     }
 
     [HttpGet("users")]
+    [ProducesResponseType<CursorPageResponse<UserShortResponse>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<CursorPageResponse<UserShortResponse>>> SearchUsers(
         [FromQuery] SearchUsersRequest request,
         CancellationToken cancellationToken)
@@ -51,6 +55,7 @@ public class SearchController : ControllerBase
     }
 
     [HttpGet("posts")]
+    [ProducesResponseType<CursorPageResponse<PostResponse>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<CursorPageResponse<PostResponse>>> SearchPosts(
         [FromQuery] SearchPostsRequest request,
         CancellationToken cancellationToken)
@@ -66,6 +71,7 @@ public class SearchController : ControllerBase
 
     [HttpGet("gifs")]
     [EnableRateLimiting(RateLimiterConfigurator.ExternalSearchPolicyName)]
+    [ProducesResponseType<IReadOnlyCollection<GifResponse>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyCollection<GifResponse>>> SearchGifs(
         [FromQuery] string? q,
         CancellationToken cancellationToken)
@@ -76,6 +82,7 @@ public class SearchController : ControllerBase
 
     [HttpGet("locations")]
     [EnableRateLimiting(RateLimiterConfigurator.ExternalSearchPolicyName)]
+    [ProducesResponseType<IReadOnlyCollection<LocationResponse>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyCollection<LocationResponse>>> SearchLocations(
         [FromQuery] string? q,
         CancellationToken cancellationToken)

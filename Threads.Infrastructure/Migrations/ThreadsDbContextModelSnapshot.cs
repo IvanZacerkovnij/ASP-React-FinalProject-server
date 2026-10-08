@@ -43,6 +43,9 @@ namespace Threads.Infrastructure.Migrations
                     b.Property<Guid>("CurrentVersionId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("LinkPreviewImageUrl")
                         .HasMaxLength(2048)
                         .HasColumnType("character varying(2048)");
@@ -88,6 +91,8 @@ namespace Threads.Infrastructure.Migrations
 
                     b.HasIndex("CurrentVersionId")
                         .IsUnique();
+
+                    b.HasIndex("DeletedAt");
 
                     b.HasIndex("ParentCommentId");
 
@@ -502,6 +507,9 @@ namespace Threads.Infrastructure.Migrations
                     b.Property<Guid>("CurrentVersionId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("EmbedDescription")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
@@ -549,6 +557,8 @@ namespace Threads.Infrastructure.Migrations
 
                     b.HasIndex("CurrentVersionId")
                         .IsUnique();
+
+                    b.HasIndex("DeletedAt");
 
                     b.HasIndex("SearchVector")
                         .HasDatabaseName("IX_Posts_SearchVector");
@@ -738,6 +748,81 @@ namespace Threads.Infrastructure.Migrations
                     b.ToTable("RefreshTokens", (string)null);
                 });
 
+            modelBuilder.Entity("Threads.Domain.Entities.Report", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Decision")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<Guid?>("ReporterId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ResolvedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ResolvedById")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("SystemCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("SystemLabel")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<Guid>("TargetId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TargetType")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("Decision");
+
+                    b.HasIndex("ReporterId");
+
+                    b.HasIndex("ResolvedById");
+
+                    b.HasIndex("Source");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("TargetType", "TargetId");
+
+                    b.ToTable("Reports", (string)null);
+                });
+
             modelBuilder.Entity("Threads.Domain.Entities.ScheduledPost", b =>
                 {
                     b.Property<Guid>("Id")
@@ -825,6 +910,9 @@ namespace Threads.Infrastructure.Migrations
                     b.Property<DateOnly?>("DateOfBirth")
                         .HasColumnType("date");
 
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("DisplayName")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
@@ -895,6 +983,8 @@ namespace Threads.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("DeletedAt");
+
                     b.HasIndex("Email")
                         .IsUnique();
 
@@ -905,6 +995,8 @@ namespace Threads.Infrastructure.Migrations
 
                     b.HasIndex("Username")
                         .IsUnique();
+
+                    b.HasIndex("IsActive", "CreatedAt", "Id");
 
                     b.ToTable("Users", (string)null);
                 });
@@ -1249,6 +1341,23 @@ namespace Threads.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Threads.Domain.Entities.Report", b =>
+                {
+                    b.HasOne("Threads.Domain.Entities.User", "Reporter")
+                        .WithMany("SubmittedReports")
+                        .HasForeignKey("ReporterId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Threads.Domain.Entities.User", "ResolvedBy")
+                        .WithMany("ResolvedReports")
+                        .HasForeignKey("ResolvedById")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Reporter");
+
+                    b.Navigation("ResolvedBy");
+                });
+
             modelBuilder.Entity("Threads.Domain.Entities.ScheduledPost", b =>
                 {
                     b.HasOne("Threads.Domain.Entities.User", "Author")
@@ -1347,7 +1456,11 @@ namespace Threads.Infrastructure.Migrations
 
                     b.Navigation("RefreshTokens");
 
+                    b.Navigation("ResolvedReports");
+
                     b.Navigation("ScheduledPosts");
+
+                    b.Navigation("SubmittedReports");
 
                     b.Navigation("UploadedMedia");
                 });

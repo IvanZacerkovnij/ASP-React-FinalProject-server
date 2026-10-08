@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using Threads.Application.Exceptions;
+using Threads.Api.Exceptions;
+using Threads.Api.Responses;
 using Threads.Infrastructure.Exceptions;
 
 namespace Threads.Api.ExceptionHandling;
@@ -27,49 +29,54 @@ public sealed class GlobalExceptionHandler(
 
         var (statusCode, title, detail) = exception switch
         {
+            InvalidUserClaimsException =>
+                (StatusCodes.Status401Unauthorized,
+                    ApiErrorTitles.Unauthorized,
+                    exception.Message),
+
             RequestValidationException =>
                 (StatusCodes.Status400BadRequest,
-                    "Invalid request",
+                    ApiErrorTitles.InvalidRequest,
                     exception.Message),
-            
+
             NotFoundException =>
                 (StatusCodes.Status404NotFound,
-                    "Resource not found",
+                    ApiErrorTitles.ResourceNotFound,
                     exception.Message),
-            
+
             ConflictException =>
                 (StatusCodes.Status409Conflict,
-                    "Conflict",
+                    ApiErrorTitles.Conflict,
                     exception.Message),
-            
+
             ForbiddenException =>
                 (StatusCodes.Status403Forbidden,
-                    "Forbidden",
+                    ApiErrorTitles.Forbidden,
                     exception.Message),
 
             MediaProcessingException =>
                 (StatusCodes.Status500InternalServerError,
-                    "Media processing failed",
+                    ApiErrorTitles.MediaProcessingFailed,
                     "Unable to process the media file"),
 
             ExternalServiceException =>
                 (StatusCodes.Status502BadGateway,
-                    "External service error",
+                    ApiErrorTitles.ExternalServiceError,
                     "An external service is unavailable"),
 
             InfrastructureConfigurationException =>
                 (StatusCodes.Status500InternalServerError,
-                    "Application configuration error",
+                    ApiErrorTitles.ApplicationConfigurationError,
                     "The application is temporarily unavailable"),
 
             _ =>
                 (StatusCodes.Status500InternalServerError,
-                    "Internal server error",
+                    ApiErrorTitles.InternalServerError,
                     "An unexpected error occurred")
         };
 
         LogException(httpContext, exception, statusCode);
-        
+
         httpContext.Response.StatusCode = statusCode;
 
         return await problemDetailsService.TryWriteAsync(

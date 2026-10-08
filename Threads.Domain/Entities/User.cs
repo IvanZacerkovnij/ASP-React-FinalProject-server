@@ -44,6 +44,8 @@ public class User : BaseEntity
     public bool IsVerified { get; set; }
     
     public bool IsActive { get; set; } = true;
+
+    public DateTimeOffset? DeletedAt { get; set; }
     
     public UserRole Role { get; set; } = UserRole.User;
 
@@ -93,4 +95,10 @@ public class User : BaseEntity
 
     public ICollection<Media> UploadedMedia { get; set; } =
         new List<Media>();
+
+    public ICollection<Report> SubmittedReports { get; set; } =
+        new List<Report>();
+
+    public ICollection<Report> ResolvedReports { get; set; } =
+        new List<Report>();
 }

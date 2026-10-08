@@ -58,10 +58,14 @@ BackEndForFinalProject
 │   │   ├── FollowsController.cs    # followers і following
 │   │   ├── SearchController.cs     # пошук користувачів, постів, GIF і локацій
 │   │   ├── LinkPreviewsController.cs # безпечне отримання metadata зовнішнього URL
-│   │   └── MediaController.cs      # upload і доступ до медіа
+│   │   ├── MediaController.cs      # upload і доступ до медіа
+│   │   ├── ReportsController.cs    # створення скарг на контент і користувачів
+│   │   └── Admin*Controller.cs     # moderation, users і dashboard для адміністратора
 │   ├── ExceptionHandling           # глобальне перетворення винятків у ProblemDetails
+│   ├── Extensions                  # controller helper для явних ProblemDetails-відповідей
 │   ├── Middleware                  # логування повільних HTTP-запитів
 │   ├── Requests                    # HTTP-моделі для multipart/form-data
+│   ├── Responses                   # стабільні title/detail для API-помилок
 │   └── Program.cs                  # entrypoint і DI-конфігурація API
 ├── Threads.Application
 │   ├── DTOs
@@ -86,7 +90,7 @@ BackEndForFinalProject
 │   ├── Exceptions                  # технічні Infrastructure exceptions
 │   ├── Migrations                  # EF Core migrations і model snapshot
 │   ├── Security                    # JWT, password hashing, CORS і policies
-│   └── Services                    # S3, Redis, email, GIF, location і ffmpeg
+│   └── Services                    # S3, Redis, email, GIF, location, ffmpeg та API configurators
 ├── deploy/nginx                    # nginx reverse proxy configuration
 ├── tests
 │   ├── Threads.Application.UnitTests          # xUnit-тести application-рівня і domain enums
@@ -268,7 +272,7 @@ API стартує після успішного healthcheck Redis. Для Redis
 
 ### База даних
 
-EF Core migrations і model snapshot зберігаються в `Threads.Infrastructure/Migrations`. Зараз історія migrations складається з однієї migration `20261002141529_Initial`, яка створює всю схему, включно з колонками `BirthDateVisibility` і `BirthYearVisibility`.
+EF Core migrations і model snapshot зберігаються в `Threads.Infrastructure/Migrations`. Migration `20261008090458_AddAdministrationAndReports` додає moderation reports, індекси адмін-запитів і soft-delete поля для users/posts/comments.
 
 API не застосовує migrations під час старту, і deploy workflow їх також не запускає. Застосувати актуальні migrations можна командою:
 
@@ -291,26 +295,36 @@ OpenAPI і Swagger UI підключені для всіх середовищ:
 
 ## Рольова авторизація
 
-Додано: `2026-09-07`
+Оновлено: `2026-10-08`
 
-- користувач має роль `User` або `Moderator`; нові користувачі за замовчуванням отримують `User`
+- користувач має роль `User` або `Admin`; нові користувачі за замовчуванням отримують `User`
 - роль зберігається в `Users.Role` як ціле число
 - роль додається до access token через `ClaimTypes.Role`
 - JWT Bearer використовує `ClaimTypes.Role` для перевірки ролі користувача
-- policy `Moderation` дозволяє доступ користувачам із роллю `Moderator`
-- майбутні moderation endpoints захищатимуться атрибутом `[Authorize(Policy = AuthorizationPolicies.Moderation)]`
-- moderation endpoints у поточній версії API ще не реалізовані
+- policy `Admin` дозволяє доступ користувачам із роллю `Admin`
+- усі `/api/admin/*` endpoints захищені атрибутом `[Authorize(Policy = AuthorizationPolicies.Admin)]`
+- `GET /api/me` повертає контрактну роль `USER` або `ADMIN`
+- blocked/deleted user не проходить login, refresh і перевірку вже виданого access token
 
 ## Обробка помилок
 
-API використовує RFC 7807 `ProblemDetails` для контрольованих помилок контролерів і винятків application/infrastructure-рівня. `GlobalExceptionHandler` зареєстрований через `AddExceptionHandler<GlobalExceptionHandler>()` і `UseExceptionHandler()`, а явні помилки контролерів формуються через спільний `ControllerProblemDetailsExtensions`.
+API використовує RFC 7807 `ProblemDetails` для контрольованих помилок контролерів, framework-відповідей і винятків application/infrastructure-рівня.
 
-Обидва шляхи повертають `Content-Type: application/problem+json` і однаковий контракт:
+- `ProblemDetailsConfigurator` налаштовує `ProblemDetailsOptions` і автоматично додає `instance` з поточного request path;
+- `GlobalExceptionHandler` зареєстрований через `AddExceptionHandler<GlobalExceptionHandler>()` і `UseExceptionHandler()`;
+- `UseStatusCodePages()` формує `ProblemDetails` для порожніх framework-відповідей, зокрема `404 Not Found` і `405 Method Not Allowed`;
+- JWT challenge/forbidden та rate limiter формують RFC 7807 відповіді для `401`, `403` і `429`;
+- явні помилки контролерів формуються через `ControllerProblemDetailsExtensions.ProblemResponse()`.
+
+Контролери документують HTTP-контракт атрибутами `ProducesResponseType`. Типи успішних відповідей вказані біля відповідних action, а повторювані `ProducesResponseType<ProblemDetails>` винесені на рівень контролера. Завдяки цьому OpenAPI явно показує DTO успішної відповіді та `ProblemDetails` для кожного задекларованого помилкового status code.
+
+Усі помилкові відповіді, включно з admin/report endpoints, JWT `401/403`, model validation і rate limiting, повертають `Content-Type: application/problem+json` та єдиний контракт:
 
 - `status` — фактичний HTTP status;
 - `title` — стабільна категорія (`Invalid request`, `Unauthorized`, `Forbidden`, `Resource not found`, `Conflict`, `Internal server error`);
 - `detail` — конкретне повідомлення;
-- `instance` — поточний шлях запиту.
+- `instance` — поточний шлях запиту;
+- `type` — необов'язковий URI типу проблеми; якщо поле відсутнє, за RFC 7807 використовується семантика `about:blank`.
 
 | Виняток | HTTP status | Призначення |
 |---|---:|---|
@@ -327,14 +341,14 @@ Application exceptions розміщені в `Threads.Application/Exceptions`, �
 
 Винятки використовуються для переривання сценарію та бізнес-помилок команд. Зокрема, update/delete неіснуючого ресурсу спричиняє `NotFoundException`, а спроба змінити чужий пост, коментар або список followers — `ForbiddenException`. Результати на кшталт неправильних credentials, недійсного refresh token, простроченого verification code або повторної interaction залишаються `null`, `false` чи окремим status і обробляються контролером.
 
-Приклад відповіді:
+Наприклад, `GET /api/users/unknown-user/replies` повертає `404 Not Found` із `Content-Type: application/problem+json`:
 
 ```json
 {
-  "title": "Invalid request",
-  "status": 400,
-  "detail": "Post must contain content, media, poll, or link preview.",
-  "instance": "/api/posts"
+  "title": "Resource not found",
+  "status": 404,
+  "detail": "User was not found.",
+  "instance": "/api/users/unknown-user/replies"
 }
 ```
 
@@ -367,7 +381,10 @@ Endpoint-и з однаковою named policy використовують сп
 
 ```json
 {
-  "message": "Too many requests. Please try again later."
+  "title": "Too many requests",
+  "status": 429,
+  "detail": "Too many requests. Please try again later.",
+  "instance": "/api/posts"
 }
 ```
 
@@ -502,6 +519,32 @@ Endpoint-и з однаковою named policy використовують сп
 `UserShortResponse` (автор поста чи коментаря, результати пошуку) також містить `bio`.
 
 `UserResponse` використовується і для публічного профілю, і для `/api/me`. Поле `email` є nullable: у відповідях `/api/users/...` воно завжди дорівнює `null`, а `GET /api/me` і успішний `PUT /api/me` повертають email поточного користувача. Приватний профіль завантажується окремо від кешованого публічного профілю, щоб email не потрапляв у public profile cache.
+
+### Reports і administration
+
+Авторизований користувач може створити скаргу з причиною `spam`, `harassment`, `misinformation`, `violence`, `hate` або `other`:
+
+| Method | Route | Auth | Призначення |
+|---|---|---|---|
+| `POST` | `/api/posts/{id}/report` | Так | Поскаржитися на пост |
+| `POST` | `/api/comments/{id}/report` | Так | Поскаржитися на коментар |
+| `POST` | `/api/users/{id}/report` | Так | Поскаржитися на користувача |
+
+Адміністративні маршрути потребують ролі `ADMIN`:
+
+| Method | Route | Призначення |
+|---|---|---|
+| `GET` | `/api/admin/users` | Пошук, фільтрація, сортування та page pagination користувачів |
+| `GET` | `/api/admin/users/{id}` | Деталі користувача з `isBlocked` |
+| `PUT` | `/api/admin/users/{id}/block` | Ідемпотентно заблокувати користувача |
+| `PUT` | `/api/admin/users/{id}/unblock` | Ідемпотентно розблокувати користувача |
+| `DELETE` | `/api/admin/users/{id}/delete` | Soft-delete користувача |
+| `GET` | `/api/admin/moderation` | Черга скарг із фільтрами та пошуком |
+| `GET` | `/api/admin/moderation/{id}` | Деталі скарги та її target |
+| `PUT` | `/api/admin/moderation/{id}/status` | Атомарно застосувати `kept`, `deleted` або `blocked` |
+| `GET` | `/api/admin/dashboard/metrics` | Поточні метрики |
+| `GET` | `/api/admin/dashboard/charts?period=7d` | UTC-серії audience/activity за 7 і 30 днів |
+| `GET` | `/api/admin/dashboard/tables?limit=5` | Останні користувачі та згруповані скарги |
 
 #### Cursor pagination
 
