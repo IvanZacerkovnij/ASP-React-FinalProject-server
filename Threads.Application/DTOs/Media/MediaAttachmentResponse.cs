@@ -1,6 +1,6 @@
-namespace Threads.Application.DTOs.Posts.Responses;
+namespace Threads.Application.DTOs.Media;
 
-public class PostMediaResponse
+public sealed class MediaAttachmentResponse
 {
     public Guid Id { get; init; }
 

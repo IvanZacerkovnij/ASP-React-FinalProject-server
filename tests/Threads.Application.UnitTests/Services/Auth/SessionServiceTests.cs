@@ -8,6 +8,7 @@ using Threads.Application.Interfaces.Auth;
 using Threads.Application.Interfaces.Security;
 using Threads.Application.Interfaces.Users;
 using Threads.Application.Services.Auth;
+using Threads.Application.UnitTests.Helpers;
 using Threads.Domain.Entities;
 
 namespace Threads.Application.UnitTests.Services.Auth;
@@ -57,7 +58,7 @@ public class SessionServiceTests
     [Fact]
     public async Task LoginAsync_WhenCredentialsAreValid_ReturnsAuthResponse()
     {
-        var user = CreateUser();
+        var user = TestEntityFactory.CreateUser();
         var request = new LoginRequest
         {
             EmailOrUsername = "  USER@EXAMPLE.COM  ",
@@ -120,7 +121,7 @@ public class SessionServiceTests
     [Fact]
     public async Task LoginAsync_WhenPasswordIsInvalid_ReturnsNull()
     {
-        var user = CreateUser();
+        var user = TestEntityFactory.CreateUser();
         var request = new LoginRequest
         {
             EmailOrUsername = user.Username,
@@ -148,7 +149,10 @@ public class SessionServiceTests
         bool isActive,
         bool isVerified)
     {
-        var user = CreateUser(isActive, isVerified);
+        var user = TestEntityFactory.CreateUser(
+            isActive: isActive,
+            isVerified: isVerified);
+        
         var request = new LoginRequest
         {
             EmailOrUsername = user.Username,
@@ -188,7 +192,7 @@ public class SessionServiceTests
     public async Task RefreshTokenAsync_WhenRotationFails_ReturnsNull()
     {
         const string rawToken = "current-refresh-token";
-        var refreshToken = CreateRefreshToken();
+        var refreshToken = TestEntityFactory.CreateRefreshToken();
         _refreshTokenRepository
             .GetByTokenHashAsync(Hash(rawToken), Arg.Any<CancellationToken>())
             .Returns(refreshToken);
@@ -212,7 +216,7 @@ public class SessionServiceTests
     public async Task RefreshTokenAsync_WhenRotationSucceeds_ReturnsNewAuthResponse()
     {
         const string rawToken = "current-refresh-token";
-        var refreshToken = CreateRefreshToken();
+        var refreshToken = TestEntityFactory.CreateRefreshToken();
         var accessTokenExpiresAt = DateTimeOffset.UtcNow.AddMinutes(15);
         _refreshTokenRepository
             .GetByTokenHashAsync(Hash(rawToken), Arg.Any<CancellationToken>())
@@ -245,7 +249,7 @@ public class SessionServiceTests
     public async Task LogoutAsync_WhenTokenIsInactive_ReturnsFalse()
     {
         const string rawToken = "inactive-refresh-token";
-        var refreshToken = CreateRefreshToken();
+        var refreshToken = TestEntityFactory.CreateRefreshToken();
         refreshToken.RevokedAt = DateTimeOffset.UtcNow;
         _refreshTokenRepository
             .GetByTokenHashAsync(Hash(rawToken), Arg.Any<CancellationToken>())
@@ -281,7 +285,7 @@ public class SessionServiceTests
     public async Task LogoutAsync_WhenTokenIsActive_RevokesTokenAndReturnsTrue()
     {
         const string rawToken = "active-refresh-token";
-        var refreshToken = CreateRefreshToken();
+        var refreshToken = TestEntityFactory.CreateRefreshToken();
         _refreshTokenRepository
             .GetByTokenHashAsync(Hash(rawToken), Arg.Any<CancellationToken>())
             .Returns(refreshToken);
@@ -294,32 +298,6 @@ public class SessionServiceTests
         await _refreshTokenRepository.Received(1).UpdateAsync(
             refreshToken,
             Arg.Any<CancellationToken>());
-    }
-
-    private static User CreateUser(bool isActive = true, bool isVerified = true)
-    {
-        return new User
-        {
-            Id = Guid.NewGuid(),
-            Email = "user@example.com",
-            Username = "testuser",
-            PasswordHash = "stored-password-hash",
-            IsActive = isActive,
-            IsVerified = isVerified
-        };
-    }
-
-    private static RefreshToken CreateRefreshToken()
-    {
-        var user = CreateUser();
-        return new RefreshToken
-        {
-            Id = Guid.NewGuid(),
-            UserId = user.Id,
-            User = user,
-            TokenHash = "stored-token-hash",
-            ExpiresAt = DateTimeOffset.UtcNow.AddDays(1)
-        };
     }
 
     private static string Hash(string value)

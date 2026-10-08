@@ -22,6 +22,10 @@ public class User : BaseEntity
     public string? Bio { get; set; }
 
     public DateOnly? DateOfBirth { get; set; }
+    
+    public VisibilityLevel BirthDateVisibility { get; set; } = VisibilityLevel.OnlyMe;
+
+    public VisibilityLevel BirthYearVisibility { get; set; } = VisibilityLevel.OnlyMe;
 
     public string? Location { get; set; }
 
@@ -45,6 +49,9 @@ public class User : BaseEntity
 
     public ICollection<Post> Posts { get; set; } =
         new List<Post>();
+
+    public ICollection<ScheduledPost> ScheduledPosts { get; set; } =
+        new List<ScheduledPost>();
 
     public ICollection<Comment> Comments { get; set; } =
         new List<Comment>();

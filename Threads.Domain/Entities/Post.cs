@@ -5,6 +5,8 @@ namespace Threads.Domain.Entities;
 public class Post : BaseEntity
 {
     public string? Content { get; set; }
+    
+    public Guid CurrentVersionId { get; set; } = Guid.NewGuid();
 
     public string? LocationName { get; set; }
 
@@ -27,6 +29,11 @@ public class Post : BaseEntity
     public Guid AuthorId { get; set; }
 
     public User Author { get; set; } = null!;
+    
+    public PostQuote? Quote { get; set; }
+    
+    public ICollection<PostVersion> Versions { get; set; } =
+        new List<PostVersion>();
 
     public ICollection<Media> Media { get; set; } =
         new List<Media>();

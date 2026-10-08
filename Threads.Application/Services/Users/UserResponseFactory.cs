@@ -28,6 +28,7 @@ public sealed class UserResponseFactory
             Id = response.Id,
             Username = response.Username,
             DisplayName = response.DisplayName,
+            Bio = response.Bio,
             Location = CreateLocation(
                 user.LocationPlaceId,
                 user.Location,
@@ -46,6 +47,7 @@ public sealed class UserResponseFactory
             Id = user.Id,
             Username = user.Username,
             DisplayName = user.DisplayName,
+            Bio = user.Bio,
             Location = CreateLocation(
                 user.LocationPlaceId,
                 user.LocationName,
@@ -68,7 +70,9 @@ public sealed class UserResponseFactory
             Email = response.Email,
             DisplayName = response.DisplayName,
             Bio = response.Bio,
-            DateOfBirth = response.DateOfBirth,
+            BirthDate = user.DateOfBirth,
+            BirthDateVisibility = user.BirthDateVisibility,
+            BirthYearVisibility = user.BirthYearVisibility,
             Location = CreateLocation(
                 user.LocationPlaceId,
                 user.Location,
@@ -89,19 +93,21 @@ public sealed class UserResponseFactory
 
     public UserResponse Create(
         UserProfileReadModel publicProfile,
-        bool isFollowedByCurrentUser)
+        bool isFollowedByCurrentUser,
+        bool canSeeBirthDate)
     {
-        return Create(publicProfile, isFollowedByCurrentUser, email: null);
+        return Create(publicProfile, isFollowedByCurrentUser, canSeeBirthDate, email: null);
     }
 
     public UserResponse CreateCurrent(User user, UserProfileReadModel profile)
     {
-        return Create(profile, isFollowedByCurrentUser: false, email: user.Email);
+        return Create(profile, isFollowedByCurrentUser: false, canSeeBirthDate: true, email: user.Email);
     }
 
     private UserResponse Create(
         UserProfileReadModel publicProfile,
         bool isFollowedByCurrentUser,
+        bool canSeeBirthDate,
         string? email)
     {
         return new UserResponse
@@ -111,7 +117,11 @@ public sealed class UserResponseFactory
             Email = email,
             DisplayName = publicProfile.DisplayName,
             Bio = publicProfile.Bio,
-            DateOfBirth = publicProfile.DateOfBirth,
+            BirthDate = canSeeBirthDate
+                ? publicProfile.DateOfBirth
+                : null,
+            BirthDateVisibility = publicProfile.BirthDateVisibility,
+            BirthYearVisibility = publicProfile.BirthYearVisibility,
             Location = CreateLocation(
                 publicProfile.LocationPlaceId,
                 publicProfile.LocationName,

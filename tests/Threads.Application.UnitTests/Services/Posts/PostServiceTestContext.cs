@@ -4,10 +4,12 @@ using NSubstitute;
 using Threads.Application.DTOs.Posts.Models;
 using Threads.Application.DTOs.Posts.Responses;
 using Threads.Application.DTOs.Users;
+using Threads.Application.Interfaces.Comments;
 using Threads.Application.Interfaces.Media;
 using Threads.Application.Interfaces.Posts;
 using Threads.Application.Interfaces.Users;
 using Threads.Application.Services.Posts;
+using Threads.Application.Services.Comments;
 using Threads.Application.Services.Users;
 using Threads.Application.UnitTests.TestSupport;
 using Threads.Domain.Entities;
@@ -43,15 +45,21 @@ internal sealed class PostServiceTestContext
             ObjectStorageService,
             userResponseFactory,
             Mapper);
+        var commentQueryService = new CommentQueryService(
+            CommentRepository,
+            new CommentResponseFactory(userResponseFactory, ObjectStorageService));
         QueryService = new PostQueryService(
             PostRepository,
             UserService,
             ResponseFactory,
+            commentQueryService,
             Cache,
             Substitute.For<ILogger<PostQueryService>>());
     }
 
     public IPostRepository PostRepository { get; } = Substitute.For<IPostRepository>();
+
+    public ICommentRepository CommentRepository { get; } = Substitute.For<ICommentRepository>();
 
     public IObjectStorageService ObjectStorageService { get; } = Substitute.For<IObjectStorageService>();
 
@@ -99,6 +107,7 @@ internal sealed class PostServiceTestContext
         return new PostSummaryReadModel
         {
             Id = Guid.NewGuid(),
+            VersionId = Guid.NewGuid(),
             Content = "post content",
             Author = new UserSummaryReadModel
             {
@@ -114,6 +123,7 @@ internal sealed class PostServiceTestContext
         return new PostResponse
         {
             Id = post.Id,
+            VersionId = post.CurrentVersionId,
             Content = post.Content ?? string.Empty,
             Author = new UserShortResponse
             {

@@ -10,11 +10,13 @@ public class PostProfile : Profile
     public PostProfile()
     {
         CreateMap<Post, PostResponse>()
+            .ForMember(destination => destination.VersionId, options => options.MapFrom(source => source.CurrentVersionId))
             .ForMember(destination => destination.Content, options => options.MapFrom(source => source.Content ?? string.Empty))
             .ForMember(destination => destination.Media, options => options.Ignore())
             .ForMember(destination => destination.Poll, options => options.Ignore())
             .ForMember(destination => destination.Location, options => options.Ignore())
-            .ForMember(destination => destination.Embed, options => options.Ignore())
+            .ForMember(destination => destination.LinkPreview, options => options.Ignore())
+            .ForMember(destination => destination.Quote, options => options.Ignore())
             .ForMember(destination => destination.LikesCount, options => options.MapFrom(source => source.PostLikes.Count))
             .ForMember(destination => destination.CommentsCount, options => options.MapFrom(source => source.Comments.Count))
             .ForMember(destination => destination.RepostsCount, options => options.MapFrom(source => source.PostReposts.Count))
@@ -28,6 +30,7 @@ public class PostProfile : Profile
             .ForMember(destination => destination.UpdatedAt, options => options.MapFrom(source => source.UpdatedAt));
 
         CreateMap<CreatePostRequest, Post>()
+            .ForMember(destination => destination.CurrentVersionId, options => options.Ignore())
             .ForMember(destination => destination.Content, options => options.Ignore())
             .ForMember(destination => destination.LocationPlaceId, options => options.Ignore())
             .ForMember(destination => destination.LocationName, options => options.Ignore())
@@ -46,9 +49,12 @@ public class PostProfile : Profile
             .ForMember(destination => destination.PostLikes, options => options.Ignore())
             .ForMember(destination => destination.PostReposts, options => options.Ignore())
             .ForMember(destination => destination.PostBookmarks, options => options.Ignore())
+            .ForMember(destination => destination.Quote, options => options.Ignore())
+            .ForMember(destination => destination.Versions, options => options.Ignore())
             .ForMember(destination => destination.Poll, options => options.Ignore());
 
         CreateMap<UpdatePostRequest, Post>()
+            .ForMember(destination => destination.CurrentVersionId, options => options.Ignore())
             .ForMember(destination => destination.Content, options => options.Ignore())
             .ForMember(destination => destination.LocationPlaceId, options => options.Ignore())
             .ForMember(destination => destination.LocationName, options => options.Ignore())
@@ -67,6 +73,8 @@ public class PostProfile : Profile
             .ForMember(destination => destination.PostLikes, options => options.Ignore())
             .ForMember(destination => destination.PostReposts, options => options.Ignore())
             .ForMember(destination => destination.PostBookmarks, options => options.Ignore())
+            .ForMember(destination => destination.Quote, options => options.Ignore())
+            .ForMember(destination => destination.Versions, options => options.Ignore())
             .ForMember(destination => destination.Poll, options => options.Ignore());
     }
 }

@@ -25,6 +25,19 @@ public class PollRepository : IPollRepository
             .FirstOrDefaultAsync(poll => poll.PostId == postId, cancellationToken);
     }
 
+    public async Task<Poll?> GetByCommentIdAsync(
+        Guid commentId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Polls
+            .AsNoTracking()
+            .AsSplitQuery()
+            .Include(poll => poll.Options.OrderBy(option => option.Position))
+            .ThenInclude(option => option.Votes)
+            .Include(poll => poll.Votes)
+            .FirstOrDefaultAsync(poll => poll.CommentId == commentId, cancellationToken);
+    }
+
     public async Task<bool> TryAddVoteAsync(
         PollVote vote,
         CancellationToken cancellationToken = default)

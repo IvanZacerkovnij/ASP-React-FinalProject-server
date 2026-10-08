@@ -5,6 +5,7 @@ using Threads.Application.DTOs.Gifs;
 using Threads.Application.DTOs.Locations;
 using Threads.Application.DTOs.Pagination;
 using Threads.Application.DTOs.Posts.Responses;
+using Threads.Application.DTOs.Search;
 using Threads.Application.DTOs.Users;
 using Threads.Application.Interfaces.Gifs;
 using Threads.Application.Interfaces.Locations;
@@ -37,15 +38,13 @@ public class SearchController : ControllerBase
 
     [HttpGet("users")]
     public async Task<ActionResult<CursorPageResponse<UserShortResponse>>> SearchUsers(
-        [FromQuery] string? q,
-        [FromQuery] CursorPageRequest pagination,
+        [FromQuery] SearchUsersRequest request,
         CancellationToken cancellationToken)
     {
         var currentUserId = User.GetCurrentUserId();
         
         var users = await _userService.SearchAsync(
-            q ?? string.Empty,
-            pagination,
+            request,
             cancellationToken,
             currentUserId);
         return Ok(users);
@@ -53,15 +52,13 @@ public class SearchController : ControllerBase
 
     [HttpGet("posts")]
     public async Task<ActionResult<CursorPageResponse<PostResponse>>> SearchPosts(
-        [FromQuery] string? q,
-        [FromQuery] CursorPageRequest pagination,
+        [FromQuery] SearchPostsRequest request,
         CancellationToken cancellationToken)
     {
         var currentUserId = User.GetCurrentUserId();
         
         var posts = await _postService.SearchAsync(
-            q ?? string.Empty,
-            pagination,
+            request,
             cancellationToken,
             currentUserId);
         return Ok(posts);

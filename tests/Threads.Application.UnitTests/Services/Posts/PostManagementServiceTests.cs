@@ -1,9 +1,12 @@
 using Microsoft.Extensions.Logging;
 using NSubstitute;
+using Threads.Application.DTOs.LinkPreviews;
 using Threads.Application.DTOs.Posts.Requests;
 using Threads.Application.Exceptions;
+using Threads.Application.Interfaces.Comments;
 using Threads.Application.Interfaces.Media;
 using Threads.Application.Services.Posts;
+using Threads.Application.Services.Versions;
 using Threads.Domain.Entities;
 using Threads.Domain.Enums;
 using MediaEntity = Threads.Domain.Entities.Media;
@@ -14,10 +17,18 @@ public class PostManagementServiceTests
 {
     private readonly PostServiceTestContext _context = new();
     private readonly IMediaRepository _mediaRepository = Substitute.For<IMediaRepository>();
+
+    private readonly PostVersionFactory _versionFactory =
+        new PostVersionFactory(new VersionSnapshotSerializer());
+    private readonly ICommentRepository _commentRepository =
+        Substitute.For<ICommentRepository>();
     private readonly PostManagementService _service;
 
     public PostManagementServiceTests()
     {
+        var quoteService = new PostQuoteService(
+            _context.PostRepository,
+            _commentRepository);
         var mediaManager = new PostMediaManager(
             _mediaRepository,
             _context.ObjectStorageService,
@@ -27,6 +38,8 @@ public class PostManagementServiceTests
             mediaManager,
             _context.QueryService,
             _context.ResponseFactory,
+            _versionFactory,
+            quoteService,
             _context.Cache,
             Substitute.For<ILogger<PostManagementService>>());
     }
@@ -76,7 +89,11 @@ public class PostManagementServiceTests
         Assert.NotNull(addedPost);
         Assert.Equal(authorId, addedPost.AuthorId);
         Assert.Equal("New post", addedPost.Content);
+        var version = Assert.Single(addedPost.Versions);
+        Assert.Equal(addedPost.CurrentVersionId, version.Id);
+        Assert.Contains("\"content\":\"New post\"", version.SnapshotJson);
         Assert.Equal(addedPost.Id, result.Id);
+        Assert.Equal(addedPost.CurrentVersionId, result.VersionId);
         Assert.Contains($"users:profile:v1:{authorId:N}", _context.Cache.RemovedKeys);
     }
 
@@ -140,6 +157,7 @@ public class PostManagementServiceTests
     public async Task UpdateAsync_WhenRequestIsValid_UpdatesPostInvalidatesCacheAndPreservesViews()
     {
         var post = PostServiceTestContext.CreatePost();
+        var previousVersionId = post.CurrentVersionId;
         var media = CreateMedia(post.AuthorId);
         _context.PostRepository
             .GetByIdAsync(post.Id, Arg.Any<CancellationToken>())
@@ -158,14 +176,19 @@ public class PostManagementServiceTests
             {
                 Content = "  updated content  ",
                 MediaIds = [media.Id],
-                Embed = new PostEmbedRequest { Url = " https://example.com " }
+                LinkPreview = new LinkPreviewRequest { Url = " https://example.com " }
             });
 
         Assert.Equal("updated content", post.Content);
         Assert.Equal("https://example.com", post.EmbedUrl);
         Assert.Same(media, Assert.Single(post.Media));
         Assert.NotNull(post.UpdatedAt);
+        Assert.NotEqual(previousVersionId, post.CurrentVersionId);
+        var version = Assert.Single(post.Versions);
+        Assert.Equal(post.CurrentVersionId, version.Id);
+        Assert.Contains("\"content\":\"updated content\"", version.SnapshotJson);
         Assert.Equal(12, result.ViewsCount);
+        Assert.Equal(post.CurrentVersionId, result.VersionId);
         await _context.PostRepository.Received(1).UpdateAsync(
             post,
             Arg.Any<CancellationToken>());

@@ -59,7 +59,8 @@ public class PostResponseFactoryTests
         Assert.Equal("video", result.Media.Last().Type);
         Assert.Null(result.Media.Last().ThumbnailUrl);
         Assert.Equal("Kyiv", result.Location?.Name);
-        Assert.Equal("https://example.com", result.Embed?.Url);
+        Assert.Equal("https://example.com/", result.LinkPreview?.Url);
+        Assert.Equal("example.com", result.LinkPreview?.Domain);
         Assert.NotNull(result.Poll);
         Assert.True(result.Poll.HasVotedByCurrentUser);
         Assert.Equal(option.Id, result.Poll.SelectedOptionId);

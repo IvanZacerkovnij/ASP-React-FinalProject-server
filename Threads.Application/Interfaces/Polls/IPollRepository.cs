@@ -5,5 +5,6 @@ namespace Threads.Application.Interfaces.Polls;
 public interface IPollRepository
 {
     Task<Poll?> GetByPostIdAsync(Guid postId, CancellationToken cancellationToken = default);
+    Task<Poll?> GetByCommentIdAsync(Guid commentId, CancellationToken cancellationToken = default);
     Task<bool> TryAddVoteAsync(PollVote vote, CancellationToken cancellationToken = default);
 }

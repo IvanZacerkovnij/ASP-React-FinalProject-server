@@ -9,6 +9,7 @@ using Threads.Application.Interfaces.Users;
 using Threads.Application.Services.Users;
 using Threads.Application.UnitTests.TestSupport;
 using Threads.Domain.Entities;
+using Threads.Domain.Enums;
 
 namespace Threads.Application.UnitTests.Services.Users;
 
@@ -219,6 +220,58 @@ public class UserProfileServiceTests
             Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task UpdateAsync_WhenVisibilityIsProvided_PersistsAndReturnsVisibility()
+    {
+        var user = CreateUser();
+        SetupUser(user);
+
+        var result = await _service.UpdateAsync(user.Id, new UpdateUserRequest
+        {
+            BirthDateVisibility = VisibilityLevel.Followers,
+            BirthYearVisibility = VisibilityLevel.Public
+        });
+
+        Assert.Equal(VisibilityLevel.Followers, user.BirthDateVisibility);
+        Assert.Equal(VisibilityLevel.Public, user.BirthYearVisibility);
+        Assert.NotNull(result);
+        Assert.Equal(VisibilityLevel.Followers, result.BirthDateVisibility);
+        Assert.Equal(VisibilityLevel.Public, result.BirthYearVisibility);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WhenVisibilityIsOmitted_KeepsExistingVisibility()
+    {
+        var user = CreateUser();
+        user.BirthDateVisibility = VisibilityLevel.Mutual;
+        user.BirthYearVisibility = VisibilityLevel.Following;
+        SetupUser(user);
+
+        await _service.UpdateAsync(user.Id, new UpdateUserRequest { DisplayName = "New Name" });
+
+        Assert.Equal(VisibilityLevel.Mutual, user.BirthDateVisibility);
+        Assert.Equal(VisibilityLevel.Following, user.BirthYearVisibility);
+    }
+
+    [Fact]
+    public void NewUser_DefaultsBirthDateVisibilityToOnlyMe()
+    {
+        var user = CreateUser();
+
+        Assert.Equal(VisibilityLevel.OnlyMe, user.BirthDateVisibility);
+        Assert.Equal(VisibilityLevel.OnlyMe, user.BirthYearVisibility);
+    }
+
+    private void SetupUser(User user)
+    {
+        _userRepository
+            .GetByIdAsync(user.Id, Arg.Any<CancellationToken>())
+            .Returns(user);
+        _userRepository
+            .GetProfileByIdAsync(user.Id, Arg.Any<CancellationToken>())
+            .Returns(_ => CreateProfile(user));
+    }
+
     private static UserFileUploadRequest CreateFile(
         Stream content,
         string fileName,
@@ -257,6 +310,8 @@ public class UserProfileServiceTests
             DisplayName = user.DisplayName,
             Bio = user.Bio,
             DateOfBirth = user.DateOfBirth,
+            BirthDateVisibility = user.BirthDateVisibility,
+            BirthYearVisibility = user.BirthYearVisibility,
             LocationPlaceId = user.LocationPlaceId,
             LocationName = user.Location,
             LocationCountry = user.LocationCountry,
@@ -281,7 +336,7 @@ public class UserProfileServiceTests
             Email = user.Email,
             DisplayName = user.DisplayName,
             Bio = user.Bio,
-            DateOfBirth = user.DateOfBirth,
+            BirthDate = user.DateOfBirth,
             IsVerified = user.IsVerified,
             CreatedAt = user.CreatedAt
         };

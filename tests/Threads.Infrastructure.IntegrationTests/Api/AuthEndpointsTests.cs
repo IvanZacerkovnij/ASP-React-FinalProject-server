@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Threads.Application.DTOs.Auth.Requests;
 using Threads.Application.DTOs.Auth.Responses;
@@ -36,7 +37,12 @@ public sealed class AuthEndpointsTests : DatabaseTestBase
         var invalidVerification = await client.PostAsJsonAsync(
             "/api/auth/verify-email",
             new VerifyEmailRequest { Email = Email, Code = invalidCode });
-        Assert.Equal(HttpStatusCode.BadRequest, invalidVerification.StatusCode);
+        await AssertProblemDetailsAsync(
+            invalidVerification,
+            HttpStatusCode.BadRequest,
+            "Invalid request",
+            "Verification code is invalid or expired.",
+            "/api/auth/verify-email");
 
         var verifyResponse = await client.PostAsJsonAsync(
             "/api/auth/verify-email",
@@ -48,7 +54,12 @@ public sealed class AuthEndpointsTests : DatabaseTestBase
         var invalidLogin = await client.PostAsJsonAsync(
             "/api/auth/login",
             new LoginRequest { EmailOrUsername = Email, Password = "WrongPassword123!" });
-        Assert.Equal(HttpStatusCode.Unauthorized, invalidLogin.StatusCode);
+        await AssertProblemDetailsAsync(
+            invalidLogin,
+            HttpStatusCode.Unauthorized,
+            "Unauthorized",
+            "Invalid credentials.",
+            "/api/auth/login");
 
         var loginResponse = await client.PostAsJsonAsync(
             "/api/auth/login",
@@ -103,7 +114,12 @@ public sealed class AuthEndpointsTests : DatabaseTestBase
         Assert.Equal(HttpStatusCode.Unauthorized, unauthenticated.StatusCode);
 
         var missing = await client.GetAsync($"/api/users/by-id/{Guid.NewGuid()}");
-        Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+        await AssertProblemDetailsAsync(
+            missing,
+            HttpStatusCode.NotFound,
+            "Resource not found",
+            "User was not found.",
+            missing.RequestMessage!.RequestUri!.AbsolutePath);
 
         Assert.Equal(HttpStatusCode.OK, (await RegisterAsync(client)).StatusCode);
         var verifyResponse = await client.PostAsJsonAsync(
@@ -117,7 +133,12 @@ public sealed class AuthEndpointsTests : DatabaseTestBase
         Assert.NotNull(session);
 
         var duplicateRegistration = await RegisterAsync(client);
-        Assert.Equal(HttpStatusCode.Conflict, duplicateRegistration.StatusCode);
+        await AssertProblemDetailsAsync(
+            duplicateRegistration,
+            HttpStatusCode.Conflict,
+            "Conflict",
+            "User with this email already exists.",
+            "/api/auth/register");
 
         var otherAuthor = TestEntityFactory.CreateUser("other-author");
         var otherPost = TestEntityFactory.CreatePost(otherAuthor);
@@ -155,5 +176,26 @@ public sealed class AuthEndpointsTests : DatabaseTestBase
     private static string Hash(string value)
     {
         return Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
+    }
+
+    private static async Task AssertProblemDetailsAsync(
+        HttpResponseMessage response,
+        HttpStatusCode expectedStatus,
+        string expectedTitle,
+        string expectedDetail,
+        string expectedInstance)
+    {
+        Assert.Equal(expectedStatus, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+
+        await using var stream = await response.Content.ReadAsStreamAsync();
+        using var document = await JsonDocument.ParseAsync(stream);
+        var problem = document.RootElement;
+
+        Assert.Equal((int)expectedStatus, problem.GetProperty("status").GetInt32());
+        Assert.Equal(expectedTitle, problem.GetProperty("title").GetString());
+        Assert.Equal(expectedDetail, problem.GetProperty("detail").GetString());
+        Assert.Equal(expectedInstance, problem.GetProperty("instance").GetString());
+        Assert.False(problem.TryGetProperty("message", out _));
     }
 }

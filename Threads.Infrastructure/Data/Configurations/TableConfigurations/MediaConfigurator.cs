@@ -50,6 +50,8 @@ public class MediaConfigurator : IEntityTypeConfiguration<Media>
 
         builder.HasIndex(media => media.UploadedByUserId);
         builder.HasIndex(media => new { media.PostId, media.SortOrder });
+        builder.HasIndex(media => new { media.CommentId, media.SortOrder });
+        builder.HasIndex(media => new { media.ScheduledPostId, media.SortOrder });
 
         builder.ToTable(table =>
             table.HasCheckConstraint(
@@ -76,6 +78,13 @@ public class MediaConfigurator : IEntityTypeConfiguration<Media>
                 "CK_Media_DurationSeconds",
                 "\"DurationSeconds\" IS NULL OR \"DurationSeconds\" >= 0"));
 
+        builder.ToTable(table =>
+            table.HasCheckConstraint(
+                "CK_Media_SingleTarget",
+                "(\"PostId\" IS NOT NULL)::int + " +
+                "(\"CommentId\" IS NOT NULL)::int + " +
+                "(\"ScheduledPostId\" IS NOT NULL)::int <= 1"));
+
         builder.HasOne(media => media.UploadedByUser)
             .WithMany(user => user.UploadedMedia)
             .HasForeignKey(media => media.UploadedByUserId)
@@ -84,6 +93,16 @@ public class MediaConfigurator : IEntityTypeConfiguration<Media>
         builder.HasOne(media => media.Post)
             .WithMany(post => post.Media)
             .HasForeignKey(media => media.PostId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasOne(media => media.Comment)
+            .WithMany(comment => comment.Media)
+            .HasForeignKey(media => media.CommentId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasOne(media => media.ScheduledPost)
+            .WithMany(scheduledPost => scheduledPost.Media)
+            .HasForeignKey(media => media.ScheduledPostId)
             .OnDelete(DeleteBehavior.Cascade);
     }
 }

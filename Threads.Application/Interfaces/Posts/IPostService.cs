@@ -1,11 +1,17 @@
 using Threads.Application.DTOs.Pagination;
 using Threads.Application.DTOs.Posts.Requests;
 using Threads.Application.DTOs.Posts.Responses;
+using Threads.Application.DTOs.Search;
+using Threads.Application.DTOs.Versions;
 
 namespace Threads.Application.Interfaces.Posts;
 
 public interface IPostService
 {
+    Task<CursorPageResponse<PostResponse>> SearchAsync(
+        SearchPostsRequest request,
+        CancellationToken cancellationToken = default,
+        Guid? currentUserId = null);
     Task<IReadOnlyCollection<PostResponse>> GetFeedAsync(CancellationToken cancellationToken = default, Guid? currentUserId = null);
     Task<CursorPageResponse<PostResponse>> GetByAuthorIdAsync(
         Guid authorId,
@@ -36,6 +42,11 @@ public interface IPostService
         CancellationToken cancellationToken = default,
         Guid? currentUserId = null);
     Task<PostResponse?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default, Guid? currentUserId = null);
+    Task<EditHistoryResponse<PostResponse>?> GetEditHistoryAsync(
+        Guid id,
+        CursorPageRequest pagination,
+        CancellationToken cancellationToken = default,
+        Guid? currentUserId = null);
     Task<PostResponse> CreateAsync(Guid authorId, CreatePostRequest request, CancellationToken cancellationToken = default);
     Task<PostResponse> UpdateAsync(
         Guid id,

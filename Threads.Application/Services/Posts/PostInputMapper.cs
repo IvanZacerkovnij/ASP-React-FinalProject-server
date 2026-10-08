@@ -1,5 +1,7 @@
 using Threads.Application.DTOs.Posts.Requests;
+using Threads.Application.DTOs.LinkPreviews;
 using Threads.Application.Exceptions;
+using Threads.Application.Services.Common;
 using Threads.Domain.Entities;
 
 namespace Threads.Application.Services.Posts;
@@ -12,7 +14,6 @@ internal static class PostInputMapper
     private const int MaxLocationIdLength = 1024;
     private const int MaxEmbedUrlLength = 2048;
     private const int MaxEmbedTitleLength = 255;
-    private const int MaxEmbedDescriptionLength = 1000;
 
     public static Post Create(Guid authorId, CreatePostRequest request)
     {
@@ -26,7 +27,7 @@ internal static class PostInputMapper
         };
 
         ApplyLocation(post, request.Location);
-        ApplyEmbed(post, request.Embed);
+        ApplyLinkPreview(post, request.LinkPreview);
 
         return post;
     }
@@ -50,13 +51,16 @@ internal static class PostInputMapper
             ApplyLocation(post, request.Location);
         }
 
-        if (request.RemoveEmbed)
+        if (request.HasLinkPreviewValue)
         {
-            ClearEmbed(post);
-        }
-        else if (request.Embed is not null)
-        {
-            ApplyEmbed(post, request.Embed);
+            if (request.LinkPreview is null)
+            {
+                ClearLinkPreview(post);
+            }
+            else
+            {
+                ApplyLinkPreview(post, request.LinkPreview);
+            }
         }
 
         if (request.Poll is not null)
@@ -75,11 +79,11 @@ internal static class PostInputMapper
         var hasContent = !string.IsNullOrWhiteSpace(post.Content);
         var hasMedia = post.Media.Count > 0;
         var hasPoll = post.Poll is not null;
-        var hasEmbed = !string.IsNullOrWhiteSpace(post.EmbedUrl);
+        var hasLinkPreview = !string.IsNullOrWhiteSpace(post.EmbedUrl);
 
-        if (!hasContent && !hasMedia && !hasPoll && !hasEmbed)
+        if (!hasContent && !hasMedia && !hasPoll && !hasLinkPreview)
         {
-            throw new RequestValidationException("Post must contain content, media, poll, or embed.");
+            throw new RequestValidationException("Post must contain content, media, poll, or link preview.");
         }
     }
 
@@ -88,30 +92,20 @@ internal static class PostInputMapper
         var hasContent = !string.IsNullOrWhiteSpace(request.Content);
         var hasMedia = request.MediaIds?.Count > 0;
         var hasPoll = request.Poll is not null;
-        var hasEmbed = request.Embed is not null;
+        var hasLinkPreview = request.LinkPreview is not null;
 
-        if (!hasContent && !hasMedia && !hasPoll && !hasEmbed)
+        if (!hasContent && !hasMedia && !hasPoll && !hasLinkPreview)
         {
-            throw new RequestValidationException("Post must contain content, media, poll, or embed.");
+            throw new RequestValidationException("Post must contain content, media, poll, or link preview.");
         }
     }
 
     private static string? NormalizeContent(string? content)
     {
-        if (string.IsNullOrWhiteSpace(content))
-        {
-            return null;
-        }
-
-        var normalizedContent = content.Trim();
-
-        if (normalizedContent.Length > MaxContentLength)
-        {
-            throw new RequestValidationException(
-                $"Post content must be {MaxContentLength} characters or less.");
-        }
-
-        return normalizedContent;
+        return InputNormalizer.NormalizeOptional(
+            content,
+            MaxContentLength,
+            "Post content");
     }
 
     private static void ApplyLocation(Post post, PostLocationRequest? location)
@@ -121,22 +115,15 @@ internal static class PostInputMapper
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(location.Name))
-        {
-            throw new RequestValidationException("Location name is required.");
-        }
-
-        var normalizedLocationName = location.Name.Trim();
-
-        if (normalizedLocationName.Length > MaxLocationNameLength)
-        {
-            throw new RequestValidationException(
-                $"Location name must be {MaxLocationNameLength} characters or less.");
-        }
-
-        post.LocationName = normalizedLocationName;
-        post.LocationPlaceId = NormalizeOptionalValue(location.Id, MaxLocationIdLength, "Location id");
-        post.LocationCountry = NormalizeOptionalValue(
+        post.LocationName = InputNormalizer.NormalizeRequired(
+            location.Name,
+            MaxLocationNameLength,
+            "Location name");
+        post.LocationPlaceId = InputNormalizer.NormalizeOptional(
+            location.Id,
+            MaxLocationIdLength,
+            "Location id");
+        post.LocationCountry = InputNormalizer.NormalizeOptional(
             location.Country,
             MaxLocationCountryLength,
             "Location country");
@@ -153,65 +140,34 @@ internal static class PostInputMapper
         post.LocationLongitude = null;
     }
 
-    private static void ApplyEmbed(Post post, PostEmbedRequest? embed)
+    private static void ApplyLinkPreview(Post post, LinkPreviewRequest? linkPreview)
     {
-        if (embed is null)
+        if (linkPreview is null)
         {
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(embed.Url))
-        {
-            throw new RequestValidationException("Embed url is required.");
-        }
-
-        var normalizedUrl = embed.Url.Trim();
-
-        if (normalizedUrl.Length > MaxEmbedUrlLength)
-        {
-            throw new RequestValidationException(
-                $"Embed url must be {MaxEmbedUrlLength} characters or less.");
-        }
-
-        post.EmbedUrl = normalizedUrl;
-        post.EmbedTitle = NormalizeOptionalValue(embed.Title, MaxEmbedTitleLength, "Embed title");
-        post.EmbedDescription = NormalizeOptionalValue(
-            embed.Description,
-            MaxEmbedDescriptionLength,
-            "Embed description");
-        post.EmbedThumbnailUrl = NormalizeOptionalValue(
-            embed.ThumbnailUrl,
+        post.EmbedUrl = InputNormalizer.NormalizeRequired(
+            linkPreview.Url,
             MaxEmbedUrlLength,
-            "Embed thumbnail url");
+            "Link preview url");
+        post.EmbedTitle = InputNormalizer.NormalizeOptional(
+            linkPreview.Title,
+            MaxEmbedTitleLength,
+            "Link preview title");
+        post.EmbedDescription = null;
+        post.EmbedThumbnailUrl = InputNormalizer.NormalizeOptional(
+            linkPreview.ImageUrl,
+            MaxEmbedUrlLength,
+            "Link preview image url");
     }
 
-    private static void ClearEmbed(Post post)
+    private static void ClearLinkPreview(Post post)
     {
         post.EmbedUrl = null;
         post.EmbedTitle = null;
         post.EmbedDescription = null;
         post.EmbedThumbnailUrl = null;
-    }
-
-    private static string? NormalizeOptionalValue(
-        string? value,
-        int maxLength,
-        string fieldName)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return null;
-        }
-
-        var normalizedValue = value.Trim();
-
-        if (normalizedValue.Length > maxLength)
-        {
-            throw new RequestValidationException(
-                $"{fieldName} must be {maxLength} characters or less.");
-        }
-
-        return normalizedValue;
     }
 
     private static Poll? MapPoll(CreatePostPollRequest? poll)

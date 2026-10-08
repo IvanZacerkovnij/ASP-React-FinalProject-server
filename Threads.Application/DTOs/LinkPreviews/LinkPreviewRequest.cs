@@ -1,8 +1,8 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace Threads.Application.DTOs.Posts.Requests;
+namespace Threads.Application.DTOs.LinkPreviews;
 
-public class PostEmbedRequest
+public sealed class LinkPreviewRequest
 {
     [Required, Url, StringLength(2048, MinimumLength = 1)]
     public required string Url { get; init; }
@@ -10,9 +10,6 @@ public class PostEmbedRequest
     [StringLength(255, MinimumLength = 1)]
     public string? Title { get; init; }
 
-    [StringLength(1000, MinimumLength = 1)]
-    public string? Description { get; init; }
-
     [Url, StringLength(2048, MinimumLength = 1)]
-    public string? ThumbnailUrl { get; init; }
+    public string? ImageUrl { get; init; }
 }

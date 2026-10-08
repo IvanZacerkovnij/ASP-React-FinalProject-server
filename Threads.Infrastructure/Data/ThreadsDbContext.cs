@@ -7,6 +7,7 @@ public class ThreadsDbContext : DbContext
 {
     public DbSet<Comment> Comments { get; set; }
     public DbSet<Post> Posts { get; set; }
+    public DbSet<ScheduledPost> ScheduledPosts { get; set; }
     public DbSet<User> Users { get; set; }
     public DbSet<Follow> Follows { get; set; }
     public DbSet<PostLike> PostLikes { get; set; }
@@ -15,6 +16,9 @@ public class ThreadsDbContext : DbContext
     public DbSet<CommentRepost> CommentReposts { get; set; }
     public DbSet<PostBookmark> PostBookmarks { get; set; }
     public DbSet<CommentBookmark> CommentBookmarks { get; set; }
+    public DbSet<PostVersion> PostVersions { get; set; }
+    public DbSet<CommentVersion> CommentVersions { get; set; }
+    public DbSet<PostQuote> PostQuotes { get; set; }
     public DbSet<Media> Medias { get; set; }
     public DbSet<Poll> Polls { get; set; }
     public DbSet<PollOption> PollOptions { get; set; }

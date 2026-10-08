@@ -4,9 +4,12 @@ using Microsoft.AspNetCore.RateLimiting;
 using Threads.Api.Extensions;
 using Threads.Application.DTOs.Comments;
 using Threads.Application.DTOs.Pagination;
+using Threads.Application.DTOs.Polls;
+using Threads.Application.DTOs.Versions;
 using Threads.Application.Interfaces.Bookmarks;
 using Threads.Application.Interfaces.Comments;
 using Threads.Application.Interfaces.Likes;
+using Threads.Application.Interfaces.Polls;
 using Threads.Application.Interfaces.Reposts;
 using Threads.Infrastructure.Services;
 
@@ -20,17 +23,20 @@ public class CommentsController : ControllerBase
     private readonly ILikeService _likeService;
     private readonly IRepostService _repostService;
     private readonly IBookmarkService _bookmarkService;
+    private readonly IPollService _pollService;
 
     public CommentsController(
         ICommentService commentService,
         ILikeService likeService,
         IRepostService repostService,
-        IBookmarkService bookmarkService)
+        IBookmarkService bookmarkService,
+        IPollService pollService)
     {
         _commentService = commentService;
         _likeService = likeService;
         _repostService = repostService;
         _bookmarkService = bookmarkService;
+        _pollService = pollService;
     }
 
     [HttpGet("post/{postId:guid}")]
@@ -60,7 +66,7 @@ public class CommentsController : ControllerBase
 
         if (currentUserId is null)
         {
-            return Unauthorized(new { message = "Invalid token claims." });
+            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
         }
 
         var comment = await _commentService.CreateAsync(currentUserId.Value, request, cancellationToken);
@@ -80,9 +86,47 @@ public class CommentsController : ControllerBase
             currentUserId);
         if (comment is null)
         {
-            return NotFound(new { message = "Comment was not found." });
+            return this.ProblemResponse(StatusCodes.Status404NotFound, "Comment was not found.");
         }
         return Ok(comment);
+    }
+
+    [HttpGet("{id:guid}/thread")]
+    public async Task<ActionResult<CommentThreadResponse>> GetThread(
+        [FromRoute] Guid id,
+        [FromQuery] CursorPageRequest pagination,
+        CancellationToken cancellationToken)
+    {
+        var currentUserId = User.GetCurrentUserId();
+
+        var thread = await _commentService.GetThreadAsync(
+            id,
+            pagination,
+            cancellationToken,
+            currentUserId);
+
+        return thread is null
+            ? this.ProblemResponse(StatusCodes.Status404NotFound, "Comment was not found.")
+            : Ok(thread);
+    }
+
+    [HttpGet("{id:guid}/edit-history")]
+    [EnableRateLimiting(RateLimiterConfigurator.EditHistoryPolicyName)]
+    public async Task<ActionResult<EditHistoryResponse<CommentResponse>>> GetEditHistory(
+        [FromRoute] Guid id,
+        [FromQuery] CursorPageRequest pagination,
+        CancellationToken cancellationToken)
+    {
+        var currentUserId = User.GetCurrentUserId();
+        var history = await _commentService.GetEditHistoryAsync(
+            id,
+            pagination,
+            cancellationToken,
+            currentUserId);
+
+        return history is null
+            ? this.ProblemResponse(StatusCodes.Status404NotFound, "Comment was not found.")
+            : Ok(history);
     }
 
     [Authorize]
@@ -96,7 +140,7 @@ public class CommentsController : ControllerBase
 
         if (currentUserId is null)
         {
-            return Unauthorized(new { message = "Invalid token claims." });
+            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
         }
 
         var updatedComment = await _commentService.UpdateAsync(
@@ -118,12 +162,45 @@ public class CommentsController : ControllerBase
 
         if (currentUserId is null)
         {
-            return Unauthorized(new { message = "Invalid token claims." });
+            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
         }
 
         await _commentService.DeleteAsync(id, currentUserId.Value, cancellationToken);
 
         return NoContent();
+    }
+
+    [Authorize]
+    [HttpPost("{id:guid}/poll/vote")]
+    [EnableRateLimiting(RateLimiterConfigurator.InteractionPolicyName)]
+    public async Task<ActionResult<PollResponse>> VotePoll(
+        [FromRoute] Guid id,
+        [FromBody] VotePollRequest request,
+        CancellationToken cancellationToken)
+    {
+        var currentUserId = User.GetCurrentUserId();
+
+        if (currentUserId is null)
+        {
+            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
+        }
+
+        var result = await _pollService.VoteCommentAsync(
+            currentUserId.Value,
+            id,
+            request,
+            cancellationToken);
+
+        return result.Status switch
+        {
+            PollVoteStatus.Success => Ok(result.Poll),
+            PollVoteStatus.CommentNotFound => this.ProblemResponse(StatusCodes.Status404NotFound, "Comment was not found."),
+            PollVoteStatus.PollNotFound => this.ProblemResponse(StatusCodes.Status404NotFound, "Poll was not found."),
+            PollVoteStatus.InvalidOption => this.ProblemResponse(StatusCodes.Status400BadRequest, "Poll option is invalid."),
+            PollVoteStatus.AlreadyVoted => this.ProblemResponse(StatusCodes.Status409Conflict, "You have already voted in this poll."),
+            PollVoteStatus.PollClosed => this.ProblemResponse(StatusCodes.Status409Conflict, "Poll is already closed."),
+            _ => this.ProblemResponse(StatusCodes.Status400BadRequest, "Unable to vote in poll.")
+        };
     }
 
     [Authorize]
@@ -137,7 +214,7 @@ public class CommentsController : ControllerBase
 
         if (currentUserId is null)
         {
-            return Unauthorized(new { message = "Invalid token claims." });
+            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
         }
 
         var currentComment = await _commentService.GetByIdAsync(
@@ -147,7 +224,7 @@ public class CommentsController : ControllerBase
 
         if (currentComment is null)
         {
-            return NotFound(new { message = "Comment was not found." });
+            return this.ProblemResponse(StatusCodes.Status404NotFound, "Comment was not found.");
         }
 
         await _likeService.AddCommentLikeAsync(currentUserId.Value, id, cancellationToken);
@@ -157,7 +234,7 @@ public class CommentsController : ControllerBase
             currentUserId.Value);
 
         return updatedComment is null
-            ? NotFound(new { message = "Comment was not found." })
+            ? this.ProblemResponse(StatusCodes.Status404NotFound, "Comment was not found.")
             : Ok(MapLikeStateResponse(updatedComment));
     }
 
@@ -172,13 +249,13 @@ public class CommentsController : ControllerBase
 
         if (currentUserId is null)
         {
-            return Unauthorized(new { message = "Invalid token claims." });
+            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
         }
 
         var result = await _commentService.RecordViewAsync(id, currentUserId.Value, cancellationToken);
 
         return result is null
-            ? NotFound(new { message = "Comment was not found." })
+            ? this.ProblemResponse(StatusCodes.Status404NotFound, "Comment was not found.")
             : Ok(result);
     }
 
@@ -193,7 +270,7 @@ public class CommentsController : ControllerBase
 
         if (currentUserId is null)
         {
-            return Unauthorized(new { message = "Invalid token claims." });
+            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
         }
 
         var currentComment = await _commentService.GetByIdAsync(
@@ -203,7 +280,7 @@ public class CommentsController : ControllerBase
 
         if (currentComment is null)
         {
-            return NotFound(new { message = "Comment was not found." });
+            return this.ProblemResponse(StatusCodes.Status404NotFound, "Comment was not found.");
         }
 
         await _likeService.RemoveCommentLikeAsync(currentUserId.Value, id, cancellationToken);
@@ -213,7 +290,7 @@ public class CommentsController : ControllerBase
             currentUserId.Value);
 
         return updatedComment is null
-            ? NotFound(new { message = "Comment was not found." })
+            ? this.ProblemResponse(StatusCodes.Status404NotFound, "Comment was not found.")
             : Ok(MapLikeStateResponse(updatedComment));
     }
 
@@ -228,7 +305,7 @@ public class CommentsController : ControllerBase
 
         if (currentUserId is null)
         {
-            return Unauthorized(new { message = "Invalid token claims." });
+            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
         }
 
         var currentComment = await _commentService.GetByIdAsync(
@@ -238,7 +315,7 @@ public class CommentsController : ControllerBase
 
         if (currentComment is null)
         {
-            return NotFound(new { message = "Comment was not found." });
+            return this.ProblemResponse(StatusCodes.Status404NotFound, "Comment was not found.");
         }
 
         var wasAdded = await _bookmarkService.AddCommentBookmarkAsync(
@@ -254,8 +331,8 @@ public class CommentsController : ControllerBase
                 currentUserId.Value);
 
             return commentAfterFailedBookmark is null
-                ? NotFound(new { message = "Comment was not found." })
-                : Conflict(new { message = "You have already bookmarked this comment." });
+                ? this.ProblemResponse(StatusCodes.Status404NotFound, "Comment was not found.")
+                : this.ProblemResponse(StatusCodes.Status409Conflict, "You have already bookmarked this comment.");
         }
 
         var updatedComment = await _commentService.GetByIdAsync(
@@ -264,7 +341,7 @@ public class CommentsController : ControllerBase
             currentUserId.Value);
 
         return updatedComment is null
-            ? NotFound(new { message = "Comment was not found." })
+            ? this.ProblemResponse(StatusCodes.Status404NotFound, "Comment was not found.")
             : Ok(MapBookmarkStateResponse(updatedComment));
     }
 
@@ -279,7 +356,7 @@ public class CommentsController : ControllerBase
 
         if (currentUserId is null)
         {
-            return Unauthorized(new { message = "Invalid token claims." });
+            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
         }
 
         var currentComment = await _commentService.GetByIdAsync(
@@ -289,7 +366,7 @@ public class CommentsController : ControllerBase
 
         if (currentComment is null)
         {
-            return NotFound(new { message = "Comment was not found." });
+            return this.ProblemResponse(StatusCodes.Status404NotFound, "Comment was not found.");
         }
 
         var wasRemoved = await _bookmarkService.RemoveCommentBookmarkAsync(
@@ -305,8 +382,8 @@ public class CommentsController : ControllerBase
                 currentUserId.Value);
 
             return commentAfterFailedUnbookmark is null
-                ? NotFound(new { message = "Comment was not found." })
-                : NotFound(new { message = "Bookmark was not found." });
+                ? this.ProblemResponse(StatusCodes.Status404NotFound, "Comment was not found.")
+                : this.ProblemResponse(StatusCodes.Status404NotFound, "Bookmark was not found.");
         }
 
         var updatedComment = await _commentService.GetByIdAsync(
@@ -315,7 +392,7 @@ public class CommentsController : ControllerBase
             currentUserId.Value);
 
         return updatedComment is null
-            ? NotFound(new { message = "Comment was not found." })
+            ? this.ProblemResponse(StatusCodes.Status404NotFound, "Comment was not found.")
             : Ok(MapBookmarkStateResponse(updatedComment));
     }
 
@@ -330,7 +407,7 @@ public class CommentsController : ControllerBase
 
         if (currentUserId is null)
         {
-            return Unauthorized(new { message = "Invalid token claims." });
+            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
         }
 
         var currentComment = await _commentService.GetByIdAsync(
@@ -340,7 +417,7 @@ public class CommentsController : ControllerBase
 
         if (currentComment is null)
         {
-            return NotFound(new { message = "Comment was not found." });
+            return this.ProblemResponse(StatusCodes.Status404NotFound, "Comment was not found.");
         }
 
         var wasAdded = await _repostService.AddCommentRepostAsync(
@@ -356,8 +433,8 @@ public class CommentsController : ControllerBase
                 currentUserId.Value);
 
             return commentAfterFailedRepost is null
-                ? NotFound(new { message = "Comment was not found." })
-                : Conflict(new { message = "You have already reposted this comment." });
+                ? this.ProblemResponse(StatusCodes.Status404NotFound, "Comment was not found.")
+                : this.ProblemResponse(StatusCodes.Status409Conflict, "You have already reposted this comment.");
         }
 
         var updatedComment = await _commentService.GetByIdAsync(
@@ -366,7 +443,7 @@ public class CommentsController : ControllerBase
             currentUserId.Value);
 
         return updatedComment is null
-            ? NotFound(new { message = "Comment was not found." })
+            ? this.ProblemResponse(StatusCodes.Status404NotFound, "Comment was not found.")
             : Ok(MapRepostStateResponse(updatedComment));
     }
 
@@ -381,7 +458,7 @@ public class CommentsController : ControllerBase
 
         if (currentUserId is null)
         {
-            return Unauthorized(new { message = "Invalid token claims." });
+            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
         }
 
         var currentComment = await _commentService.GetByIdAsync(
@@ -391,7 +468,7 @@ public class CommentsController : ControllerBase
 
         if (currentComment is null)
         {
-            return NotFound(new { message = "Comment was not found." });
+            return this.ProblemResponse(StatusCodes.Status404NotFound, "Comment was not found.");
         }
 
         var wasRemoved = await _repostService.RemoveCommentRepostAsync(
@@ -407,8 +484,8 @@ public class CommentsController : ControllerBase
                 currentUserId.Value);
 
             return commentAfterFailedUndo is null
-                ? NotFound(new { message = "Comment was not found." })
-                : NotFound(new { message = "Repost was not found." });
+                ? this.ProblemResponse(StatusCodes.Status404NotFound, "Comment was not found.")
+                : this.ProblemResponse(StatusCodes.Status404NotFound, "Repost was not found.");
         }
 
         var updatedComment = await _commentService.GetByIdAsync(
@@ -417,7 +494,7 @@ public class CommentsController : ControllerBase
             currentUserId.Value);
 
         return updatedComment is null
-            ? NotFound(new { message = "Comment was not found." })
+            ? this.ProblemResponse(StatusCodes.Status404NotFound, "Comment was not found.")
             : Ok(MapRepostStateResponse(updatedComment));
     }
 

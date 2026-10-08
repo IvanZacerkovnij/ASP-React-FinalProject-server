@@ -99,7 +99,7 @@ public class UserResponseFactoryTests
             CreatedAt = DateTimeOffset.UtcNow
         };
 
-        var result = _factory.Create(profile, isFollowedByCurrentUser: true);
+        var result = _factory.Create(profile, isFollowedByCurrentUser: true, canSeeBirthDate: true);
 
         Assert.Null(result.Email);
         Assert.Equal(4, result.FollowersCount);

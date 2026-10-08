@@ -4,12 +4,12 @@ namespace Threads.Application.Interfaces.Media;
 
 public interface IMediaService
 {
-    Task<MediaUrlResponse?> GetUrlAsync(
+    Task<MediaAttachmentResponse?> GetByIdAsync(
         Guid mediaId,
         Guid? currentUserId = null,
         CancellationToken cancellationToken = default);
 
-    Task<UploadMediaResponse> UploadAsync(
+    Task<MediaAttachmentResponse> UploadAsync(
         Guid uploadedByUserId,
         Stream content,
         string fileName,

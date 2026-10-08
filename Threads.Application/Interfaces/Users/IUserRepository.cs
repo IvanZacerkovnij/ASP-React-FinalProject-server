@@ -7,6 +7,14 @@ namespace Threads.Application.Interfaces.Users;
 public interface IUserRepository
 {
     Task<IReadOnlyCollection<UserSummaryReadModel>> SearchAsync(
+        string? query,
+        string? people,
+        string? location,
+        int limit,
+        TextCursorPosition? cursor = null,
+        Guid? currentUserId = null,
+        CancellationToken cancellationToken = default);
+    Task<IReadOnlyCollection<UserSummaryReadModel>> SearchAsync(
         string query,
         int limit,
         TextCursorPosition? cursor = null,

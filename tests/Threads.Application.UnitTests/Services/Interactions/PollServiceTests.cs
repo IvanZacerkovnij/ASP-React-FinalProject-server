@@ -1,6 +1,7 @@
 using NSubstitute;
 using Threads.Application.DTOs.Polls;
 using Threads.Application.Interfaces.Polls;
+using Threads.Application.Interfaces.Comments;
 using Threads.Application.Interfaces.Posts;
 using Threads.Application.Services.Interactions;
 using Threads.Domain.Entities;
@@ -11,11 +12,15 @@ public class PollServiceTests
 {
     private readonly IPollRepository _pollRepository = Substitute.For<IPollRepository>();
     private readonly IPostRepository _postRepository = Substitute.For<IPostRepository>();
+    private readonly ICommentRepository _commentRepository = Substitute.For<ICommentRepository>();
     private readonly PollService _service;
 
     public PollServiceTests()
     {
-        _service = new PollService(_pollRepository, _postRepository);
+        _service = new PollService(
+            _pollRepository,
+            _postRepository,
+            _commentRepository);
     }
 
     [Fact]
@@ -60,7 +65,7 @@ public class PollServiceTests
 
         var result = await _service.VoteAsync(
             userId,
-            poll.PostId,
+            poll.PostId!.Value,
             new VotePollRequest { OptionId = poll.Options.First().Id });
 
         Assert.Equal(PollVoteStatus.PollClosed, result.Status);
@@ -79,7 +84,7 @@ public class PollServiceTests
 
         var result = await _service.VoteAsync(
             Guid.NewGuid(),
-            poll.PostId,
+            poll.PostId!.Value,
             new VotePollRequest { OptionId = Guid.NewGuid() });
 
         Assert.Equal(PollVoteStatus.InvalidOption, result.Status);
@@ -107,7 +112,7 @@ public class PollServiceTests
 
         var result = await _service.VoteAsync(
             userId,
-            poll.PostId,
+            poll.PostId!.Value,
             new VotePollRequest { OptionId = option.Id });
 
         Assert.Equal(PollVoteStatus.AlreadyVoted, result.Status);
@@ -133,9 +138,9 @@ public class PollServiceTests
         persistedPoll.Votes.Add(persistedVote);
         persistedOption.Votes.Add(persistedVote);
 
-        _postRepository.ExistsAsync(poll.PostId, Arg.Any<CancellationToken>()).Returns(true);
+        _postRepository.ExistsAsync(poll.PostId!.Value, Arg.Any<CancellationToken>()).Returns(true);
         _pollRepository
-            .GetByPostIdAsync(poll.PostId, Arg.Any<CancellationToken>())
+            .GetByPostIdAsync(poll.PostId!.Value, Arg.Any<CancellationToken>())
             .Returns(poll, persistedPoll);
         _pollRepository
             .TryAddVoteAsync(Arg.Any<PollVote>(), Arg.Any<CancellationToken>())
@@ -143,7 +148,7 @@ public class PollServiceTests
 
         var result = await _service.VoteAsync(
             userId,
-            poll.PostId,
+            poll.PostId!.Value,
             new VotePollRequest { OptionId = option.Id });
 
         Assert.Equal(PollVoteStatus.AlreadyVoted, result.Status);
@@ -170,7 +175,7 @@ public class PollServiceTests
 
         var result = await _service.VoteAsync(
             userId,
-            poll.PostId,
+            poll.PostId!.Value,
             new VotePollRequest { OptionId = option.Id },
             cancellationToken);
 
@@ -187,11 +192,54 @@ public class PollServiceTests
         Assert.Equal(1, result.Poll.Options.First().VotesCount);
     }
 
+    [Fact]
+    public async Task VoteCommentAsync_WhenCommentDoesNotExist_ReturnsCommentNotFound()
+    {
+        var commentId = Guid.NewGuid();
+
+        var result = await _service.VoteCommentAsync(
+            Guid.NewGuid(),
+            commentId,
+            new VotePollRequest { OptionId = Guid.NewGuid() });
+
+        Assert.Equal(PollVoteStatus.CommentNotFound, result.Status);
+        await _pollRepository.DidNotReceive().GetByCommentIdAsync(
+            Arg.Any<Guid>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task VoteCommentAsync_WhenVoteIsAccepted_ReturnsCommentPoll()
+    {
+        var userId = Guid.NewGuid();
+        var commentId = Guid.NewGuid();
+        var poll = CreatePoll();
+        poll.PostId = null;
+        poll.CommentId = commentId;
+        var option = poll.Options.First();
+        _commentRepository.ExistsAsync(commentId, Arg.Any<CancellationToken>()).Returns(true);
+        _pollRepository
+            .GetByCommentIdAsync(commentId, Arg.Any<CancellationToken>())
+            .Returns(poll);
+        _pollRepository
+            .TryAddVoteAsync(Arg.Any<PollVote>(), Arg.Any<CancellationToken>())
+            .Returns(true);
+
+        var result = await _service.VoteCommentAsync(
+            userId,
+            commentId,
+            new VotePollRequest { OptionId = option.Id });
+
+        Assert.Equal(PollVoteStatus.Success, result.Status);
+        Assert.Equal(commentId, result.Poll?.CommentId);
+        Assert.Null(result.Poll?.PostId);
+    }
+
     private void ConfigureExistingPoll(Poll poll)
     {
-        _postRepository.ExistsAsync(poll.PostId, Arg.Any<CancellationToken>()).Returns(true);
+        _postRepository.ExistsAsync(poll.PostId!.Value, Arg.Any<CancellationToken>()).Returns(true);
         _pollRepository
-            .GetByPostIdAsync(poll.PostId, Arg.Any<CancellationToken>())
+            .GetByPostIdAsync(poll.PostId!.Value, Arg.Any<CancellationToken>())
             .Returns(poll);
     }
 

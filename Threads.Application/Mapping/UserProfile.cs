@@ -16,6 +16,7 @@ public class UserProfile : Profile
             .ForMember(destination => destination.Location, options => options.Ignore())
             .ForMember(destination => destination.AvatarUrl, options => options.MapFrom(source => source.AvatarObjectKey))
             .ForMember(destination => destination.BannerUrl, options => options.MapFrom(source => source.BannerObjectKey))
+            .ForMember(destination => destination.BirthDate, options => options.MapFrom(source => source.DateOfBirth))
             .ForMember(destination => destination.FollowersCount, options => options.MapFrom(source => source.FollowerRelations.Count))
             .ForMember(destination => destination.FollowingCount, options => options.MapFrom(source => source.FollowingRelations.Count))
             .ForMember(destination => destination.PostsCount, options => options.MapFrom(source => source.Posts.Count))

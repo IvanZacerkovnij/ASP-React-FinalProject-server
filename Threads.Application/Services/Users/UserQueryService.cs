@@ -2,6 +2,8 @@ using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Logging;
 using Threads.Application.DTOs.Pagination;
 using Threads.Application.DTOs.Users;
+using Threads.Application.DTOs.Search;
+using Threads.Application.Exceptions;
 using Threads.Application.Interfaces.Follows;
 using Threads.Application.Interfaces.Users;
 using Threads.Application.Services.Common;
@@ -60,8 +62,56 @@ public sealed class UserQueryService
             pagination.Limit,
             cursor,
             cancellationToken);
-        var hasMore = users.Count > pagination.Limit;
-        var pageUsers = users.Take(pagination.Limit).ToList();
+        return CreateSearchPage(users, pagination.Limit);
+    }
+
+    public async Task<CursorPageResponse<UserShortResponse>> SearchAsync(
+        SearchUsersRequest request,
+        CancellationToken cancellationToken = default,
+        Guid? currentUserId = null)
+    {
+        RequestValidator.Validate(request);
+        var normalizedQuery = SearchQueryNormalizer.Normalize(
+            request.Q,
+            MaximumSearchQueryLength,
+            "User search query");
+        var people = SearchFilterNormalizer.NormalizeOption(
+            request.People,
+            "following",
+            "People");
+        var location = SearchFilterNormalizer.NormalizeOption(
+            request.Location,
+            "near",
+            "Location");
+
+        if (normalizedQuery is null && people is null && location is null)
+        {
+            return new CursorPageResponse<UserShortResponse>
+            {
+                Items = [],
+                HasMore = false,
+                NextCursor = null
+            };
+        }
+
+        var cursor = CursorCodec.DecodeText(request.Cursor);
+        var users = await _userRepository.SearchAsync(
+            normalizedQuery,
+            people,
+            location,
+            request.Limit,
+            cursor,
+            currentUserId,
+            cancellationToken);
+        return CreateSearchPage(users, request.Limit);
+    }
+
+    private CursorPageResponse<UserShortResponse> CreateSearchPage(
+        IReadOnlyCollection<UserSummaryReadModel> users,
+        int limit)
+    {
+        var hasMore = users.Count > limit;
+        var pageUsers = users.Take(limit).ToList();
 
         return new CursorPageResponse<UserShortResponse>
         {
@@ -93,17 +143,32 @@ public sealed class UserQueryService
             return null;
         }
 
+        var isOwner = currentUserId == publicProfile.Id;
         var isFollowedByCurrentUser = false;
+        var followsCurrentUser = false;
 
-        if (currentUserId.HasValue && currentUserId.Value != publicProfile.Id)
+        if (currentUserId.HasValue && !isOwner)
         {
             isFollowedByCurrentUser = await _followRepository.GetByFollowerAndFollowingAsync(
                 currentUserId.Value,
                 publicProfile.Id,
                 cancellationToken) is not null;
+
+            if (BirthDateVisibilityPolicy.RequiresOwnerFollowState(publicProfile))
+            {
+                followsCurrentUser = await _followRepository.GetByFollowerAndFollowingAsync(
+                    publicProfile.Id,
+                    currentUserId.Value,
+                    cancellationToken) is not null;
+            }
         }
 
-        return _responseFactory.Create(publicProfile, isFollowedByCurrentUser);
+        var canSeeBirthDate = isOwner || BirthDateVisibilityPolicy.CanSeeBirthDate(
+            publicProfile,
+            isFollowedByCurrentUser,
+            followsCurrentUser);
+
+        return _responseFactory.Create(publicProfile, isFollowedByCurrentUser, canSeeBirthDate);
     }
 
     public async Task<UserResponse?> GetMeAsync(

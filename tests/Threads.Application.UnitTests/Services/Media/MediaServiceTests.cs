@@ -30,23 +30,23 @@ public class MediaServiceTests
     }
 
     [Fact]
-    public async Task GetUrlAsync_WhenMediaDoesNotExist_ReturnsNull()
+    public async Task GetByIdAsync_WhenMediaDoesNotExist_ReturnsNull()
     {
-        var result = await _service.GetUrlAsync(Guid.NewGuid(), Guid.NewGuid());
+        var result = await _service.GetByIdAsync(Guid.NewGuid(), Guid.NewGuid());
 
         Assert.Null(result);
         _objectStorageService.DidNotReceive().GetReadUrl(Arg.Any<string>());
     }
 
     [Fact]
-    public async Task GetUrlAsync_WhenUnattachedMediaBelongsToAnotherUser_ReturnsNull()
+    public async Task GetByIdAsync_WhenUnattachedMediaBelongsToAnotherUser_ReturnsNull()
     {
         var media = CreateMedia();
         _mediaRepository
             .GetByIdAsync(media.Id, Arg.Any<CancellationToken>())
             .Returns(media);
 
-        var result = await _service.GetUrlAsync(media.Id, Guid.NewGuid());
+        var result = await _service.GetByIdAsync(media.Id, Guid.NewGuid());
 
         Assert.Null(result);
         _objectStorageService.DidNotReceive().GetReadUrl(Arg.Any<string>());
@@ -55,7 +55,7 @@ public class MediaServiceTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task GetUrlAsync_WhenMediaIsAccessible_ReturnsReadUrl(bool attachedToPost)
+    public async Task GetByIdAsync_WhenMediaIsAccessible_ReturnsAttachment(bool attachedToPost)
     {
         var media = CreateMedia();
         media.PostId = attachedToPost ? Guid.NewGuid() : null;
@@ -63,13 +63,22 @@ public class MediaServiceTests
             .GetByIdAsync(media.Id, Arg.Any<CancellationToken>())
             .Returns(media);
 
-        var result = await _service.GetUrlAsync(
+        var result = await _service.GetByIdAsync(
             media.Id,
             attachedToPost ? Guid.NewGuid() : media.UploadedByUserId);
 
         Assert.NotNull(result);
         Assert.Equal(media.Id, result.Id);
+        Assert.Equal("image", result.Type);
         Assert.Equal($"https://cdn.example/{media.StorageKey}", result.Url);
+        Assert.Equal(result.Url, result.ThumbnailUrl);
+        Assert.Equal(media.Width, result.Width);
+        Assert.Equal(media.Height, result.Height);
+        Assert.Equal(media.DurationSeconds, result.Duration);
+        Assert.Equal(media.ContentType, result.MimeType);
+        Assert.Equal(media.FileName, result.FileName);
+        Assert.Equal(media.SizeInBytes, result.SizeInBytes);
+        Assert.Equal(media.SortOrder, result.SortOrder);
     }
 
     [Theory]
@@ -137,7 +146,7 @@ public class MediaServiceTests
         Assert.EndsWith(".png", addedMedia.StorageKey);
         Assert.Equal("image", result.Type);
         Assert.Equal(result.Url, result.ThumbnailUrl);
-        Assert.Equal(addedMedia.StorageKey, result.StorageKey);
+        Assert.Equal(0, result.SortOrder);
         await _objectStorageService.Received(1).UploadAsync(
             Arg.Any<Stream>(),
             addedMedia.StorageKey,
@@ -238,6 +247,10 @@ public class MediaServiceTests
             ContentType = "image/png",
             Type = MediaType.Image,
             SizeInBytes = 100,
+            Width = 640,
+            Height = 480,
+            DurationSeconds = 1.5,
+            SortOrder = 2,
             UploadedByUserId = Guid.NewGuid()
         };
     }

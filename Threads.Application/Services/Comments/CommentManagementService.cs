@@ -11,18 +11,24 @@ public sealed class CommentManagementService
 {
     private readonly ICommentRepository _commentRepository;
     private readonly IPostRepository _postRepository;
+    private readonly CommentMediaManager _commentMediaManager;
     private readonly CommentQueryService _commentQueryService;
+    private readonly CommentVersionFactory _commentVersionFactory;
     private readonly IMapper _mapper;
 
     public CommentManagementService(
         ICommentRepository commentRepository,
         IPostRepository postRepository,
+        CommentMediaManager commentMediaManager,
         CommentQueryService commentQueryService,
+        CommentVersionFactory commentVersionFactory,
         IMapper mapper)
     {
         _commentRepository = commentRepository;
         _postRepository = postRepository;
+        _commentMediaManager = commentMediaManager;
         _commentQueryService = commentQueryService;
+        _commentVersionFactory = commentVersionFactory;
         _mapper = mapper;
     }
 
@@ -60,6 +66,13 @@ public sealed class CommentManagementService
         comment.AuthorId = authorId;
         comment.Content = request.Content.Trim();
         comment.ParentCommentId = request.ParentCommentId;
+        CommentInputMapper.ApplyCreateMetadata(comment, request);
+        await _commentMediaManager.ApplyAsync(
+            comment,
+            authorId,
+            request.MediaIds,
+            cancellationToken);
+        comment.Versions.Add(_commentVersionFactory.Create(comment));
 
         await _commentRepository.AddAsync(comment, cancellationToken);
 
@@ -92,6 +105,25 @@ public sealed class CommentManagementService
         ValidateContent(request.Content);
 
         comment.Content = request.Content.Trim();
+
+        if (request.MediaIds is not null)
+        {
+            await _commentMediaManager.ApplyAsync(
+                comment,
+                comment.AuthorId,
+                request.MediaIds,
+                cancellationToken);
+        }
+
+        var removedPoll = CommentInputMapper.ApplyMetadataChanges(comment, request);
+
+        if (removedPoll is not null)
+        {
+            _commentRepository.RemovePoll(removedPoll);
+        }
+
+        comment.CurrentVersionId = Guid.NewGuid();
+        comment.Versions.Add(_commentVersionFactory.Create(comment));
         comment.UpdatedAt = DateTimeOffset.UtcNow;
 
         await _commentRepository.UpdateAsync(comment, cancellationToken);
@@ -121,7 +153,19 @@ public sealed class CommentManagementService
             throw new ForbiddenException("You cannot delete this comment.");
         }
 
+        var mediaStorageKeys = comment.Media
+            .SelectMany(media => new[]
+            {
+                media.StorageKey,
+                media.ThumbnailStorageKey
+            })
+            .Where(storageKey => !string.IsNullOrWhiteSpace(storageKey))
+            .Cast<string>()
+            .Distinct()
+            .ToArray();
+
         await _commentRepository.DeleteAsync(comment, cancellationToken);
+        await _commentMediaManager.TryDeleteAsync(mediaStorageKeys, cancellationToken);
     }
 
     private static void ValidateContent(string content)
@@ -131,4 +175,5 @@ public sealed class CommentManagementService
             throw new RequestValidationException("Comment content is required.");
         }
     }
+
 }

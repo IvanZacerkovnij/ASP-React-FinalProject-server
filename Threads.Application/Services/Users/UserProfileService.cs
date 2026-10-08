@@ -109,7 +109,7 @@ public sealed class UserProfileService
     {
         if (request.DisplayName is not null)
         {
-            user.DisplayName = NormalizeOptionalText(
+            user.DisplayName = InputNormalizer.NormalizeOptional(
                 request.DisplayName,
                 MaxDisplayNameLength,
                 "Display name");
@@ -117,7 +117,7 @@ public sealed class UserProfileService
 
         if (request.Bio is not null)
         {
-            user.Bio = NormalizeOptionalText(request.Bio, MaxBioLength, "Bio");
+            user.Bio = InputNormalizer.NormalizeOptional(request.Bio, MaxBioLength, "Bio");
         }
 
         if (request.DateOfBirth > DateOnly.FromDateTime(DateTime.UtcNow))
@@ -132,6 +132,16 @@ public sealed class UserProfileService
         else if (request.DateOfBirth.HasValue)
         {
             user.DateOfBirth = request.DateOfBirth;
+        }
+
+        if (request.BirthDateVisibility.HasValue)
+        {
+            user.BirthDateVisibility = request.BirthDateVisibility.Value;
+        }
+
+        if (request.BirthYearVisibility.HasValue)
+        {
+            user.BirthYearVisibility = request.BirthYearVisibility.Value;
         }
 
         if (request.RemoveLocation)
@@ -154,23 +164,6 @@ public sealed class UserProfileService
         }
     }
 
-    private static string? NormalizeOptionalText(string? value, int maxLength, string fieldName)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return null;
-        }
-
-        var normalizedValue = value.Trim();
-
-        if (normalizedValue.Length > maxLength)
-        {
-            throw new RequestValidationException($"{fieldName} must be {maxLength} characters or less.");
-        }
-
-        return normalizedValue;
-    }
-
     private static void ApplyLocation(User user, LocationRequest location)
     {
         if (string.IsNullOrWhiteSpace(location.Name))
@@ -178,9 +171,12 @@ public sealed class UserProfileService
             throw new RequestValidationException("Location name is required.");
         }
 
-        user.Location = NormalizeOptionalText(location.Name, MaxLocationLength, "Location");
-        user.LocationPlaceId = NormalizeOptionalText(location.Id, MaxLocationIdLength, "Location id");
-        user.LocationCountry = NormalizeOptionalText(
+        user.Location = InputNormalizer.NormalizeOptional(location.Name, MaxLocationLength, "Location");
+        user.LocationPlaceId = InputNormalizer.NormalizeOptional(
+            location.Id,
+            MaxLocationIdLength,
+            "Location id");
+        user.LocationCountry = InputNormalizer.NormalizeOptional(
             location.Country,
             MaxLocationCountryLength,
             "Location country");

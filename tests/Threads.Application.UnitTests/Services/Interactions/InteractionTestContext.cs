@@ -26,17 +26,18 @@ internal sealed class InteractionTestContext
             objectStorageService,
             userResponseFactory,
             mapper);
-        var commentResponseFactory = new CommentResponseFactory(userResponseFactory);
+        var commentResponseFactory = new CommentResponseFactory(userResponseFactory, objectStorageService);
 
+        CommentQueryService = new CommentQueryService(
+            CommentRepository,
+            commentResponseFactory);
         PostQueryService = new PostQueryService(
             PostRepository,
             Substitute.For<IUserService>(),
             postResponseFactory,
+            CommentQueryService,
             Substitute.For<HybridCache>(),
             Substitute.For<ILogger<PostQueryService>>());
-        CommentQueryService = new CommentQueryService(
-            CommentRepository,
-            commentResponseFactory);
     }
 
     public IPostRepository PostRepository { get; } = Substitute.For<IPostRepository>();

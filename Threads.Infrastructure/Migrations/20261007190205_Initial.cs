@@ -1,5 +1,6 @@
 ﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
+using NpgsqlTypes;
 
 #nullable disable
 
@@ -44,6 +45,8 @@ namespace Threads.Infrastructure.Migrations
                     DisplayName = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
                     Bio = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
                     DateOfBirth = table.Column<DateOnly>(type: "date", nullable: true),
+                    BirthDateVisibility = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false, defaultValue: "OnlyMe"),
+                    BirthYearVisibility = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false, defaultValue: "OnlyMe"),
                     Location = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
                     LocationPlaceId = table.Column<string>(type: "character varying(1024)", maxLength: 1024, nullable: true),
                     LocationCountry = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
@@ -54,6 +57,9 @@ namespace Threads.Infrastructure.Migrations
                     IsVerified = table.Column<bool>(type: "boolean", nullable: false),
                     IsActive = table.Column<bool>(type: "boolean", nullable: false),
                     Role = table.Column<int>(type: "integer", nullable: false, defaultValue: 0),
+                    SearchVector = table.Column<NpgsqlTsVector>(type: "tsvector", nullable: true)
+                        .Annotation("Npgsql:TsVectorConfig", "simple")
+                        .Annotation("Npgsql:TsVectorProperties", new[] { "Username", "DisplayName", "Location", "LocationCountry" }),
                     CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
                 },
@@ -96,6 +102,7 @@ namespace Threads.Infrastructure.Migrations
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     Content = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
+                    CurrentVersionId = table.Column<Guid>(type: "uuid", nullable: false),
                     LocationName = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
                     LocationPlaceId = table.Column<string>(type: "character varying(1024)", maxLength: 1024, nullable: true),
                     LocationCountry = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
@@ -106,6 +113,9 @@ namespace Threads.Infrastructure.Migrations
                     EmbedDescription = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
                     EmbedThumbnailUrl = table.Column<string>(type: "character varying(2048)", maxLength: 2048, nullable: true),
                     AuthorId = table.Column<Guid>(type: "uuid", nullable: false),
+                    SearchVector = table.Column<NpgsqlTsVector>(type: "tsvector", nullable: true)
+                        .Annotation("Npgsql:TsVectorConfig", "simple")
+                        .Annotation("Npgsql:TsVectorProperties", new[] { "Content", "LocationName", "EmbedTitle" }),
                     CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
                 },
@@ -144,11 +154,46 @@ namespace Threads.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "ScheduledPosts",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false),
+                    Content = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
+                    LinkPreviewUrl = table.Column<string>(type: "character varying(2048)", maxLength: 2048, nullable: true),
+                    LinkPreviewTitle = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
+                    LinkPreviewImageUrl = table.Column<string>(type: "character varying(2048)", maxLength: 2048, nullable: true),
+                    ScheduledAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    AuthorId = table.Column<Guid>(type: "uuid", nullable: false),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ScheduledPosts", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_ScheduledPosts_Users_AuthorId",
+                        column: x => x.AuthorId,
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Comments",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     Content = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: false),
+                    LinkPreviewUrl = table.Column<string>(type: "character varying(2048)", maxLength: 2048, nullable: true),
+                    LinkPreviewTitle = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
+                    LinkPreviewImageUrl = table.Column<string>(type: "character varying(2048)", maxLength: 2048, nullable: true),
+                    LocationName = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
+                    LocationPlaceId = table.Column<string>(type: "character varying(1024)", maxLength: 1024, nullable: true),
+                    LocationCountry = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
+                    LocationLatitude = table.Column<double>(type: "double precision", nullable: true),
+                    LocationLongitude = table.Column<double>(type: "double precision", nullable: true),
+                    CurrentVersionId = table.Column<Guid>(type: "uuid", nullable: false),
                     PostId = table.Column<Guid>(type: "uuid", nullable: false),
                     AuthorId = table.Column<Guid>(type: "uuid", nullable: false),
                     ParentCommentId = table.Column<Guid>(type: "uuid", nullable: true),
@@ -174,69 +219,6 @@ namespace Threads.Infrastructure.Migrations
                         name: "FK_Comments_Users_AuthorId",
                         column: x => x.AuthorId,
                         principalTable: "Users",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "Media",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    StorageKey = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
-                    FileName = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
-                    ContentType = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
-                    Type = table.Column<int>(type: "integer", nullable: false),
-                    SizeInBytes = table.Column<long>(type: "bigint", nullable: false),
-                    Width = table.Column<int>(type: "integer", nullable: true),
-                    Height = table.Column<int>(type: "integer", nullable: true),
-                    DurationSeconds = table.Column<double>(type: "double precision", nullable: true),
-                    ThumbnailStorageKey = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
-                    SortOrder = table.Column<int>(type: "integer", nullable: false),
-                    UploadedByUserId = table.Column<Guid>(type: "uuid", nullable: false),
-                    PostId = table.Column<Guid>(type: "uuid", nullable: true),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Media", x => x.Id);
-                    table.CheckConstraint("CK_Media_DurationSeconds", "\"DurationSeconds\" IS NULL OR \"DurationSeconds\" >= 0");
-                    table.CheckConstraint("CK_Media_Height", "\"Height\" IS NULL OR \"Height\" >= 0");
-                    table.CheckConstraint("CK_Media_SizeInBytes", "\"SizeInBytes\" >= 0");
-                    table.CheckConstraint("CK_Media_SortOrder", "\"SortOrder\" >= 0");
-                    table.CheckConstraint("CK_Media_Width", "\"Width\" IS NULL OR \"Width\" >= 0");
-                    table.ForeignKey(
-                        name: "FK_Media_Posts_PostId",
-                        column: x => x.PostId,
-                        principalTable: "Posts",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_Media_Users_UploadedByUserId",
-                        column: x => x.UploadedByUserId,
-                        principalTable: "Users",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "Polls",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    PostId = table.Column<Guid>(type: "uuid", nullable: false),
-                    EndsAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Polls", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_Polls_Posts_PostId",
-                        column: x => x.PostId,
-                        principalTable: "Posts",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -292,6 +274,30 @@ namespace Threads.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "PostQuotes",
+                columns: table => new
+                {
+                    PostId = table.Column<Guid>(type: "uuid", nullable: false),
+                    TargetType = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
+                    TargetId = table.Column<Guid>(type: "uuid", nullable: false),
+                    TargetVersionId = table.Column<Guid>(type: "uuid", nullable: false),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_PostQuotes", x => x.PostId);
+                    table.CheckConstraint("CK_PostQuotes_TargetId", "\"TargetId\" <> '00000000-0000-0000-0000-000000000000'");
+                    table.CheckConstraint("CK_PostQuotes_TargetType", "\"TargetType\" IN ('Post', 'Comment')");
+                    table.CheckConstraint("CK_PostQuotes_TargetVersionId", "\"TargetVersionId\" <> '00000000-0000-0000-0000-000000000000'");
+                    table.ForeignKey(
+                        name: "FK_PostQuotes_Posts_PostId",
+                        column: x => x.PostId,
+                        principalTable: "Posts",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "PostReposts",
                 columns: table => new
                 {
@@ -312,6 +318,28 @@ namespace Threads.Infrastructure.Migrations
                         name: "FK_PostReposts_Users_UserId",
                         column: x => x.UserId,
                         principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "PostVersions",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    PostId = table.Column<Guid>(type: "uuid", nullable: false),
+                    SchemaVersion = table.Column<int>(type: "integer", nullable: false),
+                    SnapshotJson = table.Column<string>(type: "jsonb", nullable: false),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_PostVersions", x => x.Id);
+                    table.CheckConstraint("CK_PostVersions_SchemaVersion", "\"SchemaVersion\" > 0");
+                    table.ForeignKey(
+                        name: "FK_PostVersions_Posts_PostId",
+                        column: x => x.PostId,
+                        principalTable: "Posts",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -417,6 +445,28 @@ namespace Threads.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "CommentVersions",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    CommentId = table.Column<Guid>(type: "uuid", nullable: false),
+                    SchemaVersion = table.Column<int>(type: "integer", nullable: false),
+                    SnapshotJson = table.Column<string>(type: "jsonb", nullable: false),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_CommentVersions", x => x.Id);
+                    table.CheckConstraint("CK_CommentVersions_SchemaVersion", "\"SchemaVersion\" > 0");
+                    table.ForeignKey(
+                        name: "FK_CommentVersions_Comments_CommentId",
+                        column: x => x.CommentId,
+                        principalTable: "Comments",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "CommentViews",
                 columns: table => new
                 {
@@ -442,6 +492,93 @@ namespace Threads.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "Media",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false),
+                    StorageKey = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
+                    FileName = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
+                    ContentType = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
+                    Type = table.Column<int>(type: "integer", nullable: false),
+                    SizeInBytes = table.Column<long>(type: "bigint", nullable: false),
+                    Width = table.Column<int>(type: "integer", nullable: true),
+                    Height = table.Column<int>(type: "integer", nullable: true),
+                    DurationSeconds = table.Column<double>(type: "double precision", nullable: true),
+                    ThumbnailStorageKey = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
+                    SortOrder = table.Column<int>(type: "integer", nullable: false),
+                    UploadedByUserId = table.Column<Guid>(type: "uuid", nullable: false),
+                    PostId = table.Column<Guid>(type: "uuid", nullable: true),
+                    CommentId = table.Column<Guid>(type: "uuid", nullable: true),
+                    ScheduledPostId = table.Column<Guid>(type: "uuid", nullable: true),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Media", x => x.Id);
+                    table.CheckConstraint("CK_Media_DurationSeconds", "\"DurationSeconds\" IS NULL OR \"DurationSeconds\" >= 0");
+                    table.CheckConstraint("CK_Media_Height", "\"Height\" IS NULL OR \"Height\" >= 0");
+                    table.CheckConstraint("CK_Media_SingleTarget", "(\"PostId\" IS NOT NULL)::int + (\"CommentId\" IS NOT NULL)::int + (\"ScheduledPostId\" IS NOT NULL)::int <= 1");
+                    table.CheckConstraint("CK_Media_SizeInBytes", "\"SizeInBytes\" >= 0");
+                    table.CheckConstraint("CK_Media_SortOrder", "\"SortOrder\" >= 0");
+                    table.CheckConstraint("CK_Media_Width", "\"Width\" IS NULL OR \"Width\" >= 0");
+                    table.ForeignKey(
+                        name: "FK_Media_Comments_CommentId",
+                        column: x => x.CommentId,
+                        principalTable: "Comments",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_Media_Posts_PostId",
+                        column: x => x.PostId,
+                        principalTable: "Posts",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_Media_ScheduledPosts_ScheduledPostId",
+                        column: x => x.ScheduledPostId,
+                        principalTable: "ScheduledPosts",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_Media_Users_UploadedByUserId",
+                        column: x => x.UploadedByUserId,
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Polls",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    PostId = table.Column<Guid>(type: "uuid", nullable: true),
+                    CommentId = table.Column<Guid>(type: "uuid", nullable: true),
+                    EndsAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Polls", x => x.Id);
+                    table.CheckConstraint("CK_Polls_SingleTarget", "(\"PostId\" IS NOT NULL)::int + (\"CommentId\" IS NOT NULL)::int = 1");
+                    table.ForeignKey(
+                        name: "FK_Polls_Comments_CommentId",
+                        column: x => x.CommentId,
+                        principalTable: "Comments",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_Polls_Posts_PostId",
+                        column: x => x.PostId,
+                        principalTable: "Posts",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "PollOptions",
                 columns: table => new
                 {
@@ -455,6 +592,7 @@ namespace Threads.Infrastructure.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_PollOptions", x => x.Id);
+                    table.UniqueConstraint("AK_PollOptions_PollId_Id", x => new { x.PollId, x.Id });
                     table.ForeignKey(
                         name: "FK_PollOptions_Polls_PollId",
                         column: x => x.PollId,
@@ -478,10 +616,10 @@ namespace Threads.Infrastructure.Migrations
                 {
                     table.PrimaryKey("PK_PollVotes", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_PollVotes_PollOptions_PollOptionId",
-                        column: x => x.PollOptionId,
+                        name: "FK_PollVotes_PollOptions_PollId_PollOptionId",
+                        columns: x => new { x.PollId, x.PollOptionId },
                         principalTable: "PollOptions",
-                        principalColumn: "Id",
+                        principalColumns: new[] { "PollId", "Id" },
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
                         name: "FK_PollVotes_Polls_PollId",
@@ -518,6 +656,12 @@ namespace Threads.Infrastructure.Migrations
                 column: "AuthorId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_Comments_CurrentVersionId",
+                table: "Comments",
+                column: "CurrentVersionId",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Comments_ParentCommentId",
                 table: "Comments",
                 column: "ParentCommentId");
@@ -526,6 +670,11 @@ namespace Threads.Infrastructure.Migrations
                 name: "IX_Comments_PostId_CreatedAt_Id",
                 table: "Comments",
                 columns: new[] { "PostId", "CreatedAt", "Id" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_CommentVersions_CommentId_CreatedAt",
+                table: "CommentVersions",
+                columns: new[] { "CommentId", "CreatedAt" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_CommentViews_UserId",
@@ -549,9 +698,19 @@ namespace Threads.Infrastructure.Migrations
                 columns: new[] { "FollowingId", "CreatedAt", "Id" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_Media_CommentId_SortOrder",
+                table: "Media",
+                columns: new[] { "CommentId", "SortOrder" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Media_PostId_SortOrder",
                 table: "Media",
                 columns: new[] { "PostId", "SortOrder" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Media_ScheduledPostId_SortOrder",
+                table: "Media",
+                columns: new[] { "ScheduledPostId", "SortOrder" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_Media_StorageKey",
@@ -583,21 +742,27 @@ namespace Threads.Infrastructure.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_Polls_CommentId",
+                table: "Polls",
+                column: "CommentId",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Polls_PostId",
                 table: "Polls",
                 column: "PostId",
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_PollVotes_PollId_PollOptionId",
+                table: "PollVotes",
+                columns: new[] { "PollId", "PollOptionId" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_PollVotes_PollId_UserId",
                 table: "PollVotes",
                 columns: new[] { "PollId", "UserId" },
                 unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_PollVotes_PollOptionId",
-                table: "PollVotes",
-                column: "PollOptionId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_PollVotes_UserId",
@@ -615,6 +780,11 @@ namespace Threads.Infrastructure.Migrations
                 columns: new[] { "UserId", "CreatedAt", "PostId" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_PostQuotes_TargetType_TargetId",
+                table: "PostQuotes",
+                columns: new[] { "TargetType", "TargetId" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_PostReposts_UserId_CreatedAt_PostId",
                 table: "PostReposts",
                 columns: new[] { "UserId", "CreatedAt", "PostId" });
@@ -623,6 +793,23 @@ namespace Threads.Infrastructure.Migrations
                 name: "IX_Posts_AuthorId_CreatedAt_Id",
                 table: "Posts",
                 columns: new[] { "AuthorId", "CreatedAt", "Id" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Posts_CurrentVersionId",
+                table: "Posts",
+                column: "CurrentVersionId",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Posts_SearchVector",
+                table: "Posts",
+                column: "SearchVector")
+                .Annotation("Npgsql:IndexMethod", "gin");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_PostVersions_PostId_CreatedAt",
+                table: "PostVersions",
+                columns: new[] { "PostId", "CreatedAt" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_PostViews_UserId",
@@ -641,10 +828,26 @@ namespace Threads.Infrastructure.Migrations
                 columns: new[] { "UserId", "ExpiresAt" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_ScheduledPosts_AuthorId_ScheduledAt_Id",
+                table: "ScheduledPosts",
+                columns: new[] { "AuthorId", "ScheduledAt", "Id" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ScheduledPosts_ScheduledAt_Id",
+                table: "ScheduledPosts",
+                columns: new[] { "ScheduledAt", "Id" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Users_Email",
                 table: "Users",
                 column: "Email",
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Users_SearchVector",
+                table: "Users",
+                column: "SearchVector")
+                .Annotation("Npgsql:IndexMethod", "gin");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Users_Username",
@@ -664,6 +867,9 @@ namespace Threads.Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "CommentReposts");
+
+            migrationBuilder.DropTable(
+                name: "CommentVersions");
 
             migrationBuilder.DropTable(
                 name: "CommentViews");
@@ -687,7 +893,13 @@ namespace Threads.Infrastructure.Migrations
                 name: "PostLikes");
 
             migrationBuilder.DropTable(
+                name: "PostQuotes");
+
+            migrationBuilder.DropTable(
                 name: "PostReposts");
+
+            migrationBuilder.DropTable(
+                name: "PostVersions");
 
             migrationBuilder.DropTable(
                 name: "PostViews");
@@ -696,13 +908,16 @@ namespace Threads.Infrastructure.Migrations
                 name: "RefreshTokens");
 
             migrationBuilder.DropTable(
-                name: "Comments");
+                name: "ScheduledPosts");
 
             migrationBuilder.DropTable(
                 name: "PollOptions");
 
             migrationBuilder.DropTable(
                 name: "Polls");
+
+            migrationBuilder.DropTable(
+                name: "Comments");
 
             migrationBuilder.DropTable(
                 name: "Posts");

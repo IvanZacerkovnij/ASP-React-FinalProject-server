@@ -6,6 +6,24 @@ public class Comment : BaseEntity
 {
     public string Content { get; set; } = null!;
 
+    public string? LinkPreviewUrl { get; set; }
+
+    public string? LinkPreviewTitle { get; set; }
+
+    public string? LinkPreviewImageUrl { get; set; }
+
+    public string? LocationName { get; set; }
+
+    public string? LocationPlaceId { get; set; }
+
+    public string? LocationCountry { get; set; }
+
+    public double? LocationLatitude { get; set; }
+
+    public double? LocationLongitude { get; set; }
+    
+    public Guid CurrentVersionId { get; set; } = Guid.NewGuid();
+
     public Guid PostId { get; set; }
 
     public Post Post { get; set; } = null!;
@@ -17,6 +35,9 @@ public class Comment : BaseEntity
     public Guid? ParentCommentId { get; set; }
 
     public Comment? ParentComment { get; set; }
+    
+    public ICollection<CommentVersion> Versions { get; set; } =
+        new List<CommentVersion>();
 
     public ICollection<Comment> Replies { get; set; } =
         new List<Comment>();
@@ -32,4 +53,9 @@ public class Comment : BaseEntity
 
     public ICollection<CommentView> CommentViews { get; set; } =
         new List<CommentView>();
+
+    public ICollection<Media> Media { get; set; } =
+        new List<Media>();
+
+    public Poll? Poll { get; set; }
 }

@@ -6,11 +6,45 @@ namespace Threads.Application.Interfaces.Comments;
 
 public interface ICommentRepository
 {
+    Task<IReadOnlyCollection<CommentSummaryReadModel>> GetByAuthorIdAsync(
+        Guid authorId,
+        int limit,
+        CursorPosition? cursor = null,
+        Guid? currentUserId = null,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyCollection<CommentSummaryReadModel>> GetByPostIdAsync(
         Guid postId,
         int limit,
         CursorPosition? cursor = null,
         Guid? currentUserId = null,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyCollection<CommentSummaryReadModel>> GetAncestorsAsync(
+        Guid commentId,
+        Guid? currentUserId = null,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyCollection<CommentSummaryReadModel>> GetRepliesAsync(
+        Guid parentCommentId,
+        int limit,
+        CursorPosition? cursor = null,
+        Guid? currentUserId = null,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyCollection<CommentSummaryReadModel>> GetSummariesByIdsAsync(
+        IReadOnlyCollection<Guid> ids,
+        Guid? currentUserId = null,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyCollection<CommentVersion>> GetVersionsAsync(
+        Guid commentId,
+        int limit,
+        CursorPosition? cursor = null,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyCollection<CommentVersion>> GetVersionsByIdsAsync(
+        IReadOnlyCollection<Guid> versionIds,
         CancellationToken cancellationToken = default);
 
     Task<Comment?> GetByIdAsync(
@@ -27,6 +61,7 @@ public interface ICommentRepository
         CancellationToken cancellationToken = default);
 
     Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<bool> VersionExistsAsync(Guid commentId, Guid versionId, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyCollection<CommentSummaryReadModel>> GetLikedByUserIdAsync(
         Guid userId,
@@ -54,6 +89,7 @@ public interface ICommentRepository
         Guid userId,
         CancellationToken cancellationToken = default);
     Task AddAsync(Comment comment, CancellationToken cancellationToken = default);
+    void RemovePoll(Poll poll);
     Task UpdateAsync(Comment comment, CancellationToken cancellationToken = default);
     Task DeleteAsync(Comment comment, CancellationToken cancellationToken = default);
 }

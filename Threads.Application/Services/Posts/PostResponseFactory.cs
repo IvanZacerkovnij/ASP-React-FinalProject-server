@@ -1,10 +1,13 @@
 using AutoMapper;
+using Threads.Application.DTOs.LinkPreviews;
+using Threads.Application.DTOs.Media;
 using Threads.Application.DTOs.Polls;
 using Threads.Application.DTOs.Posts.Models;
 using Threads.Application.DTOs.Posts.Responses;
 using Threads.Application.DTOs.Users;
 using Threads.Application.Interfaces.Media;
 using Threads.Application.Services.Users;
+using Threads.Application.Services.LinkPreviews;
 using Threads.Domain.Entities;
 using Threads.Domain.Enums;
 using MediaEntity = Threads.Domain.Entities.Media;
@@ -38,6 +41,7 @@ public sealed class PostResponseFactory
         return new PostResponse
         {
             Id = response.Id,
+            VersionId = post.CurrentVersionId,
             Content = response.Content,
             Author = _userResponseFactory.CreateShort(post.Author),
             Media = post.Media
@@ -51,10 +55,9 @@ public sealed class PostResponseFactory
                 post.LocationCountry,
                 post.LocationLatitude,
                 post.LocationLongitude),
-            Embed = MapEmbed(
+            LinkPreview = MapLinkPreview(
                 post.EmbedUrl,
                 post.EmbedTitle,
-                post.EmbedDescription,
                 post.EmbedThumbnailUrl),
             LikesCount = response.LikesCount,
             CommentsCount = response.CommentsCount,
@@ -78,6 +81,7 @@ public sealed class PostResponseFactory
         return new PostResponse
         {
             Id = post.Id,
+            VersionId = post.VersionId,
             Content = post.Content ?? string.Empty,
             Author = _userResponseFactory.CreateShort(post.Author),
             Media = post.Media
@@ -91,10 +95,9 @@ public sealed class PostResponseFactory
                 post.LocationCountry,
                 post.LocationLatitude,
                 post.LocationLongitude),
-            Embed = MapEmbed(
+            LinkPreview = MapLinkPreview(
                 post.EmbedUrl,
                 post.EmbedTitle,
-                post.EmbedDescription,
                 post.EmbedThumbnailUrl),
             LikesCount = post.LikesCount,
             CommentsCount = post.CommentsCount,
@@ -118,6 +121,7 @@ public sealed class PostResponseFactory
         return new PostResponse
         {
             Id = post.Id,
+            VersionId = post.VersionId,
             Content = post.Content ?? string.Empty,
             Author = MapUser(author),
             Media = post.Media
@@ -131,10 +135,9 @@ public sealed class PostResponseFactory
                 post.LocationCountry,
                 post.LocationLatitude,
                 post.LocationLongitude),
-            Embed = MapEmbed(
+            LinkPreview = MapLinkPreview(
                 post.EmbedUrl,
                 post.EmbedTitle,
-                post.EmbedDescription,
                 post.EmbedThumbnailUrl),
             LikesCount = engagement.LikesCount,
             CommentsCount = engagement.CommentsCount,
@@ -150,9 +153,9 @@ public sealed class PostResponseFactory
         };
     }
 
-    private PostMediaResponse MapMedia(MediaEntity media)
+    private MediaAttachmentResponse MapMedia(MediaEntity media)
     {
-        return new PostMediaResponse
+        return new MediaAttachmentResponse
         {
             Id = media.Id,
             Type = ResolveMediaResponseType(media.ContentType, media.Type),
@@ -172,9 +175,9 @@ public sealed class PostResponseFactory
         };
     }
 
-    private PostMediaResponse MapMedia(PostMediaReadModel media)
+    private MediaAttachmentResponse MapMedia(PostMediaReadModel media)
     {
-        return new PostMediaResponse
+        return new MediaAttachmentResponse
         {
             Id = media.Id,
             Type = ResolveMediaResponseType(media.ContentType, media.Type),
@@ -322,21 +325,14 @@ public sealed class PostResponseFactory
             };
     }
 
-    private static PostEmbedResponse? MapEmbed(
+    private static LinkPreviewResponse? MapLinkPreview(
         string? url,
         string? title,
-        string? description,
         string? thumbnailUrl)
     {
         return string.IsNullOrWhiteSpace(url)
             ? null
-            : new PostEmbedResponse
-            {
-                Url = url,
-                Title = title,
-                Description = description,
-                ThumbnailUrl = thumbnailUrl
-            };
+            : LinkPreviewResponseFactory.Create(url, title, thumbnailUrl);
     }
 
     private static string ResolveMediaResponseType(string contentType, MediaType mediaType)

@@ -4,7 +4,9 @@ public class PollResponse
 {
     public Guid Id { get; init; }
 
-    public Guid PostId { get; init; }
+    public Guid? PostId { get; init; }
+
+    public Guid? CommentId { get; init; }
 
     public DateTimeOffset? EndsAt { get; init; }
 

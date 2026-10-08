@@ -51,9 +51,11 @@ public sealed class PostMediaManager
             throw new ForbiddenException("One or more media items do not belong to the current user.");
         }
 
-        if (media.Any(item => item.PostId.HasValue && item.PostId != post.Id))
+        if (media.Any(item => item.CommentId.HasValue ||
+                              item.ScheduledPostId.HasValue ||
+                              item.PostId.HasValue && item.PostId != post.Id))
         {
-            throw new ConflictException("One or more media items are already attached to another post.");
+            throw new ConflictException("One or more media items are already attached to another content item.");
         }
 
         foreach (var existingMedia in post.Media.Where(item => !distinctMediaIds.Contains(item.Id)).ToList())

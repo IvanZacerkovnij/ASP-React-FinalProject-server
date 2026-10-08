@@ -1,10 +1,15 @@
 using Threads.Application.DTOs.Pagination;
 using Threads.Application.DTOs.Users;
+using Threads.Application.DTOs.Search;
 
 namespace Threads.Application.Interfaces.Users;
 
 public interface IUserService
 {
+    Task<CursorPageResponse<UserShortResponse>> SearchAsync(
+        SearchUsersRequest request,
+        CancellationToken cancellationToken = default,
+        Guid? currentUserId = null);
     Task<CursorPageResponse<UserShortResponse>> SearchAsync(
         string query,
         CursorPageRequest pagination,

@@ -2,7 +2,7 @@
 
 Backend для соціального застосунку у стилі Threads, побудований на `ASP.NET Core Web API` з `PostgreSQL`, `EF Core`, `JWT`, `AWS S3` і обробкою медіа через `ffmpeg`.
 
-> Останнє оновлення документації: `2026-09-22`
+> Останнє оновлення документації: `2026-10-08`
 
 ## Зміст
 
@@ -27,10 +27,12 @@ Backend для соціального застосунку у стилі Threads
 
 - JWT-автентифікація з `access token` + `refresh token`
 - реєстрація, логін, logout, `me`, скидання і зміна пароля
-- профілі користувачів з `avatar`, `banner`, `bio`, `location`
-- пости з текстом, embed, локацією, медіа та опитуваннями
+- профілі користувачів з `avatar`, `banner`, `bio`, `location` і датою народження
+- налаштування видимості дати та року народження (`public`, `followers`, `following`, `mutual`, `only_me`)
+- пости з текстом, link preview, цитатами, локацією, медіа, опитуваннями та edit history
+- відкладена публікація постів через scheduled posts і background worker
 - лайки, репости, bookmarks і перегляди для постів та коментарів
-- коментарі з підтримкою вкладеності через `parent comment` і user-interactions
+- коментарі з вкладеністю, thread context, edit history, медіа, poll, location і link preview
 - підписки: followers / following
 - пошук користувачів і постів
 - пошук GIF через `Giphy`
@@ -55,6 +57,7 @@ BackEndForFinalProject
 │   │   ├── CommentsController.cs   # коментарі та відповіді
 │   │   ├── FollowsController.cs    # followers і following
 │   │   ├── SearchController.cs     # пошук користувачів, постів, GIF і локацій
+│   │   ├── LinkPreviewsController.cs # безпечне отримання metadata зовнішнього URL
 │   │   └── MediaController.cs      # upload і доступ до медіа
 │   ├── ExceptionHandling           # глобальне перетворення винятків у ProblemDetails
 │   ├── Middleware                  # логування повільних HTTP-запитів
@@ -75,7 +78,7 @@ BackEndForFinalProject
 ├── Threads.Domain
 │   ├── Common                      # базові domain-моделі
 │   ├── Entities                    # EF/domain entities
-│   └── Enums                       # domain enums
+│   └── Enums                       # domain enums (UserRole, MediaType, VisibilityLevel)
 ├── Threads.Infrastructure
 │   ├── Data
 │   │   ├── Configurations          # EF Core і table configurations
@@ -86,7 +89,9 @@ BackEndForFinalProject
 │   └── Services                    # S3, Redis, email, GIF, location і ffmpeg
 ├── deploy/nginx                    # nginx reverse proxy configuration
 ├── tests
-│   └── Threads.Application.UnitTests # xUnit-тести application-рівня
+│   ├── Threads.Application.UnitTests          # xUnit-тести application-рівня і domain enums
+│   └── Threads.Infrastructure.IntegrationTests # repositories, security, transactions і API на PostgreSQL
+├── .github/workflows               # GitHub Actions deploy на сервер
 ├── Dockerfile                      # образ API
 ├── docker-compose.yml              # API та Redis для локального запуску
 └── BackEndForFinalProject.sln      # solution file
@@ -99,8 +104,8 @@ BackEndForFinalProject
 3. Application service виконує бізнес-логіку, включно з ownership-перевірками для команд зміни й видалення ресурсів.
 4. Репозиторії та зовнішні інтеграції працюють через `Threads.Infrastructure`.
 5. Очікувані негативні результати повертаються через `null`, `bool`, status DTO або application exceptions залежно від сценарію.
-6. Необроблені винятки проходять через глобальний exception handler і перетворюються на `ProblemDetails`.
-7. API повертає DTO або стандартизовану помилку у вигляді JSON-відповіді.
+6. Контролерні помилки перетворюються на `ProblemDetails` через спільний API helper, а винятки — через глобальний exception handler.
+7. API повертає DTO або стандартизовану RFC 7807 помилку з `Content-Type: application/problem+json`.
 
 ## Технології
 
@@ -122,6 +127,7 @@ BackEndForFinalProject
 - `Docker`
 - `Nginx`
 - `xUnit` + `NSubstitute`
+- `Testcontainers` (PostgreSQL для integration tests)
 
 ## Запуск через Docker
 
@@ -262,13 +268,17 @@ API стартує після успішного healthcheck Redis. Для Redis
 
 ### База даних
 
-EF Core migrations і model snapshot зберігаються в `Threads.Infrastructure/Migrations`. Застосувати актуальні migrations можна командою:
+EF Core migrations і model snapshot зберігаються в `Threads.Infrastructure/Migrations`. Зараз історія migrations складається з однієї migration `20261002141529_Initial`, яка створює всю схему, включно з колонками `BirthDateVisibility` і `BirthYearVisibility`.
+
+API не застосовує migrations під час старту, і deploy workflow їх також не запускає. Застосувати актуальні migrations можна командою:
 
 ```bash
 dotnet ef database update \
   --project Threads.Infrastructure \
   --startup-project Threads.Api
 ```
+
+> ⚠️ Попередні migrations (`20260922094548_Initial`, `20261002104849_EnforceRepositoryDataIntegrity`) було замінено новою `Initial`. Для порожньої БД це не має значення. Якщо БД вже містить таблиці, створені старими migrations, `database update` спробує створити їх повторно й завершиться помилкою. Таку БД потрібно або перестворити, або відновити старі migrations і додати окрему migration для нових колонок.
 
 ## Документація API
 
@@ -293,7 +303,14 @@ OpenAPI і Swagger UI підключені для всіх середовищ:
 
 ## Обробка помилок
 
-API використовує `GlobalExceptionHandler` із `IExceptionHandler`, зареєстрований через `AddExceptionHandler<GlobalExceptionHandler>()` і `UseExceptionHandler()`. Контролери не дублюють однакові `try/catch`: вони викликають application services, а необроблені винятки централізовано перетворюються на `ProblemDetails`.
+API використовує RFC 7807 `ProblemDetails` для контрольованих помилок контролерів і винятків application/infrastructure-рівня. `GlobalExceptionHandler` зареєстрований через `AddExceptionHandler<GlobalExceptionHandler>()` і `UseExceptionHandler()`, а явні помилки контролерів формуються через спільний `ControllerProblemDetailsExtensions`.
+
+Обидва шляхи повертають `Content-Type: application/problem+json` і однаковий контракт:
+
+- `status` — фактичний HTTP status;
+- `title` — стабільна категорія (`Invalid request`, `Unauthorized`, `Forbidden`, `Resource not found`, `Conflict`, `Internal server error`);
+- `detail` — конкретне повідомлення;
+- `instance` — поточний шлях запиту.
 
 | Виняток | HTTP status | Призначення |
 |---|---:|---|
@@ -310,14 +327,13 @@ Application exceptions розміщені в `Threads.Application/Exceptions`, �
 
 Винятки використовуються для переривання сценарію та бізнес-помилок команд. Зокрема, update/delete неіснуючого ресурсу спричиняє `NotFoundException`, а спроба змінити чужий пост, коментар або список followers — `ForbiddenException`. Результати на кшталт неправильних credentials, недійсного refresh token, простроченого verification code або повторної interaction залишаються `null`, `false` чи окремим status і обробляються контролером.
 
-Приклад відповіді глобального handler:
+Приклад відповіді:
 
 ```json
 {
-  "type": "about:blank",
   "title": "Invalid request",
   "status": 400,
-  "detail": "Post must contain content, media, poll, or embed.",
+  "detail": "Post must contain content, media, poll, or link preview.",
   "instance": "/api/posts"
 }
 ```
@@ -342,7 +358,8 @@ IP-based політики використовують `HttpContext.Connection.R
 | `CommentCreationPolicy` | token bucket: burst `15`, `+5 / 30 с` | user ID | створення коментарів |
 | `InteractionPolicy` | token bucket: burst `60`, `+30 / 30 с` | user ID | views, likes, bookmarks, reposts, follows і poll votes |
 | `MediaUploadPolicy` | token bucket: burst `5`, `+1 / 1 хв` | user ID | upload медіа |
-| `ExternalSearchPolicy` | token bucket: burst `10`, `+5 / 10 с` | IP | Giphy і Geoapify search |
+| `EditHistoryPolicy` | token bucket: burst `20`, `+5 / 10 с` | user ID або IP | edit history постів і коментарів |
+| `ExternalSearchPolicy` | token bucket: burst `10`, `+5 / 10 с` | IP | Giphy, Geoapify і link preview resolve |
 
 Endpoint-и з однаковою named policy використовують спільний bucket у межах одного partition key. Наприклад, усі interactions одного користувача витрачають спільні токени `InteractionPolicy`, а GIF і location search з однієї IP використовують спільні токени `ExternalSearchPolicy`.
 
@@ -389,6 +406,7 @@ Endpoint-и з однаковою named policy використовують сп
 | `GET` | `/api/users/by-id/{id}` | Ні | Отримати профіль за `Guid` |
 | `GET` | `/api/users/by-username/{username}` | Ні | Отримати профіль за username |
 | `GET` | `/api/users/{username}/posts?limit=20&cursor=...` | Ні | Отримати сторінку постів користувача |
+| `GET` | `/api/users/{username}/replies?limit=20&cursor=...` | Ні | Отримати сторінку коментарів користувача |
 | `GET` | `/api/users/{username}/likes?limit=20&cursor=...` | Ні | Отримати сторінку лайкнутих користувачем постів та коментарів |
 | `GET` | `/api/users/{username}/reposts?limit=20&cursor=...` | Ні | Отримати сторінку reposts постів і коментарів користувача |
 
@@ -428,6 +446,60 @@ Endpoint-и з однаковою named policy використовують сп
 ```
 
 `POST /api/me/change-password/confirm` перевіряє наявність pending-зміни та строк дії коду, застосовує новий password hash і відкликає всі refresh tokens користувача. Обидва endpoint-и потребують Bearer access token.
+
+#### Оновлення профілю
+
+`PUT /api/me` приймає `multipart/form-data`. Усі поля необов'язкові: не передане поле не змінюється.
+
+| Поле | Тип | Опис |
+|---|---|---|
+| `DisplayName` | `string` | `1–100` символів |
+| `Bio` | `string` | `1–500` символів |
+| `Location` | `LocationRequest` | `id`, `name`, `country`, `latitude`, `longitude` |
+| `RemoveLocation` | `bool` | Очистити локацію |
+| `BirthDate` | `YYYY-MM-DD` | Дата народження, не може бути в майбутньому |
+| `BirthDateVisibility` | `VisibilityLevel` | Хто бачить дату народження |
+| `BirthYearVisibility` | `VisibilityLevel` | Хто бачить рік народження |
+| `RemoveBirthDate` | `bool` | Очистити дату народження |
+| `Avatar` / `Banner` | `File` | Зображення до `10 MB` |
+| `RemoveAvatar` / `RemoveBanner` | `bool` | Видалити avatar / banner |
+
+#### Видимість дати народження
+
+`VisibilityLevel` передається і повертається рядком у snake_case:
+
+| Значення | Хто бачить |
+|---|---|
+| `public` | усі, включно з анонімними запитами |
+| `followers` | користувачі, підписані на власника профілю |
+| `following` | користувачі, на яких підписаний власник профілю |
+| `mutual` | лише взаємні підписки |
+| `only_me` | лише власник (значення за замовчуванням) |
+
+Інші значення, наприклад `OnlyMe` або `4`, повертають `400 Bad Request`. JSON-назви задаються атрибутами `[JsonStringEnumMemberName]` у `VisibilityLevel`, а `VisibilityLevelConverter` використовує ті самі назви для `multipart/form-data`.
+
+Правила перевіряє `BirthDateVisibilityPolicy` в `UserQueryService`:
+
+- власник профілю завжди отримує свою `birthDate`;
+- інші користувачі отримують `birthDate` лише тоді, коли їм доступні **і** дата (`birthDateVisibility`), **і** рік (`birthYearVisibility`); інакше `birthDate` дорівнює `null`;
+- `birthDateVisibility` і `birthYearVisibility` повертаються завжди, щоб клієнт міг показати, що дата прихована;
+- зворотний follow (`owner → viewer`) запитується з БД лише тоді, коли дата існує і хоча б одне з налаштувань дорівнює `following` або `mutual`.
+
+> Формат часткової дати (наприклад, день і місяць без року) ще не узгоджено з frontend, тому зараз прихований рік ховає всю дату.
+
+Приклад відповіді:
+
+```json
+{
+  "username": "mock_user",
+  "bio": "Profile bio",
+  "birthDate": "2000-01-01",
+  "birthDateVisibility": "followers",
+  "birthYearVisibility": "only_me"
+}
+```
+
+`UserShortResponse` (автор поста чи коментаря, результати пошуку) також містить `bio`.
 
 `UserResponse` використовується і для публічного профілю, і для `/api/me`. Поле `email` є nullable: у відповідях `/api/users/...` воно завжди дорівнює `null`, а `GET /api/me` і успішний `PUT /api/me` повертають email поточного користувача. Приватний профіль завантажується окремо від кешованого публічного профілю, щоб email не потрапляв у public profile cache.
 
@@ -494,7 +566,12 @@ Endpoint-и з однаковою named policy використовують сп
 | Method | Route | Auth | Призначення |
 |---|---|---|---|
 | `GET` | `/api/posts/feed` | Ні | Отримати публічну стрічку постів |
+| `GET` | `/api/posts/scheduled` | Так | Отримати власні заплановані пости |
+| `POST` | `/api/posts/scheduled` | Так | Створити запланований пост |
+| `PATCH` | `/api/posts/scheduled/{id}` | Так | Частково оновити власний запланований пост |
+| `DELETE` | `/api/posts/scheduled/{id}` | Так | Видалити власний запланований пост |
 | `GET` | `/api/posts/{id}` | Ні | Отримати пост за `Guid` |
+| `GET` | `/api/posts/{id}/edit-history?limit=20&cursor=...` | Ні | Отримати версії редагування поста |
 | `POST` | `/api/posts/{id}/view` | Так | Зареєструвати перегляд поста |
 | `POST` | `/api/posts/{id}/like` | Так | Поставити лайк посту |
 | `DELETE` | `/api/posts/{id}/like` | Так | Прибрати лайк із поста |
@@ -507,6 +584,10 @@ Endpoint-и з однаковою named policy використовують сп
 | `PUT` | `/api/posts/{id}` | Так | Оновити власний пост |
 | `DELETE` | `/api/posts/{id}` | Так | Видалити власний пост |
 
+Scheduled post підтримує текст, media attachments і link preview. `ScheduledAt` має бути в майбутньому; background worker кожні `30 секунд` публікує до `20` готових записів за один цикл, переносить media до створеного поста та створює його початкову snapshot-версію.
+
+Звичайний post також може містити quote на post або comment із фіксацією конкретного `QuotedTargetVersionId`. Edit history повертає immutable snapshots, тому старі версії не змінюються разом із поточним контентом.
+
 Повторний конкурентний vote не створює дублікат: `PollRepository` перехоплює лише PostgreSQL `UniqueViolation` для constraint `IX_PollVotes_PollId_UserId` і повертає сервісу `false`. Інші помилки БД не маскуються як повторне голосування.
 
 ### Comments
@@ -515,9 +596,12 @@ Endpoint-и з однаковою named policy використовують сп
 |---|---|---|---|
 | `GET` | `/api/comments/post/{postId}?limit=20&cursor=...` | Ні | Отримати сторінку коментарів поста |
 | `GET` | `/api/comments/{id}` | Ні | Отримати коментар за `Guid` |
+| `GET` | `/api/comments/{id}/thread?limit=20&cursor=...` | Ні | Отримати пост, ancestors, target і сторінку прямих відповідей |
+| `GET` | `/api/comments/{id}/edit-history?limit=20&cursor=...` | Ні | Отримати версії редагування коментаря |
 | `POST` | `/api/comments` | Так | Створити коментар або відповідь |
 | `PUT` | `/api/comments/{id}` | Так | Оновити власний коментар |
 | `DELETE` | `/api/comments/{id}` | Так | Видалити власний коментар |
+| `POST` | `/api/comments/{id}/poll/vote` | Так | Проголосувати в poll коментаря |
 | `POST` | `/api/comments/{id}/view` | Так | Зареєструвати перегляд коментаря |
 | `POST` | `/api/comments/{id}/like` | Так | Поставити лайк коментарю |
 | `DELETE` | `/api/comments/{id}/like` | Так | Прибрати лайк із коментаря |
@@ -526,9 +610,22 @@ Endpoint-и з однаковою named policy використовують сп
 | `POST` | `/api/comments/{id}/bookmark` | Так | Додати коментар у bookmarks |
 | `DELETE` | `/api/comments/{id}/bookmark` | Так | Прибрати коментар із bookmarks |
 
+`POST /api/comments` підтримує `mediaIds`, `poll`, `location` і `linkPreview`. Для update поле `content` залишається обов'язковим, `mediaIds` замінює набір вкладень лише коли передане, а metadata керується явними командами:
+
+```json
+{
+  "content": "Updated comment",
+  "removePoll": true,
+  "removeLocation": true,
+  "removeLinkPreview": true
+}
+```
+
+Щоб установити metadata, клієнт передає відповідно `poll`, `location` або `linkPreview`. Одночасна передача значення і відповідного `remove...: true` повертає `400 Invalid request`. Відсутнє поле не змінює поточне значення.
+
 ### Логіка CommentService
 
-`CommentService` знаходиться у `Threads.Application/Services/Comments/CommentService.cs` і є фасадом над `CommentQueryService`, `CommentManagementService` та `CommentInteractionService`. Читання, команди створення/оновлення/видалення і реєстрація переглядів розділені між цими сервісами, а `CommentResponseFactory` разом із `UserResponseFactory` формують response DTO та read URL для аватара.
+`CommentService` знаходиться у `Threads.Application/Services/Comments/CommentService.cs` і є фасадом над `CommentQueryService`, `CommentManagementService`, `CommentInteractionService`, `CommentVersionService` та `CommentThreadService`. Читання, команди, interactions, edit history і побудова thread context розділені між цими сервісами, а `CommentResponseFactory` разом із `UserResponseFactory` формують response DTO та read URL для медіа й аватара.
 
 Усі публічні методи асинхронні та приймають `CancellationToken`, щоб запит до БД можна було скасувати, якщо клієнт розірвав HTTP-з'єднання або застосунок завершує роботу.
 
@@ -537,7 +634,10 @@ Endpoint-и з однаковою named policy використовують сп
 | Метод | Що робить |
 |---|---|
 | `GetByPostIdAsync(postId, pagination, cancellationToken, currentUserId)` | Повертає `CursorPageResponse<CommentResponse>` із максимум `pagination.limit` коментарів. Результат сортується за `CreatedAt + Id` від старих коментарів до нових і містить як кореневі коментарі, так і відповіді з `ParentCommentId`. |
+| `GetByAuthorIdAsync(authorId, pagination, cancellationToken, currentUserId)` | Повертає cursor-сторінку коментарів користувача для `/api/users/{username}/replies`. |
 | `GetByIdAsync(id, cancellationToken, currentUserId)` | Повертає один коментар за `Guid`. Якщо коментар не існує, повертає `null`, який контролер перетворює на `404 Not Found`. |
+| `GetThreadAsync(id, pagination, cancellationToken, currentUserId)` | Повертає пост, ланцюжок ancestors, target comment і cursor-сторінку його прямих відповідей. |
+| `GetEditHistoryAsync(id, pagination, cancellationToken, currentUserId)` | Повертає snapshot-версії коментаря з pagination за `CreatedAt + Id`. |
 | `GetLikedByUserIdAsync(userId, limit, cursor, cancellationToken, currentUserId)` | Повертає до `limit + 1` кандидатів-коментарів для спільної сторінки likes. У `ActionAt` записується час створення лайка. |
 | `GetBookmarkedByUserIdAsync(userId, limit, cursor, cancellationToken, currentUserId)` | Повертає до `limit + 1` кандидатів-коментарів для спільної сторінки bookmarks. У `ActionAt` записується час створення bookmark. |
 | `GetRepostedByUserIdAsync(userId, limit, cursor, cancellationToken, currentUserId)` | Повертає до `limit + 1` кандидатів-коментарів для спільної сторінки reposts. У `ActionAt` записується час створення repost. |
@@ -553,18 +653,19 @@ Endpoint-и з однаковою named policy використовують сп
 1. Відхиляє порожній текст або рядок лише з пробілів через `RequestValidationException`.
 2. Перевіряє існування поста з `request.PostId`.
 3. Якщо переданий `ParentCommentId`, перевіряє існування батьківського коментаря та належність до того самого поста.
-4. Створює `Comment` через AutoMapper, встановлює `AuthorId` із поточного користувача та обрізає зовнішні пробіли через `Trim()`.
-5. Зберігає entity та повторно завантажує її з навігаційними властивостями для повної API-відповіді.
+4. Створює `Comment`, нормалізує текст, location, poll і link preview та прив'язує до `20` попередньо завантажених media items.
+5. Створює початкову immutable snapshot-версію коментаря.
+6. Зберігає entity та повторно завантажує її з навігаційними властивостями для повної API-відповіді.
 
 База обмежує довжину `Content` до `1000` символів. Сервіс окремо перевіряє тільки те, що текст не порожній.
 
 ##### `UpdateAsync`
 
-Метод знаходить коментар, викидає `NotFoundException`, якщо його немає, і `ForbiddenException`, якщо `currentUserId` не збігається з `AuthorId`. Після ownership-перевірки він валідує новий текст, оновлює тільки `Content`, виставляє `UpdatedAt` у UTC і повертає `CommentResponse`. Автор, пост і `ParentCommentId` не змінюються.
+Метод знаходить коментар, викидає `NotFoundException`, якщо його немає, і `ForbiddenException`, якщо `currentUserId` не збігається з `AuthorId`. Після ownership-перевірки він оновлює текст, а за наявності відповідних полів — media, poll, location і link preview. `RemovePoll`, `RemoveLocation` та `RemoveLinkPreview` явно очищають metadata; передача одночасно значення і remove-прапорця відхиляється через `RequestValidationException`. Кожне успішне оновлення створює нову snapshot-версію та змінює `CurrentVersionId` і `UpdatedAt`. Автор, пост і `ParentCommentId` не змінюються.
 
 ##### `DeleteAsync`
 
-Метод викидає `NotFoundException`, якщо коментар не знайдений, і `ForbiddenException`, якщо операцію виконує не автор. Після перевірки `CommentManagementService` видаляє коментар; через cascade delete разом із ним видаляються replies, likes, bookmarks, reposts і views.
+Метод викидає `NotFoundException`, якщо коментар не знайдений, і `ForbiddenException`, якщо операцію виконує не автор. Після перевірки `CommentManagementService` видаляє коментар; через cascade delete разом із ним видаляються replies, poll, versions, likes, bookmarks, reposts і views. Очищення media objects у S3 виконується best-effort після успішної DB-операції.
 
 #### Likes, bookmarks і reposts
 
@@ -585,8 +686,9 @@ Endpoint-и з однаковою named policy використовують сп
 
 `CommentResponseFactory` формує фінальний `CommentResponse` із такими даними:
 
-- основні поля: `Id`, `PostId`, `ParentCommentId`, `Content`, `CreatedAt`, `UpdatedAt`;
-- автор: `Id`, `Username`, `DisplayName`, `Location`, `AvatarUrl`, `IsVerified`;
+- основні поля: `Id`, `VersionId`, `PostId`, `ParentCommentId`, `Content`, `CreatedAt`, `UpdatedAt`;
+- автор: `Id`, `Username`, `DisplayName`, `Bio`, `Location`, `AvatarUrl`, `IsVerified`;
+- розширений контент: `Attachments`, `Poll`, `Location`, `LinkPreview`;
 - counters: `LikesCount`, `RepliesCount`, `RepostsCount`, `ViewsCount`;
 - viewer state: `IsLikedByCurrentUser`, `IsBookmarkedByCurrentUser`, `IsRepostedByCurrentUser`;
 - `ActionAt`: час like/bookmark/repost у відповідній interaction collection або `null` у звичайних content endpoints.
@@ -598,11 +700,15 @@ URL аватара не зберігається безпосередньо в D
 | Service method | HTTP endpoint |
 |---|---|
 | `GetByPostIdAsync` | `GET /api/comments/post/{postId}?limit=20&cursor=...` |
+| `GetByAuthorIdAsync` | `GET /api/users/{username}/replies?limit=20&cursor=...` |
 | `GetByIdAsync` | `GET /api/comments/{id}` |
+| `GetThreadAsync` | `GET /api/comments/{id}/thread?limit=20&cursor=...` |
+| `GetEditHistoryAsync` | `GET /api/comments/{id}/edit-history?limit=20&cursor=...` |
 | `CreateAsync` | `POST /api/comments` |
 | `UpdateAsync` | `PUT /api/comments/{id}` |
 | `DeleteAsync` | `DELETE /api/comments/{id}` |
 | `RecordViewAsync` | `POST /api/comments/{id}/view` |
+| `VoteCommentAsync` через `PollService` | `POST /api/comments/{id}/poll/vote` |
 | `AddCommentLikeAsync` / `RemoveCommentLikeAsync` | `POST` / `DELETE /api/comments/{id}/like` |
 | `AddCommentBookmarkAsync` / `RemoveCommentBookmarkAsync` | `POST` / `DELETE /api/comments/{id}/bookmark` |
 | `AddCommentRepostAsync` / `RemoveCommentRepostAsync` | `POST` / `DELETE /api/comments/{id}/repost` |
@@ -632,6 +738,16 @@ URL аватара не зберігається безпосередньо в D
 | `GET` | `/api/search/locations?q=...` | Ні | Знайти локації через Geoapify |
 
 Search users сортується за `Username + Id` у зростаючому порядку, а search posts — за `CreatedAt + Id` у спадному. Для наступної сторінки потрібно повторити той самий `q` і передати `nextCursor` як `cursor`.
+
+User search додатково підтримує `people=following` і `location=near`. Post search підтримує ці самі filters, а також `exactPhrase`, `anyWords`, `excludeWords`, `from`, `minReplies`, `minLikes`, `minReposts`, `fromDate`, `toDate` і `hasMedia`. Невідомі значення enum-like filters і некоректний date range повертають `400 Invalid request`.
+
+### Link previews
+
+| Method | Route | Auth | Призначення |
+|---|---|---|---|
+| `POST` | `/api/linkpreviews/resolve` | Ні | Безпечно отримати title, image і domain для HTTP/HTTPS URL |
+
+Link preview resolver блокує loopback, private/link-local адреси та redirect-и на приватні hosts, дозволяє лише HTTP/HTTPS без user info, обмежує redirects і обсяг прочитаного HTML. Endpoint використовує спільну `ExternalSearchPolicy`.
 
 ### Media
 
@@ -680,12 +796,25 @@ Engagement поста не кешується: counters і viewer-specific state
 
 ## Тестування
 
-Solution містить проєкт `tests/Threads.Application.UnitTests` на `xUnit` з `NSubstitute`. Наразі тести покривають валідацію майбутніх дат і базові сценарії `SessionService`.
+Solution містить два тестові проєкти на `xUnit`:
+
+| Проєкт | Що покриває | Залежності |
+|---|---|---|
+| `tests/Threads.Application.UnitTests` | application services (auth, posts, scheduled posts, comments, versions, interactions, follows, media, link previews, users), cursor/cache helpers, mapping, валідацію DTO та domain policies | `NSubstitute`, без зовнішніх сервісів |
+| `tests/Threads.Infrastructure.IntegrationTests` | repositories, JWT/password/auth-code security, auth transactions, link preview HTTP behavior і API через `WebApplicationFactory` (`Auth`, `Profile`, `Search`, `CommentThread`, `UserReplies`) | `Testcontainers` з `postgres:17-alpine` |
+
+Integration tests самі запускають PostgreSQL-контейнер і застосовують migrations, тому для них потрібен запущений Docker.
 
 Запуск усіх тестів:
 
 ```bash
 dotnet test BackEndForFinalProject.sln
+```
+
+Лише unit tests (без Docker):
+
+```bash
+dotnet test tests/Threads.Application.UnitTests
 ```
 
 ## Розгортання
@@ -698,9 +827,13 @@ dotnet test BackEndForFinalProject.sln
 - конфіг `deploy/nginx/threads.conf` проксіює трафік на `127.0.0.1:7000`
 - Nginx передає `X-Forwarded-For` і `X-Forwarded-Proto`; API довіряє лише proxy з `ReverseProxy__KnownProxy`
 - forwarded headers обробляються до authentication та rate limiting, тому IP-based policies використовують адресу клієнта, а не Docker gateway
+- GitHub Actions workflow `.github/workflows/build-deploy.yaml` запускається на push у `main` (або вручну): підключається до сервера по SSH, робить `git pull`, оновлює nginx, записує `.env` із secret `APP_ENV_FILE` і перезбирає контейнери через `docker compose up -d --build`
+- workflow не запускає тести й не застосовує EF Core migrations: перед push у `main` потрібно локально виконати `dotnet test`, а migrations застосувати окремо
 
 ## Примітки
 
 - README описує фактичні контролери, маршрути й конфігурацію, які є в коді зараз.
 - `Like`, `Bookmark`, `Repost` і `View` розділені на окремі сутності для дописів і коментарів.
-- Останні зміни від `2026-09-22`: додано Swagger UI, unit test project, структуроване логування та best-effort cache/file cleanup; ownership-перевірки update/delete залишаються в application services, а часові поля DTO використовують `DateTimeOffset`.
+- Зміни від `2026-09-22`: додано Swagger UI, unit test project, структуроване логування та best-effort cache/file cleanup; ownership-перевірки update/delete залишаються в application services, а часові поля DTO використовують `DateTimeOffset`.
+- Зміни від `2026-10-02`: додано integration tests на Testcontainers, `bio` у `UserShortResponse`, налаштування видимості дати народження; у контракті API `DateOfBirth` → `birthDate`, `RemoveDateOfBirth` → `RemoveBirthDate` (у БД і entity поле досі називається `DateOfBirth`); migrations зведено в одну `Initial`.
+- Зміни від `2026-10-08`: додано scheduled posts, content versions/edit history, comment threads і user replies, advanced search filters, quotes, link previews, media/poll/location для comments та уніфікований RFC 7807 error contract. Очищення comment metadata виконується явними `RemovePoll`, `RemoveLocation` і `RemoveLinkPreview`.

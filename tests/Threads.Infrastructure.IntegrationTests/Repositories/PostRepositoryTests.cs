@@ -58,7 +58,7 @@ public sealed class PostRepositoryTests : DatabaseTestBase
     [Fact]
     public async Task GetByAuthorIdAsync_OrdersByTimestampAndIdAndAppliesExclusiveCursor()
     {
-        var author = TestEntityFactory.CreateUser();
+        var author = TestEntityFactory.CreateUser(bio: "Author bio");
         var otherAuthor = TestEntityFactory.CreateUser("other-author");
         var oldest = TestEntityFactory.CreatePost(author, "oldest", Oldest, Guid.Parse("00000000-0000-0000-0000-000000000010"));
         var middle = TestEntityFactory.CreatePost(author, "middle", Middle, Guid.Parse("00000000-0000-0000-0000-000000000020"));
@@ -84,6 +84,72 @@ public sealed class PostRepositoryTests : DatabaseTestBase
         Assert.Equal([higherLatest.Id, lowerLatest.Id], firstPage.Select(post => post.Id));
         Assert.Equal([lowerLatest.Id, middle.Id], afterHighest.Select(post => post.Id));
         Assert.Equal([oldest.Id], afterMiddle.Select(post => post.Id));
+        Assert.Equal("Author bio", firstPage.First().Author.Bio);
+    }
+
+    [Fact]
+    public async Task GetSummariesByIdsAsync_ReturnsDistinctExistingPostsInRequestedOrder()
+    {
+        var author = TestEntityFactory.CreateUser();
+        var first = TestEntityFactory.CreatePost(author, "first");
+        var second = TestEntityFactory.CreatePost(author, "second");
+        var missingId = Guid.NewGuid();
+        await SeedAsync(author, first, second);
+
+        await using var dbContext = Fixture.CreateContext();
+        var repository = new PostRepository(dbContext);
+
+        var result = await repository.GetSummariesByIdsAsync(
+            [second.Id, missingId, first.Id, second.Id]);
+
+        Assert.Equal([second.Id, first.Id], result.Select(post => post.Id));
+    }
+
+    [Fact]
+    public async Task GetVersionsAsync_ReturnsOnlyPostVersionsInStableChronologicalOrder()
+    {
+        var author = TestEntityFactory.CreateUser();
+        var post = TestEntityFactory.CreatePost(author);
+        var otherPost = TestEntityFactory.CreatePost(author, "other");
+        var versionTime = Oldest;
+        var lowerId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+        var higherId = Guid.Parse("00000000-0000-0000-0000-000000000002");
+        post.Versions.Add(new PostVersion
+        {
+            Id = higherId,
+            PostId = post.Id,
+            Post = post,
+            SnapshotJson = "{}",
+            CreatedAt = versionTime
+        });
+        post.Versions.Add(new PostVersion
+        {
+            Id = lowerId,
+            PostId = post.Id,
+            Post = post,
+            SnapshotJson = "{}",
+            CreatedAt = versionTime
+        });
+        otherPost.Versions.Add(new PostVersion
+        {
+            PostId = otherPost.Id,
+            Post = otherPost,
+            SnapshotJson = "{}",
+            CreatedAt = versionTime.AddMinutes(-1)
+        });
+        await SeedAsync(author, post, otherPost);
+
+        await using var dbContext = Fixture.CreateContext();
+        var repository = new PostRepository(dbContext);
+
+        var result = await repository.GetVersionsAsync(post.Id, limit: 10);
+        var afterLowerId = await repository.GetVersionsAsync(
+            post.Id,
+            limit: 10,
+            new CursorPosition(versionTime, lowerId));
+
+        Assert.Equal([lowerId, higherId], result.Select(version => version.Id));
+        Assert.Equal([higherId], afterLowerId.Select(version => version.Id));
     }
 
     [Fact]
@@ -231,6 +297,157 @@ public sealed class PostRepositoryTests : DatabaseTestBase
 
         Assert.Equal([latest.Id, middle.Id], firstPage.Select(post => post.Id));
         Assert.Equal([oldest.Id], afterMiddle.Select(post => post.Id));
+    }
+
+    [Fact]
+    public async Task SearchAsync_AppliesAdvancedFiltersAndExcludesNonMatchingPosts()
+    {
+        var current = TestEntityFactory.CreateUser(
+            "current-searcher",
+            locationLatitude: 50.4501,
+            locationLongitude: 30.5234);
+        var author = TestEntityFactory.CreateUser("target-author");
+        var otherAuthor = TestEntityFactory.CreateUser("other-author");
+        var matching = TestEntityFactory.CreatePost(
+            author,
+            "The Exact Phrase contains alpha content",
+            new DateTimeOffset(2026, 1, 2, 12, 0, 0, TimeSpan.Zero),
+            locationLatitude: 50.4547,
+            locationLongitude: 30.5238);
+        var excluded = TestEntityFactory.CreatePost(
+            author,
+            "The exact phrase contains alpha forbidden",
+            new DateTimeOffset(2026, 1, 2, 11, 0, 0, TimeSpan.Zero),
+            locationLatitude: 50.4547,
+            locationLongitude: 30.5238);
+        var wrongAuthor = TestEntityFactory.CreatePost(
+            otherAuthor,
+            "The exact phrase contains alpha content",
+            new DateTimeOffset(2026, 1, 2, 10, 0, 0, TimeSpan.Zero),
+            locationLatitude: 50.4547,
+            locationLongitude: 30.5238);
+        var far = TestEntityFactory.CreatePost(
+            author,
+            "The exact phrase contains alpha content",
+            new DateTimeOffset(2026, 1, 2, 9, 0, 0, TimeSpan.Zero),
+            locationLatitude: 49.8397,
+            locationLongitude: 24.0297);
+        var follow = TestEntityFactory.CreateFollow(current, author);
+        var comment = TestEntityFactory.CreateComment(current, matching, "reply");
+        var like = TestEntityFactory.CreatePostLike(current, matching);
+        var repost = TestEntityFactory.CreatePostRepost(current, matching);
+        var media = TestEntityFactory.CreatePostMedia(current, matching, "search/matching.jpg");
+
+        await SeedAsync(
+            current,
+            author,
+            otherAuthor,
+            matching,
+            excluded,
+            wrongAuthor,
+            far,
+            follow,
+            comment,
+            like,
+            repost,
+            media);
+
+        await using var dbContext = Fixture.CreateContext();
+        var repository = new PostRepository(dbContext);
+
+        var exactPhrase = await SearchAsync(repository, exactPhrase: "exact phrase");
+        var anyWords = await SearchAsync(repository, anyWords: ["missing", "alpha"]);
+        var excludeWords = await SearchAsync(repository, excludeWords: ["forbidden"]);
+        var from = await SearchAsync(repository, from: "target-author");
+        var counters = await SearchAsync(repository, minReplies: 1, minLikes: 1, minReposts: 1);
+        var dates = await SearchAsync(
+            repository,
+            fromDate: new DateOnly(2026, 1, 2),
+            toDate: new DateOnly(2026, 1, 2));
+        var withMedia = await SearchAsync(repository, hasMedia: true);
+        var combined = await SearchAsync(
+            repository,
+            people: "following",
+            location: "near",
+            exactPhrase: "exact phrase",
+            anyWords: ["alpha"],
+            excludeWords: ["forbidden"],
+            from: "target-author",
+            minReplies: 1,
+            minLikes: 1,
+            minReposts: 1,
+            fromDate: new DateOnly(2026, 1, 2),
+            toDate: new DateOnly(2026, 1, 2),
+            hasMedia: true,
+            currentUserId: current.Id);
+
+        Assert.Contains(exactPhrase, post => post.Id == matching.Id);
+        Assert.Contains(anyWords, post => post.Id == matching.Id);
+        Assert.DoesNotContain(excludeWords, post => post.Id == excluded.Id);
+        Assert.DoesNotContain(from, post => post.Id == wrongAuthor.Id);
+        Assert.Equal([matching.Id], counters.Select(post => post.Id));
+        Assert.DoesNotContain(dates, post => post.CreatedAt.Date != matching.CreatedAt.Date);
+        Assert.Equal([matching.Id], withMedia.Select(post => post.Id));
+        Assert.Equal([matching.Id], combined.Select(post => post.Id));
+    }
+
+    [Fact]
+    public async Task SearchAsync_FilterOnlyOrdersDescendingAndUsesExclusiveCursor()
+    {
+        var author = TestEntityFactory.CreateUser("ordered-author");
+        var oldest = TestEntityFactory.CreatePost(author, "oldest", Oldest);
+        var middle = TestEntityFactory.CreatePost(author, "middle", Middle);
+        var latest = TestEntityFactory.CreatePost(author, "latest", Latest);
+        await SeedAsync(author, oldest, middle, latest);
+
+        await using var dbContext = Fixture.CreateContext();
+        var repository = new PostRepository(dbContext);
+        var firstPage = await SearchAsync(repository, hasMedia: false, limit: 1);
+        var afterMiddle = await SearchAsync(
+            repository,
+            hasMedia: false,
+            limit: 10,
+            cursor: new CursorPosition(middle.CreatedAt, middle.Id));
+
+        Assert.Equal([latest.Id, middle.Id], firstPage.Select(post => post.Id));
+        Assert.Equal([oldest.Id], afterMiddle.Select(post => post.Id));
+    }
+
+    private static Task<IReadOnlyCollection<Threads.Application.DTOs.Posts.Models.PostSummaryReadModel>> SearchAsync(
+        PostRepository repository,
+        string? people = null,
+        string? location = null,
+        string? exactPhrase = null,
+        IReadOnlyCollection<string>? anyWords = null,
+        IReadOnlyCollection<string>? excludeWords = null,
+        string? from = null,
+        int? minReplies = null,
+        int? minLikes = null,
+        int? minReposts = null,
+        DateOnly? fromDate = null,
+        DateOnly? toDate = null,
+        bool? hasMedia = null,
+        int limit = 50,
+        CursorPosition? cursor = null,
+        Guid? currentUserId = null)
+    {
+        return repository.SearchAsync(
+            null,
+            people,
+            location,
+            exactPhrase,
+            anyWords ?? [],
+            excludeWords ?? [],
+            from,
+            minReplies,
+            minLikes,
+            minReposts,
+            fromDate,
+            toDate,
+            hasMedia,
+            limit,
+            cursor,
+            currentUserId);
     }
 
     private async Task<int?> RecordViewAsync(Guid postId, Guid viewerId)

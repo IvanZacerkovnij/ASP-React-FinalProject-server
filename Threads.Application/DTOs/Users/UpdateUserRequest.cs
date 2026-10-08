@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using Threads.Application.DTOs.Locations;
 using Threads.Application.DTOs.Validation;
+using Threads.Domain.Enums;
 
 namespace Threads.Application.DTOs.Users;
 
@@ -15,6 +16,10 @@ public class UpdateUserRequest
 
     [NotInFutureDate]
     public DateOnly? DateOfBirth { get; init; }
+
+    public VisibilityLevel? BirthDateVisibility { get; init; }
+
+    public VisibilityLevel? BirthYearVisibility { get; init; }
 
     [DefaultValue(false)]
     public bool RemoveDateOfBirth { get; init; }

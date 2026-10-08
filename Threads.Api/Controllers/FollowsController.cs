@@ -34,21 +34,21 @@ public class FollowsController : ControllerBase
 
         if (currentUserId is null)
         {
-            return Unauthorized(new { message = "Invalid token claims." });
+            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
         }
 
         var user = await _userService.GetByIdAsync(userId, cancellationToken);
 
         if (user is null)
         {
-            return NotFound(new { message = "User was not found." });
+            return this.ProblemResponse(StatusCodes.Status404NotFound, "User was not found.");
         }
 
         var wasAdded = await _followService.AddFollowAsync(currentUserId.Value, userId, cancellationToken);
 
         return wasAdded
             ? Ok(new { message = "User followed successfully." })
-            : Conflict(new { message = "Unable to follow this user." });
+            : this.ProblemResponse(StatusCodes.Status409Conflict, "Unable to follow this user.");
     }
 
     [Authorize]
@@ -62,21 +62,21 @@ public class FollowsController : ControllerBase
 
         if (currentUserId is null)
         {
-            return Unauthorized(new { message = "Invalid token claims." });
+            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
         }
 
         var user = await _userService.GetByIdAsync(userId, cancellationToken);
 
         if (user is null)
         {
-            return NotFound(new { message = "User was not found." });
+            return this.ProblemResponse(StatusCodes.Status404NotFound, "User was not found.");
         }
 
         var wasRemoved = await _followService.RemoveFollowAsync(currentUserId.Value, userId, cancellationToken);
 
         return wasRemoved
             ? NoContent()
-            : NotFound(new { message = "Follow was not found." });
+            : this.ProblemResponse(StatusCodes.Status404NotFound, "Follow was not found.");
     }
 
     [HttpGet("{userId:guid}/followers")]
@@ -89,7 +89,7 @@ public class FollowsController : ControllerBase
 
         if (user is null)
         {
-            return NotFound(new { message = "User was not found." });
+            return this.ProblemResponse(StatusCodes.Status404NotFound, "User was not found.");
         }
 
         var followers = await _followService.GetFollowersAsync(userId, pagination, cancellationToken);
@@ -107,7 +107,7 @@ public class FollowsController : ControllerBase
 
         if (user is null)
         {
-            return NotFound(new { message = "User was not found." });
+            return this.ProblemResponse(StatusCodes.Status404NotFound, "User was not found.");
         }
 
         var following = await _followService.GetFollowingAsync(userId, pagination, cancellationToken);
@@ -127,7 +127,7 @@ public class FollowsController : ControllerBase
 
         if (currentUserId is null)
         {
-            return Unauthorized(new { message = "Invalid token claims." });
+            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
         }
 
         await _followService.RemoveFollowerAsync(

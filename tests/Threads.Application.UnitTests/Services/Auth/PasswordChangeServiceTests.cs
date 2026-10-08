@@ -7,6 +7,7 @@ using Threads.Application.Interfaces.Auth;
 using Threads.Application.Interfaces.Security;
 using Threads.Application.Interfaces.Users;
 using Threads.Application.Services.Auth;
+using Threads.Application.UnitTests.Helpers;
 using Threads.Domain.Entities;
 
 namespace Threads.Application.UnitTests.Services.Auth;
@@ -110,7 +111,7 @@ public class PasswordChangeServiceTests
     [Fact]
     public async Task StartPasswordChangeAsync_WhenUserIsInactive_ReturnsUserNotFound()
     {
-        var user = CreateUser(isActive: false);
+        var user = TestEntityFactory.CreateUser(isActive: false);
         _userRepository
             .GetByIdAsync(user.Id, Arg.Any<CancellationToken>())
             .Returns(user);
@@ -124,7 +125,7 @@ public class PasswordChangeServiceTests
     [Fact]
     public async Task StartPasswordChangeAsync_WhenCurrentPasswordIsInvalid_ReturnsInvalidCurrentPassword()
     {
-        var user = CreateUser();
+        var user = TestEntityFactory.CreateUser();
         var request = CreateStartRequest();
         _userRepository
             .GetByIdAsync(user.Id, Arg.Any<CancellationToken>())
@@ -146,7 +147,7 @@ public class PasswordChangeServiceTests
     [Fact]
     public async Task StartPasswordChangeAsync_WhenNewPasswordMatchesCurrent_ReturnsInvalidNewPassword()
     {
-        var user = CreateUser();
+        var user = TestEntityFactory.CreateUser();
         var request = CreateStartRequest();
         _userRepository
             .GetByIdAsync(user.Id, Arg.Any<CancellationToken>())
@@ -167,7 +168,7 @@ public class PasswordChangeServiceTests
     [Fact]
     public async Task StartPasswordChangeAsync_WhenRequestIsValid_SavesPendingHashAndSendsCode()
     {
-        var user = CreateUser();
+        var user = TestEntityFactory.CreateUser();
         var request = CreateStartRequest();
         var previousUpdatedAt = user.UpdatedAt;
         using var cancellationTokenSource = new CancellationTokenSource();
@@ -203,7 +204,7 @@ public class PasswordChangeServiceTests
     [Fact]
     public async Task ConfirmPasswordChangeAsync_WhenNoChangeIsPending_ReturnsNoPendingPasswordChange()
     {
-        var user = CreateUser();
+        var user = TestEntityFactory.CreateUser();
         _userRepository
             .GetByIdAsync(user.Id, Arg.Any<CancellationToken>())
             .Returns(user);
@@ -222,7 +223,7 @@ public class PasswordChangeServiceTests
     [Fact]
     public async Task ConfirmPasswordChangeAsync_WhenUserIsInactive_ReturnsUserNotFound()
     {
-        var user = CreateUser(isActive: false);
+        var user = TestEntityFactory.CreateUser(isActive: false);
         user.PendingPasswordHash = "new-password-hash";
         _userRepository
             .GetByIdAsync(user.Id, Arg.Any<CancellationToken>())
@@ -242,7 +243,7 @@ public class PasswordChangeServiceTests
     [Fact]
     public async Task ConfirmPasswordChangeAsync_WhenCodeIsInvalid_ReturnsInvalidConfirmationCode()
     {
-        var user = CreateUser();
+        var user = TestEntityFactory.CreateUser();
         user.PendingPasswordHash = "new-password-hash";
         user.PasswordResetCodeHash = "confirmation-code-hash";
         user.PasswordResetCodeExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5);
@@ -263,7 +264,7 @@ public class PasswordChangeServiceTests
     [Fact]
     public async Task ConfirmPasswordChangeAsync_WhenCodeIsExpired_ReturnsInvalidConfirmationCode()
     {
-        var user = CreateUser();
+        var user = TestEntityFactory.CreateUser();
         user.PendingPasswordHash = "new-password-hash";
         user.PasswordResetCodeHash = "confirmation-code-hash";
         user.PasswordResetCodeExpiresAt = DateTimeOffset.UtcNow.AddMinutes(-1);
@@ -288,7 +289,7 @@ public class PasswordChangeServiceTests
     [Fact]
     public async Task ConfirmPasswordChangeAsync_WhenCodeIsValid_ChangesPasswordAndRevokesSessions()
     {
-        var user = CreateUser();
+        var user = TestEntityFactory.CreateUser();
         user.PendingPasswordHash = "new-password-hash";
         user.PasswordResetCodeHash = "confirmation-code-hash";
         user.PasswordResetCodeExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5);
@@ -343,18 +344,6 @@ public class PasswordChangeServiceTests
         {
             CurrentPassword = "CurrentPassword123!",
             NewPassword = "NewPassword123!"
-        };
-    }
-
-    private static User CreateUser(bool isActive = true)
-    {
-        return new User
-        {
-            Id = Guid.NewGuid(),
-            Email = "user@example.com",
-            Username = "testuser",
-            PasswordHash = "current-password-hash",
-            IsActive = isActive
         };
     }
 }

@@ -2,14 +2,18 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Threads.Api.Extensions;
+using Threads.Application.DTOs.Pagination;
 using Threads.Application.DTOs.Polls;
 using Threads.Application.DTOs.Posts.Requests;
 using Threads.Application.DTOs.Posts.Responses;
+using Threads.Application.DTOs.ScheduledPosts;
+using Threads.Application.DTOs.Versions;
 using Threads.Application.Interfaces.Bookmarks;
 using Threads.Application.Interfaces.Likes;
 using Threads.Application.Interfaces.Polls;
 using Threads.Application.Interfaces.Posts;
 using Threads.Application.Interfaces.Reposts;
+using Threads.Application.Interfaces.ScheduledPosts;
 using Threads.Application.Interfaces.Users;
 using Threads.Infrastructure.Services;
 
@@ -25,6 +29,7 @@ public class PostsController : ControllerBase
     private readonly IPollService _pollService;
     private readonly IUserService _userService;
     private readonly IBookmarkService _bookmarkService;
+    private readonly IScheduledPostService _scheduledPostService;
 
     public PostsController(
         IPostService postService,
@@ -32,7 +37,8 @@ public class PostsController : ControllerBase
         IRepostService repostService,
         IPollService pollService,
         IUserService userService,
-        IBookmarkService bookmarkService)
+        IBookmarkService bookmarkService,
+        IScheduledPostService scheduledPostService)
     {
         _postService = postService;
         _likeService = likeService;
@@ -40,6 +46,7 @@ public class PostsController : ControllerBase
         _pollService = pollService;
         _userService = userService;
         _bookmarkService = bookmarkService;
+        _scheduledPostService = scheduledPostService;
     }
 
     [HttpGet("feed")]
@@ -49,6 +56,86 @@ public class PostsController : ControllerBase
         
         var posts = await _postService.GetFeedAsync(cancellationToken, currentUserId);
         return Ok(posts);
+    }
+
+    [Authorize]
+    [HttpGet("scheduled")]
+    public async Task<ActionResult<IReadOnlyCollection<ScheduledPostResponse>>> GetScheduled(
+        CancellationToken cancellationToken)
+    {
+        var currentUserId = User.GetCurrentUserId();
+
+        if (currentUserId is null)
+        {
+            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
+        }
+
+        var scheduledPosts = await _scheduledPostService.GetAsync(
+            currentUserId.Value,
+            cancellationToken);
+        return Ok(scheduledPosts);
+    }
+
+    [Authorize]
+    [HttpPost("scheduled")]
+    public async Task<ActionResult<ScheduledPostResponse>> CreateScheduled(
+        [FromBody] CreateScheduledPostRequest request,
+        CancellationToken cancellationToken)
+    {
+        var currentUserId = User.GetCurrentUserId();
+
+        if (currentUserId is null)
+        {
+            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
+        }
+
+        var scheduledPost = await _scheduledPostService.CreateAsync(
+            currentUserId.Value,
+            request,
+            cancellationToken);
+        return Ok(scheduledPost);
+    }
+
+    [Authorize]
+    [HttpPatch("scheduled/{id:guid}")]
+    public async Task<ActionResult<ScheduledPostResponse>> UpdateScheduled(
+        [FromRoute] Guid id,
+        [FromBody] UpdateScheduledPostRequest request,
+        CancellationToken cancellationToken)
+    {
+        var currentUserId = User.GetCurrentUserId();
+
+        if (currentUserId is null)
+        {
+            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
+        }
+
+        var scheduledPost = await _scheduledPostService.UpdateAsync(
+            id,
+            currentUserId.Value,
+            request,
+            cancellationToken);
+        return Ok(scheduledPost);
+    }
+
+    [Authorize]
+    [HttpDelete("scheduled/{id:guid}")]
+    public async Task<IActionResult> DeleteScheduled(
+        [FromRoute] Guid id,
+        CancellationToken cancellationToken)
+    {
+        var currentUserId = User.GetCurrentUserId();
+
+        if (currentUserId is null)
+        {
+            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
+        }
+
+        await _scheduledPostService.DeleteAsync(
+            id,
+            currentUserId.Value,
+            cancellationToken);
+        return NoContent();
     }
     
 
@@ -62,8 +149,27 @@ public class PostsController : ControllerBase
         var post = await _postService.GetByIdAsync(id, cancellationToken, currentUserId);
 
         return post is null
-            ? NotFound(new { message = "Post was not found." })
+            ? this.ProblemResponse(StatusCodes.Status404NotFound, "Post was not found.")
             : Ok(post);
+    }
+
+    [HttpGet("{id:guid}/edit-history")]
+    [EnableRateLimiting(RateLimiterConfigurator.EditHistoryPolicyName)]
+    public async Task<ActionResult<EditHistoryResponse<PostResponse>>> GetEditHistory(
+        [FromRoute] Guid id,
+        [FromQuery] CursorPageRequest pagination,
+        CancellationToken cancellationToken)
+    {
+        var currentUserId = User.GetCurrentUserId();
+        var history = await _postService.GetEditHistoryAsync(
+            id,
+            pagination,
+            cancellationToken,
+            currentUserId);
+
+        return history is null
+            ? this.ProblemResponse(StatusCodes.Status404NotFound, "Post was not found.")
+            : Ok(history);
     }
 
     [Authorize]
@@ -77,13 +183,13 @@ public class PostsController : ControllerBase
 
         if (currentUserId is null)
         {
-            return Unauthorized(new { message = "Invalid token claims." });
+            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
         }
 
         var result = await _postService.RecordViewAsync(id, currentUserId.Value, cancellationToken);
 
         return result is null
-            ? NotFound(new { message = "Post was not found." })
+            ? this.ProblemResponse(StatusCodes.Status404NotFound, "Post was not found.")
             : Ok(result);
     }
 
@@ -98,21 +204,21 @@ public class PostsController : ControllerBase
 
         if (currentUserId is null)
         {
-            return Unauthorized(new { message = "Invalid token claims." });
+            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
         }
 
         var currentPost = await _postService.GetByIdAsync(id, cancellationToken, currentUserId);
 
         if (currentPost is null)
         {
-            return NotFound(new { message = "Post was not found." });
+            return this.ProblemResponse(StatusCodes.Status404NotFound, "Post was not found.");
         }
 
         await _likeService.AddPostLikeAsync(currentUserId.Value, id, cancellationToken);
         var updatedPost = await _postService.GetByIdAsync(id, cancellationToken, currentUserId.Value);
 
         return updatedPost is null
-            ? NotFound(new { message = "Post was not found." })
+            ? this.ProblemResponse(StatusCodes.Status404NotFound, "Post was not found.")
             : Ok(MapLikeStateResponse(updatedPost));
     }
 
@@ -127,14 +233,14 @@ public class PostsController : ControllerBase
 
         if (currentUserId is null)
         {
-            return Unauthorized(new { message = "Invalid token claims." });
+            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
         }
 
         var currentPost = await _postService.GetByIdAsync(id, cancellationToken, currentUserId);
 
         if (currentPost is null)
         {
-            return NotFound(new { message = "Post was not found." });
+            return this.ProblemResponse(StatusCodes.Status404NotFound, "Post was not found.");
         }
 
         var wasAdded = await _repostService.AddPostRepostAsync(currentUserId.Value, id, cancellationToken);
@@ -144,14 +250,14 @@ public class PostsController : ControllerBase
             var postAfterFailedRepost = await _postService.GetByIdAsync(id, cancellationToken, currentUserId.Value);
 
             return postAfterFailedRepost is null
-                ? NotFound(new { message = "Post was not found." })
-                : Conflict(new { message = "You have already reposted this post." });
+                ? this.ProblemResponse(StatusCodes.Status404NotFound, "Post was not found.")
+                : this.ProblemResponse(StatusCodes.Status409Conflict, "You have already reposted this post.");
         }
 
         var updatedPost = await _postService.GetByIdAsync(id, cancellationToken, currentUserId.Value);
 
         return updatedPost is null
-            ? NotFound(new { message = "Post was not found." })
+            ? this.ProblemResponse(StatusCodes.Status404NotFound, "Post was not found.")
             : Ok(MapRepostStateResponse(updatedPost));
     }
 
@@ -166,14 +272,14 @@ public class PostsController : ControllerBase
 
         if (currentUserId is null)
         {
-            return Unauthorized(new { message = "Invalid token claims." });
+            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
         }
 
         var currentPost = await _postService.GetByIdAsync(id, cancellationToken, currentUserId);
 
         if (currentPost is null)
         {
-            return NotFound(new { message = "Post was not found." });
+            return this.ProblemResponse(StatusCodes.Status404NotFound, "Post was not found.");
         }
 
         var wasRemoved = await _repostService.RemovePostRepostAsync(currentUserId.Value, id, cancellationToken);
@@ -183,14 +289,14 @@ public class PostsController : ControllerBase
             var postAfterFailedUndo = await _postService.GetByIdAsync(id, cancellationToken, currentUserId.Value);
 
             return postAfterFailedUndo is null
-                ? NotFound(new { message = "Post was not found." })
-                : NotFound(new { message = "Repost was not found." });
+                ? this.ProblemResponse(StatusCodes.Status404NotFound, "Post was not found.")
+                : this.ProblemResponse(StatusCodes.Status404NotFound, "Repost was not found.");
         }
 
         var updatedPost = await _postService.GetByIdAsync(id, cancellationToken, currentUserId.Value);
 
         return updatedPost is null
-            ? NotFound(new { message = "Post was not found." })
+            ? this.ProblemResponse(StatusCodes.Status404NotFound, "Post was not found.")
             : Ok(MapRepostStateResponse(updatedPost));
     }
 
@@ -205,21 +311,21 @@ public class PostsController : ControllerBase
 
         if (currentUserId is null)
         {
-            return Unauthorized(new { message = "Invalid token claims." });
+            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
         }
 
         var currentPost = await _postService.GetByIdAsync(id, cancellationToken, currentUserId);
 
         if (currentPost is null)
         {
-            return NotFound(new { message = "Post was not found." });
+            return this.ProblemResponse(StatusCodes.Status404NotFound, "Post was not found.");
         }
 
         await _likeService.RemovePostLikeAsync(currentUserId.Value, id, cancellationToken);
         var updatedPost = await _postService.GetByIdAsync(id, cancellationToken, currentUserId.Value);
 
         return updatedPost is null
-            ? NotFound(new { message = "Post was not found." })
+            ? this.ProblemResponse(StatusCodes.Status404NotFound, "Post was not found.")
             : Ok(MapLikeStateResponse(updatedPost));
     }
 
@@ -234,14 +340,14 @@ public class PostsController : ControllerBase
         
         if (currentUserId is null)
         {
-            return Unauthorized(new { message = "Invalid token claims." });
+            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
         }
         
         var currentPost = await _postService.GetByIdAsync(id, cancellationToken, currentUserId);
 
         if (currentPost is null)
         {
-            return NotFound(new { message = "Post was not found." });
+            return this.ProblemResponse(StatusCodes.Status404NotFound, "Post was not found.");
         }
         
         var wasAdded = await _bookmarkService.AddPostBookmarkAsync(currentUserId.Value, id, cancellationToken);
@@ -250,14 +356,14 @@ public class PostsController : ControllerBase
             var postAfterFailedBookmark = await _postService.GetByIdAsync(id, cancellationToken, currentUserId.Value);
 
             return postAfterFailedBookmark is null
-                ? NotFound(new { message = "Post was not found." })
-                : Conflict(new { message = "You have already bookmarked this post." });
+                ? this.ProblemResponse(StatusCodes.Status404NotFound, "Post was not found.")
+                : this.ProblemResponse(StatusCodes.Status409Conflict, "You have already bookmarked this post.");
         }
         
         var updatedPost = await _postService.GetByIdAsync(id, cancellationToken, currentUserId);
         
         return updatedPost is null 
-            ? NotFound(new { message = "Post was not found." }):
+            ? this.ProblemResponse(StatusCodes.Status404NotFound, "Post was not found."):
             Ok(MapBookmarkStateResponse(updatedPost));
     }
     
@@ -272,14 +378,14 @@ public class PostsController : ControllerBase
         
         if (currentUserId is null)
         {
-            return Unauthorized(new { message = "Invalid token claims." });
+            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
         }
         
         var currentPost = await _postService.GetByIdAsync(id, cancellationToken, currentUserId);
 
         if (currentPost is null)
         {
-            return NotFound(new { message = "Post was not found." });
+            return this.ProblemResponse(StatusCodes.Status404NotFound, "Post was not found.");
         }
         
         var wasRemoved = await _bookmarkService.RemovePostBookmarkAsync(currentUserId.Value, id, cancellationToken);
@@ -288,14 +394,14 @@ public class PostsController : ControllerBase
             var postAfterFailedBookmark = await _postService.GetByIdAsync(id, cancellationToken, currentUserId.Value);
 
             return postAfterFailedBookmark is null
-                ? NotFound(new { message = "Post was not found." })
-                : NotFound(new { message = "Bookmark was not found." });
+                ? this.ProblemResponse(StatusCodes.Status404NotFound, "Post was not found.")
+                : this.ProblemResponse(StatusCodes.Status404NotFound, "Bookmark was not found.");
         }
         
         var updatedPost = await _postService.GetByIdAsync(id, cancellationToken, currentUserId);
         
         return updatedPost is null 
-            ? NotFound(new { message = "Post was not found." }):
+            ? this.ProblemResponse(StatusCodes.Status404NotFound, "Post was not found."):
             Ok(MapBookmarkStateResponse(updatedPost));
     }
 
@@ -311,7 +417,7 @@ public class PostsController : ControllerBase
 
         if (currentUserId is null)
         {
-            return Unauthorized(new { message = "Invalid token claims." });
+            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
         }
 
         var result = await _pollService.VoteAsync(currentUserId.Value, id, request, cancellationToken);
@@ -319,12 +425,12 @@ public class PostsController : ControllerBase
         return result.Status switch
         {
             PollVoteStatus.Success => Ok(result.Poll),
-            PollVoteStatus.PostNotFound => NotFound(new { message = "Post was not found." }),
-            PollVoteStatus.PollNotFound => NotFound(new { message = "Poll was not found." }),
-            PollVoteStatus.InvalidOption => BadRequest(new { message = "Poll option is invalid." }),
-            PollVoteStatus.AlreadyVoted => Conflict(new { message = "You have already voted in this poll." }),
-            PollVoteStatus.PollClosed => Conflict(new { message = "Poll is already closed." }),
-            _ => BadRequest(new { message = "Unable to vote in poll." })
+            PollVoteStatus.PostNotFound => this.ProblemResponse(StatusCodes.Status404NotFound, "Post was not found."),
+            PollVoteStatus.PollNotFound => this.ProblemResponse(StatusCodes.Status404NotFound, "Poll was not found."),
+            PollVoteStatus.InvalidOption => this.ProblemResponse(StatusCodes.Status400BadRequest, "Poll option is invalid."),
+            PollVoteStatus.AlreadyVoted => this.ProblemResponse(StatusCodes.Status409Conflict, "You have already voted in this poll."),
+            PollVoteStatus.PollClosed => this.ProblemResponse(StatusCodes.Status409Conflict, "Poll is already closed."),
+            _ => this.ProblemResponse(StatusCodes.Status400BadRequest, "Unable to vote in poll.")
         };
     }
 
@@ -339,7 +445,7 @@ public class PostsController : ControllerBase
 
         if (currentUserId is null)
         {
-            return Unauthorized(new { message = "Invalid token claims." });
+            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
         }
 
         var post = await _postService.CreateAsync(currentUserId.Value, request, cancellationToken);
@@ -358,7 +464,7 @@ public class PostsController : ControllerBase
 
         if (currentUserId is null)
         {
-            return Unauthorized(new { message = "Invalid token claims." });
+            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
         }
 
         var updatedPost = await _postService.UpdateAsync(
@@ -380,7 +486,7 @@ public class PostsController : ControllerBase
 
         if (currentUserId is null)
         {
-            return Unauthorized(new { message = "Invalid token claims." });
+            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
         }
 
         await _postService.DeleteAsync(id, currentUserId.Value, cancellationToken);

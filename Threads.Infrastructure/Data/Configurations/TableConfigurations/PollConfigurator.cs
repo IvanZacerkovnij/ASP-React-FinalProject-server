@@ -18,9 +18,22 @@ public class PollConfigurator : IEntityTypeConfiguration<Poll>
         builder.HasIndex(poll => poll.PostId)
             .IsUnique();
 
+        builder.HasIndex(poll => poll.CommentId)
+            .IsUnique();
+
+        builder.ToTable(table =>
+            table.HasCheckConstraint(
+                "CK_Polls_SingleTarget",
+                "(\"PostId\" IS NOT NULL)::int + (\"CommentId\" IS NOT NULL)::int = 1"));
+
         builder.HasOne(poll => poll.Post)
             .WithOne(post => post.Poll)
             .HasForeignKey<Poll>(poll => poll.PostId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasOne(poll => poll.Comment)
+            .WithOne(comment => comment.Poll)
+            .HasForeignKey<Poll>(poll => poll.CommentId)
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasMany(poll => poll.Options)

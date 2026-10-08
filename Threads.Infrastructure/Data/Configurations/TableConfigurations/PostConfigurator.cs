@@ -16,6 +16,12 @@ public class PostConfigurator : IEntityTypeConfiguration<Post>
         builder.Property(post => post.Content)
             .HasMaxLength(2000);
 
+        builder.Property(post => post.CurrentVersionId)
+            .IsRequired();
+
+        builder.HasIndex(post => post.CurrentVersionId)
+            .IsUnique();
+
         builder.Property(post => post.LocationName)
             .HasMaxLength(255);
 

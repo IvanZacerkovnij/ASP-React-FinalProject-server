@@ -5,6 +5,7 @@ using Threads.Application.Exceptions;
 using Threads.Application.Interfaces.Auth;
 using Threads.Application.Interfaces.Security;
 using Threads.Application.Services.Auth;
+using Threads.Application.UnitTests.Helpers;
 using Threads.Domain.Entities;
 
 namespace Threads.Application.UnitTests.Services.Auth;
@@ -35,7 +36,7 @@ public class RefreshTokenManagerTests
     public async Task GetStoredAsync_HashesNormalizedTokenBeforeLookup()
     {
         const string refreshToken = "refresh-token";
-        var storedToken = CreateRefreshToken();
+        var storedToken = TestEntityFactory.CreateRefreshToken();
         _refreshTokenRepository
             .GetByTokenHashAsync(Hash(refreshToken), Arg.Any<CancellationToken>())
             .Returns(storedToken);
@@ -56,7 +57,7 @@ public class RefreshTokenManagerTests
         bool userIsActive)
     {
         const string rawToken = "refresh-token";
-        var storedToken = CreateRefreshToken(userIsActive);
+        var storedToken = TestEntityFactory.CreateRefreshToken(userIsActive);
         if (!tokenIsActive)
         {
             storedToken.RevokedAt = DateTimeOffset.UtcNow;
@@ -75,7 +76,7 @@ public class RefreshTokenManagerTests
     public async Task GetActiveAsync_WhenTokenAndUserAreActive_ReturnsStoredToken()
     {
         const string rawToken = "refresh-token";
-        var storedToken = CreateRefreshToken();
+        var storedToken = TestEntityFactory.CreateRefreshToken();
         _refreshTokenRepository
             .GetByTokenHashAsync(Hash(rawToken), Arg.Any<CancellationToken>())
             .Returns(storedToken);
@@ -116,7 +117,7 @@ public class RefreshTokenManagerTests
     [Fact]
     public async Task RotateAsync_WhenRepositorySucceeds_ReturnsNewTokenAndPersistsHash()
     {
-        var currentToken = CreateRefreshToken();
+        var currentToken = TestEntityFactory.CreateRefreshToken();
         RefreshToken? replacementToken = null;
         _tokenService.GenerateRefreshToken().Returns("rotated-refresh-token");
         _refreshTokenRepository
@@ -139,7 +140,7 @@ public class RefreshTokenManagerTests
     [Fact]
     public async Task RotateAsync_WhenRepositoryRejectsRotation_ReturnsNull()
     {
-        var currentToken = CreateRefreshToken();
+        var currentToken = TestEntityFactory.CreateRefreshToken();
         _tokenService.GenerateRefreshToken().Returns("rotated-refresh-token");
         _refreshTokenRepository
             .TryRotateAsync(
@@ -157,7 +158,7 @@ public class RefreshTokenManagerTests
     [Fact]
     public async Task RevokeAsync_SetsRevocationTimeAndUpdatesToken()
     {
-        var refreshToken = CreateRefreshToken();
+        var refreshToken = TestEntityFactory.CreateRefreshToken();
         var beforeRevoke = DateTimeOffset.UtcNow;
 
         await _manager.RevokeAsync(refreshToken);
@@ -167,27 +168,6 @@ public class RefreshTokenManagerTests
         await _refreshTokenRepository.Received(1).UpdateAsync(
             refreshToken,
             Arg.Any<CancellationToken>());
-    }
-
-    private static RefreshToken CreateRefreshToken(bool userIsActive = true)
-    {
-        var user = new User
-        {
-            Id = Guid.NewGuid(),
-            Email = "user@example.com",
-            Username = "testuser",
-            PasswordHash = "password-hash",
-            IsActive = userIsActive
-        };
-
-        return new RefreshToken
-        {
-            Id = Guid.NewGuid(),
-            UserId = user.Id,
-            User = user,
-            TokenHash = "stored-token-hash",
-            ExpiresAt = DateTimeOffset.UtcNow.AddDays(1)
-        };
     }
 
     private static string Hash(string value)

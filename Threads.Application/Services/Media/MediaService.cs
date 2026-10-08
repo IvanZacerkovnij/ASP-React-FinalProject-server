@@ -41,7 +41,7 @@ public class MediaService : IMediaService
         _logger = logger;
     }
 
-    public async Task<MediaUrlResponse?> GetUrlAsync(
+    public async Task<MediaAttachmentResponse?> GetByIdAsync(
         Guid mediaId,
         Guid? currentUserId = null,
         CancellationToken cancellationToken = default)
@@ -53,21 +53,19 @@ public class MediaService : IMediaService
             return null;
         }
 
-        var canAccess = media.PostId.HasValue || currentUserId == media.UploadedByUserId;
+        var canAccess = media.PostId.HasValue ||
+                        media.CommentId.HasValue ||
+                        currentUserId == media.UploadedByUserId;
 
         if (!canAccess)
         {
             return null;
         }
 
-        return new MediaUrlResponse
-        {
-            Id = media.Id,
-            Url = _objectStorageService.GetReadUrl(media.StorageKey)
-        };
+        return CreateResponse(media);
     }
 
-    public async Task<UploadMediaResponse> UploadAsync(
+    public async Task<MediaAttachmentResponse> UploadAsync(
         Guid uploadedByUserId,
         Stream content,
         string fileName,
@@ -166,23 +164,7 @@ public class MediaService : IMediaService
                 throw;
             }
 
-            var mediaUrl = _objectStorageService.GetReadUrl(media.StorageKey);
-            var responseType = ResolveResponseType(media.ContentType, media.Type);
-
-            var response = new UploadMediaResponse
-            {
-                Id = media.Id,
-                Type = responseType,
-                Url = mediaUrl,
-                ThumbnailUrl = GetThumbnailUrl(media, mediaUrl, responseType),
-                Width = media.Width,
-                Height = media.Height,
-                Duration = media.DurationSeconds,
-                MimeType = media.ContentType,
-                StorageKey = media.StorageKey,
-                FileName = media.FileName,
-                SizeInBytes = media.SizeInBytes
-            };
+            var response = CreateResponse(media);
 
             _logger.LogInformation(
                 "Media {MediaId} uploaded by user {UserId} as {ContentType} with size {SizeInBytes} bytes in {ElapsedMilliseconds} ms",
@@ -296,6 +278,27 @@ public class MediaService : IMediaService
         return responseType is "image" or "gif"
             ? mediaUrl
             : null;
+    }
+
+    private MediaAttachmentResponse CreateResponse(MediaEntity media)
+    {
+        var mediaUrl = _objectStorageService.GetReadUrl(media.StorageKey);
+        var responseType = ResolveResponseType(media.ContentType, media.Type);
+
+        return new MediaAttachmentResponse
+        {
+            Id = media.Id,
+            Type = responseType,
+            Url = mediaUrl,
+            ThumbnailUrl = GetThumbnailUrl(media, mediaUrl, responseType),
+            Width = media.Width,
+            Height = media.Height,
+            Duration = media.DurationSeconds,
+            MimeType = media.ContentType,
+            FileName = media.FileName,
+            SizeInBytes = media.SizeInBytes,
+            SortOrder = media.SortOrder
+        };
     }
 
     private static string ResolveResponseType(string contentType, MediaType mediaType)

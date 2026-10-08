@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Threads.Api.Extensions;
 using Threads.Application.DTOs.Auth.Requests;
 using Threads.Application.DTOs.Auth.Responses;
 using Threads.Application.Interfaces.Auth;
@@ -37,7 +38,7 @@ public class AuthController : ControllerBase
         var response = await _authService.LoginAsync(request, cancellationToken);
 
         return response is null
-            ? Unauthorized(new { message = "Invalid credentials." })
+            ? this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid credentials.")
             : Ok(response);
     }
 
@@ -50,7 +51,7 @@ public class AuthController : ControllerBase
         var response = await _authService.RefreshTokenAsync(request, cancellationToken);
 
         return response is null
-            ? Unauthorized(new { message = "Invalid refresh token." })
+            ? this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid refresh token.")
             : Ok(response);
     }
 
@@ -63,7 +64,7 @@ public class AuthController : ControllerBase
 
         return wasLoggedOut
             ? NoContent()
-            : Unauthorized(new { message = "Invalid refresh token." });
+            : this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid refresh token.");
     }
 
     [HttpPost("forgot-password")]
@@ -86,7 +87,7 @@ public class AuthController : ControllerBase
 
         return isValid
             ? Ok(new { message = "Reset code is valid." })
-            : BadRequest(new { message = "Reset code is invalid or expired." });
+            : this.ProblemResponse(StatusCodes.Status400BadRequest, "Reset code is invalid or expired.");
     }
 
     [HttpPost("reset-password")]
@@ -99,7 +100,7 @@ public class AuthController : ControllerBase
 
         return wasReset
             ? Ok(new { message = "Password reset successfully." })
-            : BadRequest(new { message = "Reset code is invalid or expired." });
+            : this.ProblemResponse(StatusCodes.Status400BadRequest, "Reset code is invalid or expired.");
     }
 
     [HttpPost("verify-email")]
@@ -111,7 +112,7 @@ public class AuthController : ControllerBase
         var response = await _authService.VerifyEmailAsync(request, cancellationToken);
 
         return response is null
-            ? BadRequest(new { message = "Verification code is invalid or expired." })
+            ? this.ProblemResponse(StatusCodes.Status400BadRequest, "Verification code is invalid or expired.")
             : Ok(response);
     }
     

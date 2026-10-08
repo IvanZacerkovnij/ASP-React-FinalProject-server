@@ -16,6 +16,30 @@ public class CommentConfigurator : IEntityTypeConfiguration<Comment>
             .IsRequired()
             .HasMaxLength(1000);
 
+        builder.Property(comment => comment.LinkPreviewUrl)
+            .HasMaxLength(2048);
+
+        builder.Property(comment => comment.LinkPreviewTitle)
+            .HasMaxLength(255);
+
+        builder.Property(comment => comment.LinkPreviewImageUrl)
+            .HasMaxLength(2048);
+
+        builder.Property(comment => comment.LocationName)
+            .HasMaxLength(255);
+
+        builder.Property(comment => comment.LocationPlaceId)
+            .HasMaxLength(1024);
+
+        builder.Property(comment => comment.LocationCountry)
+            .HasMaxLength(255);
+
+        builder.Property(comment => comment.CurrentVersionId)
+            .IsRequired();
+
+        builder.HasIndex(comment => comment.CurrentVersionId)
+            .IsUnique();
+
         builder.Property(comment => comment.CreatedAt)
             .IsRequired();
 
@@ -36,6 +60,16 @@ public class CommentConfigurator : IEntityTypeConfiguration<Comment>
         builder.HasOne(comment => comment.ParentComment)
             .WithMany(comment => comment.Replies)
             .HasForeignKey(comment => comment.ParentCommentId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasMany(comment => comment.Media)
+            .WithOne(media => media.Comment)
+            .HasForeignKey(media => media.CommentId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasOne(comment => comment.Poll)
+            .WithOne(poll => poll.Comment)
+            .HasForeignKey<Poll>(poll => poll.CommentId)
             .OnDelete(DeleteBehavior.Cascade);
 
     }

@@ -1,5 +1,6 @@
 using Threads.Application.DTOs.Polls;
 using Threads.Application.Interfaces.Polls;
+using Threads.Application.Interfaces.Comments;
 using Threads.Application.Interfaces.Posts;
 using Threads.Domain.Entities;
 
@@ -9,11 +10,16 @@ public class PollService : IPollService
 {
     private readonly IPollRepository _pollRepository;
     private readonly IPostRepository _postRepository;
+    private readonly ICommentRepository _commentRepository;
 
-    public PollService(IPollRepository pollRepository, IPostRepository postRepository)
+    public PollService(
+        IPollRepository pollRepository,
+        IPostRepository postRepository,
+        ICommentRepository commentRepository)
     {
         _pollRepository = pollRepository;
         _postRepository = postRepository;
+        _commentRepository = commentRepository;
     }
 
     public async Task<PollVoteResult> VoteAsync(
@@ -31,6 +37,46 @@ public class PollService : IPollService
         }
 
         var poll = await _pollRepository.GetByPostIdAsync(postId, cancellationToken);
+
+        return await VoteAsync(
+            userId,
+            poll,
+            request,
+            token => _pollRepository.GetByPostIdAsync(postId, token),
+            cancellationToken);
+    }
+
+    public async Task<PollVoteResult> VoteCommentAsync(
+        Guid userId,
+        Guid commentId,
+        VotePollRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!await _commentRepository.ExistsAsync(commentId, cancellationToken))
+        {
+            return new PollVoteResult
+            {
+                Status = PollVoteStatus.CommentNotFound
+            };
+        }
+
+        var poll = await _pollRepository.GetByCommentIdAsync(commentId, cancellationToken);
+
+        return await VoteAsync(
+            userId,
+            poll,
+            request,
+            token => _pollRepository.GetByCommentIdAsync(commentId, token),
+            cancellationToken);
+    }
+
+    private async Task<PollVoteResult> VoteAsync(
+        Guid userId,
+        Poll? poll,
+        VotePollRequest request,
+        Func<CancellationToken, Task<Poll?>> reloadPoll,
+        CancellationToken cancellationToken)
+    {
 
         if (poll is null)
         {
@@ -82,7 +128,7 @@ public class PollService : IPollService
 
         if (!wasAdded)
         {
-            var persistedPoll = await _pollRepository.GetByPostIdAsync(postId, cancellationToken) ?? poll;
+            var persistedPoll = await reloadPoll(cancellationToken) ?? poll;
 
             return new PollVoteResult
             {
@@ -109,6 +155,7 @@ public class PollService : IPollService
         {
             Id = poll.Id,
             PostId = poll.PostId,
+            CommentId = poll.CommentId,
             EndsAt = poll.EndsAt,
             TotalVotes = poll.Votes.Count,
             HasVotedByCurrentUser = currentVote is not null,

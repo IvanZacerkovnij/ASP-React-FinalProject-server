@@ -1,10 +1,13 @@
 using Threads.Application.DTOs.Users;
+using Threads.Application.DTOs.Quotes;
 
 namespace Threads.Application.DTOs.Posts.Models;
 
 public sealed class PostSummaryReadModel
 {
     public Guid Id { get; init; }
+
+    public Guid VersionId { get; init; }
 
     public string? Content { get; init; }
 
@@ -31,6 +34,8 @@ public sealed class PostSummaryReadModel
     public string? EmbedDescription { get; init; }
 
     public string? EmbedThumbnailUrl { get; init; }
+
+    public QuoteReadModel? Quote { get; init; }
 
     public int LikesCount { get; init; }
 

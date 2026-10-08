@@ -15,6 +15,8 @@ public sealed class PostManagementService
     private readonly PostMediaManager _postMediaManager;
     private readonly PostQueryService _postQueryService;
     private readonly PostResponseFactory _responseFactory;
+    private readonly PostVersionFactory _postVersionFactory;
+    private readonly PostQuoteService _postQuoteService;
     private readonly HybridCache _cache;
     private readonly ILogger<PostManagementService> _logger;
 
@@ -23,6 +25,8 @@ public sealed class PostManagementService
         PostMediaManager postMediaManager,
         PostQueryService postQueryService,
         PostResponseFactory responseFactory,
+        PostVersionFactory postVersionFactory,
+        PostQuoteService postQuoteService,
         HybridCache cache,
         ILogger<PostManagementService> logger)
     {
@@ -30,6 +34,8 @@ public sealed class PostManagementService
         _postMediaManager = postMediaManager;
         _postQueryService = postQueryService;
         _responseFactory = responseFactory;
+        _postVersionFactory = postVersionFactory;
+        _postQuoteService = postQuoteService;
         _cache = cache;
         _logger = logger;
     }
@@ -41,15 +47,26 @@ public sealed class PostManagementService
     {
         var post = PostInputMapper.Create(authorId, request);
         var mediaIds = request.MediaIds ?? [];
+        post.Quote = await _postQuoteService.CreateAsync(
+            post,
+            request,
+            cancellationToken);
 
         await _postMediaManager.ApplyAsync(post, authorId, mediaIds, cancellationToken);
+        post.Versions.Add(_postVersionFactory.Create(post));
         await _postRepository.AddAsync(post, cancellationToken);
         await CacheInvalidation.TryRemoveAsync(_cache, _logger, UserProfileCache.GetProfileKey(authorId));
 
         var createdPost = await _postRepository.GetByIdAsync(post.Id, cancellationToken)
             ?? throw new InvalidOperationException("Created post was not found.");
 
-        return _responseFactory.Create(createdPost, authorId, viewsCount: 0);
+        var response = _responseFactory.Create(createdPost, authorId, viewsCount: 0);
+        response.Quote = await _postQueryService.CreateQuoteAsync(
+            createdPost.Quote,
+            authorId,
+            cancellationToken);
+
+        return response;
     }
 
     public async Task<PostResponse> UpdateAsync(
@@ -83,6 +100,9 @@ public sealed class PostManagementService
 
         PostInputMapper.ApplyMetadataChanges(post, request);
         PostInputMapper.ValidateState(post);
+
+        post.CurrentVersionId = Guid.NewGuid();
+        post.Versions.Add(_postVersionFactory.Create(post));
         post.UpdatedAt = DateTimeOffset.UtcNow;
 
         await _postRepository.UpdateAsync(post, cancellationToken);
@@ -91,7 +111,14 @@ public sealed class PostManagementService
         var updatedPost = await _postRepository.GetByIdAsync(post.Id, cancellationToken);
         var viewsCount = await _postQueryService.GetViewCountAsync(post.Id, cancellationToken);
 
-        return _responseFactory.Create(updatedPost ?? post, post.AuthorId, viewsCount);
+        var responsePost = updatedPost ?? post;
+        var response = _responseFactory.Create(responsePost, post.AuthorId, viewsCount);
+        response.Quote = await _postQueryService.CreateQuoteAsync(
+            responsePost.Quote,
+            post.AuthorId,
+            cancellationToken);
+
+        return response;
     }
 
     public async Task DeleteAsync(

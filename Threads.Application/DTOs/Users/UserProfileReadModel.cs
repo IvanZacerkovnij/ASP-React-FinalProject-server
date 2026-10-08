@@ -1,3 +1,5 @@
+using Threads.Domain.Enums;
+
 namespace Threads.Application.DTOs.Users;
 
 public sealed class UserProfileReadModel
@@ -11,6 +13,10 @@ public sealed class UserProfileReadModel
     public string? Bio { get; init; }
 
     public DateOnly? DateOfBirth { get; init; }
+    
+    public VisibilityLevel BirthDateVisibility { get; init; } = VisibilityLevel.OnlyMe;
+
+    public VisibilityLevel BirthYearVisibility { get; init; } = VisibilityLevel.OnlyMe;
 
     public string? LocationPlaceId { get; init; }
 

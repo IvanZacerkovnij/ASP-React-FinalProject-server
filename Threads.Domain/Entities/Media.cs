@@ -34,4 +34,12 @@ public class Media : BaseEntity
     public Guid? PostId { get; set; }
 
     public Post? Post { get; set; }
+
+    public Guid? CommentId { get; set; }
+
+    public Comment? Comment { get; set; }
+
+    public Guid? ScheduledPostId { get; set; }
+
+    public ScheduledPost? ScheduledPost { get; set; }
 }

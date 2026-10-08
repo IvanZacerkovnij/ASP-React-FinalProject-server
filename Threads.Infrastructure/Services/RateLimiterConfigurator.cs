@@ -23,6 +23,7 @@ public static class RateLimiterConfigurator
     public const string CommentCreationPolicyName = "CommentCreationPolicy";
     public const string InteractionPolicyName = "InteractionPolicy";
     public const string MediaUploadPolicyName = "MediaUploadPolicy";
+    public const string EditHistoryPolicyName = "EditHistoryPolicy";
     
     public const string ExternalSearchPolicyName = "ExternalSearchPolicy";
     
@@ -67,6 +68,9 @@ public static class RateLimiterConfigurator
 
         options.AddPolicy(MediaUploadPolicyName, httpContext =>
             TokenBucketByUser(httpContext, 5, 1, TimeSpan.FromMinutes(1)));
+
+        options.AddPolicy(EditHistoryPolicyName, httpContext =>
+            TokenBucketByUser(httpContext, 20, 5, TimeSpan.FromSeconds(10)));
         
         options.AddPolicy(ExternalSearchPolicyName, httpContext =>
             TokenBucketByIp(httpContext, 10, 5, TimeSpan.FromSeconds(10)));

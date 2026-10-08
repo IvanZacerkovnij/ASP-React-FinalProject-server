@@ -21,16 +21,16 @@ public class MediaController : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
-    public async Task<ActionResult<MediaUrlResponse>> GetById(
+    public async Task<ActionResult<MediaAttachmentResponse>> GetById(
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
     {
         var currentUserId = User.GetCurrentUserId();
         
-        var media = await _mediaService.GetUrlAsync(id, currentUserId, cancellationToken);
+        var media = await _mediaService.GetByIdAsync(id, currentUserId, cancellationToken);
 
         return media is null
-            ? NotFound(new { message = "Media was not found." })
+            ? this.ProblemResponse(StatusCodes.Status404NotFound, "Media was not found.")
             : Ok(media);
     }
 
@@ -39,7 +39,7 @@ public class MediaController : ControllerBase
     [EnableRateLimiting(RateLimiterConfigurator.MediaUploadPolicyName)]
     [RequestSizeLimit(104_857_600)]
     [RequestFormLimits(MultipartBodyLengthLimit = 104_857_600)]
-    public async Task<ActionResult<UploadMediaResponse>> Upload(
+    public async Task<ActionResult<MediaAttachmentResponse>> Upload(
         [FromForm] UploadMediaRequest request,
         CancellationToken cancellationToken)
     {
@@ -47,12 +47,12 @@ public class MediaController : ControllerBase
 
         if (currentUserId is null)
         {
-            return Unauthorized(new { message = "Invalid token claims." });
+            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
         }
 
         if (request.File is null || request.File.Length == 0)
         {
-            return BadRequest(new { message = "File is required." });
+            return this.ProblemResponse(StatusCodes.Status400BadRequest, "File is required.");
         }
 
         await using var stream = request.File.OpenReadStream();

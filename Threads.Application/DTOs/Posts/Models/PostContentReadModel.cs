@@ -1,8 +1,12 @@
+using Threads.Application.DTOs.Quotes;
+
 namespace Threads.Application.DTOs.Posts.Models;
 
 public sealed class PostContentReadModel
 {
     public Guid Id { get; init; }
+
+    public Guid VersionId { get; init; }
 
     public string? Content { get; init; }
 
@@ -29,6 +33,8 @@ public sealed class PostContentReadModel
     public string? EmbedDescription { get; init; }
 
     public string? EmbedThumbnailUrl { get; init; }
+
+    public QuoteReadModel? Quote { get; init; }
 
     public DateTimeOffset CreatedAt { get; init; }
 

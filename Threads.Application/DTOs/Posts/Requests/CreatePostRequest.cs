@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Threads.Application.DTOs.LinkPreviews;
 using Threads.Application.DTOs.Validation;
 
 namespace Threads.Application.DTOs.Posts.Requests;
@@ -15,5 +16,14 @@ public class CreatePostRequest
 
     public PostLocationRequest? Location { get; init; }
 
-    public PostEmbedRequest? Embed { get; init; }
+    public LinkPreviewRequest? LinkPreview { get; init; }
+
+    [NotEmptyGuid]
+    public Guid? QuotedPostId { get; init; }
+
+    [NotEmptyGuid]
+    public Guid? QuotedCommentId { get; init; }
+
+    [NotEmptyGuid]
+    public Guid? QuotedTargetVersionId { get; init; }
 }

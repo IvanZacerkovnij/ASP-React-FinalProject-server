@@ -7,6 +7,8 @@ public sealed class UserSummaryReadModel
     public required string Username { get; init; }
 
     public string? DisplayName { get; init; }
+    
+    public string? Bio { get; init; }
 
     public string? LocationPlaceId { get; init; }
 

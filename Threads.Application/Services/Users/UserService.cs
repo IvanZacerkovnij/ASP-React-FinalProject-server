@@ -1,5 +1,6 @@
 using Threads.Application.DTOs.Pagination;
 using Threads.Application.DTOs.Users;
+using Threads.Application.DTOs.Search;
 using Threads.Application.Interfaces.Users;
 
 namespace Threads.Application.Services.Users;
@@ -18,6 +19,14 @@ public sealed class UserService : IUserService
         _userQueryService = userQueryService;
         _userProfileService = userProfileService;
         _userDeletionService = userDeletionService;
+    }
+
+    public Task<CursorPageResponse<UserShortResponse>> SearchAsync(
+        SearchUsersRequest request,
+        CancellationToken cancellationToken = default,
+        Guid? currentUserId = null)
+    {
+        return _userQueryService.SearchAsync(request, cancellationToken, currentUserId);
     }
 
     public Task<CursorPageResponse<UserShortResponse>> SearchAsync(

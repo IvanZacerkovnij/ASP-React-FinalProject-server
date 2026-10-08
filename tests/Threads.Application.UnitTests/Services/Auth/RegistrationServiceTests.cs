@@ -7,6 +7,7 @@ using Threads.Application.Interfaces.Auth;
 using Threads.Application.Interfaces.Security;
 using Threads.Application.Interfaces.Users;
 using Threads.Application.Services.Auth;
+using Threads.Application.UnitTests.Helpers;
 using Threads.Domain.Entities;
 
 namespace Threads.Application.UnitTests.Services.Auth;
@@ -102,12 +103,9 @@ public class RegistrationServiceTests
             Password = "Password123!"
         };
 
-        var existingUser = new User
-        {
-            Email = "user@example.com",
-            Username = "existinguser",
-            PasswordHash = "stored-password-hash"
-        };
+        var existingUser = TestEntityFactory.CreateUser(
+            email: "user@example.com",
+            username: "existinguser");
 
         userRepository
             .GetByEmailAsync(
@@ -149,14 +147,8 @@ public class RegistrationServiceTests
             Password = "Password123!"
         };
 
-        var existingPendingRegistration = new PendingRegistration()
-        {
-            Username = "pending-Username",
-            Email = "user@example.com",
-            PasswordHash = "stored-password-hash",
-            VerificationCode = "verification-code",
-            VerificationCodeExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5)
-        };
+        var existingPendingRegistration = TestEntityFactory.CreatePendingRegistration(
+            email: request.Email);
 
         PendingRegistration? updatedRegistration = null;
         passwordHasher.HashPassword(request.Password).Returns("new-password-hash");
@@ -202,10 +194,7 @@ public class RegistrationServiceTests
             Password = "Password123!"
         };
 
-        var existingUser = new User
-        {
-            Username = "username"
-        };
+        var existingUser = TestEntityFactory.CreateUser("username");
         
         userRepository.GetByUsernameAsync(
             request.Username,
@@ -247,24 +236,11 @@ public class RegistrationServiceTests
             Password = "Password123!"
         };
 
-        var pendingRegistrationByEmail = new PendingRegistration
-        {
-            Id = Guid.NewGuid(),
-            Email = request.Email,
-            Username = "another-username",
-            PasswordHash = "stored-password-hash",
-            VerificationCode = "123456",
-            VerificationCodeExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5)
-        };
-        var pendingRegistrationByUsername = new PendingRegistration
-        {
-            Id = Guid.NewGuid(),
-            Email = "another@example.com",
-            Username = request.Username,
-            PasswordHash = "stored-password-hash",
-            VerificationCode = "654321",
-            VerificationCodeExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5)
-        };
+        var pendingRegistrationByEmail = TestEntityFactory.CreatePendingRegistration(
+            email: request.Email);
+        
+        var pendingRegistrationByUsername = TestEntityFactory.CreatePendingRegistration(
+            username: request.Username);
 
         pendingRegistrationRepository
             .GetByEmailAsync(request.Email, Arg.Any<CancellationToken>())
@@ -301,14 +277,10 @@ public class RegistrationServiceTests
             Username = "username",
             Password = "Password123!"
         };
-        var expiredPendingRegistration = new PendingRegistration
-        {
-            Email = request.Email,
-            Username = "old-username",
-            PasswordHash = "old-password-hash",
-            VerificationCode = "123456",
-            VerificationCodeExpiresAt = DateTimeOffset.UtcNow.AddMinutes(-1)
-        };
+        var expiredPendingRegistration = TestEntityFactory.CreatePendingRegistration(
+            email: request.Email,
+            timeOffset: -1);
+        
         PendingRegistration? addedRegistration = null;
 
         passwordHasher.HashPassword(request.Password).Returns("new-password-hash");
@@ -432,14 +404,10 @@ public class RegistrationServiceTests
             Password = "Password123!",
             DisplayName = "New Display Name"
         };
-        var existingPendingRegistration = new PendingRegistration
-        {
-            Email = "old@example.com",
-            Username = request.Username,
-            PasswordHash = "old-password-hash",
-            VerificationCode = "123456",
-            VerificationCodeExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5)
-        };
+        
+        var existingPendingRegistration = TestEntityFactory.CreatePendingRegistration(
+            username: request.Username);
+        
         PendingRegistration? updatedRegistration = null;
 
         passwordHasher.HashPassword(request.Password).Returns("new-password-hash");
@@ -482,14 +450,9 @@ public class RegistrationServiceTests
             Username = "username",
             Password = "Password123!"
         };
-        var existingPendingRegistration = new PendingRegistration
-        {
-            Email = request.Email,
-            Username = request.Username,
-            PasswordHash = "old-password-hash",
-            VerificationCode = "123456",
-            VerificationCodeExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5)
-        };
+        var existingPendingRegistration = TestEntityFactory.CreatePendingRegistration(
+            email: request.Email,
+            username: request.Username);
 
         passwordHasher.HashPassword(request.Password).Returns("new-password-hash");
         pendingRegistrationRepository
@@ -544,14 +507,8 @@ public class RegistrationServiceTests
             Email = "user@example.com",
             Code = "654321"
         };
-        var pendingRegistration = new PendingRegistration
-        {
-            Email = request.Email,
-            Username = "username",
-            PasswordHash = "password-hash",
-            VerificationCode = "123456",
-            VerificationCodeExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5)
-        };
+        var pendingRegistration = TestEntityFactory.CreatePendingRegistration(
+            email: request.Email);
 
         pendingRegistrationRepository
             .GetByEmailAsync(request.Email, Arg.Any<CancellationToken>())
@@ -579,14 +536,8 @@ public class RegistrationServiceTests
             Email = "user@example.com",
             Code = "12345x"
         };
-        var pendingRegistration = new PendingRegistration
-        {
-            Email = request.Email,
-            Username = "username",
-            PasswordHash = "password-hash",
-            VerificationCode = "123456",
-            VerificationCodeExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5)
-        };
+        var pendingRegistration = TestEntityFactory.CreatePendingRegistration(
+            email: request.Email);
         pendingRegistrationRepository
             .GetByEmailAsync(request.Email, Arg.Any<CancellationToken>())
             .Returns(pendingRegistration);
@@ -610,14 +561,11 @@ public class RegistrationServiceTests
             Email = "user@example.com",
             Code = "123456"
         };
-        var expiredPendingRegistration = new PendingRegistration
-        {
-            Email = request.Email,
-            Username = "username",
-            PasswordHash = "password-hash",
-            VerificationCode = request.Code,
-            VerificationCodeExpiresAt = DateTimeOffset.UtcNow.AddMinutes(-1)
-        };
+        
+        var expiredPendingRegistration = TestEntityFactory.CreatePendingRegistration(
+            email: request.Email,
+            code: request.Code,
+            timeOffset: -1);
 
         pendingRegistrationRepository
             .GetByEmailAsync(request.Email, Arg.Any<CancellationToken>())
@@ -645,15 +593,10 @@ public class RegistrationServiceTests
             Email = "user@example.com",
             Code = "123456"
         };
-        var pendingRegistration = new PendingRegistration
-        {
-            Email = request.Email,
-            Username = "username",
-            PasswordHash = "password-hash",
-            DisplayName = "Display Name",
-            VerificationCode = request.Code,
-            VerificationCodeExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5)
-        };
+        var pendingRegistration = TestEntityFactory.CreatePendingRegistration(
+            email: request.Email,
+            code: request.Code);
+        
         var accessTokenExpiresAt = DateTimeOffset.UtcNow.AddMinutes(30);
         User? addedUser = null;
 
@@ -701,20 +644,11 @@ public class RegistrationServiceTests
             Email = "user@example.com",
             Code = "123456"
         };
-        var pendingRegistration = new PendingRegistration
-        {
-            Email = request.Email,
-            Username = "username",
-            PasswordHash = "password-hash",
-            VerificationCode = request.Code,
-            VerificationCodeExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5)
-        };
-        var existingUser = new User
-        {
-            Email = request.Email,
-            Username = "another-username",
-            PasswordHash = "password-hash"
-        };
+        var pendingRegistration = TestEntityFactory.CreatePendingRegistration(
+            email: request.Email);
+
+        var existingUser = TestEntityFactory.CreateUser(
+            email: request.Email);
 
         ConfigureAuthTransaction();
         pendingRegistrationRepository
@@ -768,14 +702,9 @@ public class RegistrationServiceTests
         {
             Email = "user@example.com"
         };
-        var expiredPendingRegistration = new PendingRegistration
-        {
-            Email = request.Email,
-            Username = "username",
-            PasswordHash = "password-hash",
-            VerificationCode = "123456",
-            VerificationCodeExpiresAt = DateTimeOffset.UtcNow.AddMinutes(-1)
-        };
+        var expiredPendingRegistration = TestEntityFactory.CreatePendingRegistration(
+            email: request.Email,
+            timeOffset: -1);
 
         pendingRegistrationRepository
             .GetByEmailAsync(request.Email, Arg.Any<CancellationToken>())
@@ -803,14 +732,9 @@ public class RegistrationServiceTests
         {
             Email = "user@example.com"
         };
-        var pendingRegistration = new PendingRegistration
-        {
-            Email = request.Email,
-            Username = "username",
-            PasswordHash = "password-hash",
-            VerificationCode = "123456",
-            VerificationCodeExpiresAt = DateTimeOffset.UtcNow.AddMinutes(1)
-        };
+        var pendingRegistration = TestEntityFactory.CreatePendingRegistration(
+            email: request.Email);
+        
         var previousExpiration = pendingRegistration.VerificationCodeExpiresAt;
 
         pendingRegistrationRepository

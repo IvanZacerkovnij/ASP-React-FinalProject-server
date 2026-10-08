@@ -7,9 +7,39 @@ namespace Threads.Application.Interfaces.Posts;
 
 public interface IPostRepository
 {
+    Task<IReadOnlyCollection<PostSummaryReadModel>> SearchAsync(
+        string? query,
+        string? people,
+        string? location,
+        string? exactPhrase,
+        IReadOnlyCollection<string> anyWords,
+        IReadOnlyCollection<string> excludeWords,
+        string? from,
+        int? minReplies,
+        int? minLikes,
+        int? minReposts,
+        DateOnly? fromDate,
+        DateOnly? toDate,
+        bool? hasMedia,
+        int limit,
+        CursorPosition? cursor = null,
+        Guid? currentUserId = null,
+        CancellationToken cancellationToken = default);
     Task<IReadOnlyCollection<PostSummaryReadModel>> GetRandomAsync(
         int count,
         Guid? currentUserId = null,
+        CancellationToken cancellationToken = default);
+    Task<IReadOnlyCollection<PostSummaryReadModel>> GetSummariesByIdsAsync(
+        IReadOnlyCollection<Guid> ids,
+        Guid? currentUserId = null,
+        CancellationToken cancellationToken = default);
+    Task<IReadOnlyCollection<PostVersion>> GetVersionsAsync(
+        Guid postId,
+        int limit,
+        CursorPosition? cursor = null,
+        CancellationToken cancellationToken = default);
+    Task<IReadOnlyCollection<PostVersion>> GetVersionsByIdsAsync(
+        IReadOnlyCollection<Guid> versionIds,
         CancellationToken cancellationToken = default);
     Task<IReadOnlyCollection<PostSummaryReadModel>> GetByAuthorIdAsync(
         Guid authorId,
@@ -42,6 +72,7 @@ public interface IPostRepository
         Guid? currentUserId = null,
         CancellationToken cancellationToken = default);
     Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<bool> VersionExistsAsync(Guid postId, Guid versionId, CancellationToken cancellationToken = default);
     Task<Post?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<PostContentReadModel?> GetContentByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<PostEngagementReadModel?> GetEngagementByIdAsync(

@@ -13,9 +13,12 @@ using Threads.Application.Interfaces.Locations;
 using Threads.Application.Interfaces.Polls;
 using Threads.Application.Interfaces.Posts;
 using Threads.Application.Interfaces.Reposts;
+using Threads.Application.Interfaces.ScheduledPosts;
 using Threads.Application.Interfaces.Security;
 using Threads.Application.Interfaces.Users;
 using Threads.Application.Interfaces.Likes;
+using Threads.Application.Interfaces.LinkPreviews;
+using Threads.Application.Interfaces.Versions;
 using Threads.Application.Mapping;
 using Threads.Application.Services.Auth;
 using Threads.Application.Services.Comments;
@@ -23,7 +26,9 @@ using Threads.Application.Services.Follows;
 using Threads.Application.Services.Interactions;
 using Threads.Application.Services.Media;
 using Threads.Application.Services.Posts;
+using Threads.Application.Services.ScheduledPosts;
 using Threads.Application.Services.Users;
+using Threads.Application.Services.Versions;
 using Threads.Infrastructure.Data;
 using Threads.Infrastructure.Data.Configurations;
 using Threads.Infrastructure.Data.Repositories.Bookmarks;
@@ -35,6 +40,7 @@ using Threads.Infrastructure.Data.Repositories.PendingRegistrations;
 using Threads.Infrastructure.Data.Repositories.Polls;
 using Threads.Infrastructure.Data.Repositories.Posts;
 using Threads.Infrastructure.Data.Repositories.Reposts;
+using Threads.Infrastructure.Data.Repositories.ScheduledPosts;
 using Threads.Infrastructure.Data.Repositories.RefreshTokens;
 using Threads.Infrastructure.Data.Repositories.Users;
 using Threads.Infrastructure.Data.Transactions;
@@ -58,7 +64,17 @@ public class Program
         builder.Services.AddScoped<IPollRepository, PollRepository>();
         builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         builder.Services.AddScoped<IPendingRegistrationRepository, PendingRegistrationRepository>();
+        builder.Services.AddScoped<IScheduledPostRepository, ScheduledPostRepository>();
         builder.Services.AddScoped<IAuthTransaction, AuthTransaction>();
+
+        builder.Services.AddSingleton<IVersionSnapshotSerializer, VersionSnapshotSerializer>();
+        builder.Services.AddScoped<PostVersionFactory>();
+        builder.Services.AddScoped<CommentVersionFactory>();
+        builder.Services.AddScoped<PostVersionResponseFactory>();
+        builder.Services.AddScoped<CommentVersionResponseFactory>();
+        builder.Services.AddScoped<PostVersionService>();
+        builder.Services.AddScoped<CommentVersionService>();
+        builder.Services.AddScoped<PostQuoteService>();
     }
 
     private static void AddServices(WebApplicationBuilder builder)
@@ -75,11 +91,16 @@ public class Program
         builder.Services.AddScoped<PostMediaManager>();
         builder.Services.AddScoped<PostResponseFactory>();
         builder.Services.AddScoped<IPostService, PostService>();
+        builder.Services.AddScoped<ScheduledPostMediaManager>();
+        builder.Services.AddScoped<ScheduledPostResponseFactory>();
+        builder.Services.AddScoped<IScheduledPostService, ScheduledPostService>();
         builder.Services.AddScoped<IPollService, PollService>();
         builder.Services.AddScoped<CommentQueryService>();
         builder.Services.AddScoped<CommentManagementService>();
         builder.Services.AddScoped<CommentInteractionService>();
+        builder.Services.AddScoped<CommentMediaManager>();
         builder.Services.AddScoped<CommentResponseFactory>();
+        builder.Services.AddScoped<CommentThreadService>();
         builder.Services.AddScoped<ICommentService, CommentService>();
         builder.Services.AddScoped<IFollowService, FollowService>();
         builder.Services.AddScoped<ILikeService, LikeService>();
@@ -100,6 +121,7 @@ public class Program
         builder.Services.AddScoped<IMediaProcessingService, FfmpegMediaProcessingService>();
         builder.Services.AddScoped<IObjectStorageService, S3ObjectStorageService>();
         builder.Services.AddScoped<IAuthEmailService, AuthEmailService>();
+        builder.Services.AddHostedService<ScheduledPostPublishingWorker>();
         builder.Services.AddResend(options => ResendConfigurator.Configure(options, builder.Configuration));
     }
 
@@ -107,6 +129,9 @@ public class Program
     {
         builder.Services.AddHttpClient<IGifSearchService, GiphyGifSearchService>(client => GifConfigurator.Configure(client, builder.Configuration));
         builder.Services.AddHttpClient<ILocationSearchService, GeoapifyLocationSearchService>(client => LocationConfigurator.Configure(client, builder.Configuration));
+        builder.Services
+            .AddHttpClient<ILinkPreviewService, LinkPreviewService>(LinkPreviewHttpConfigurator.Configure)
+            .ConfigurePrimaryHttpMessageHandler(LinkPreviewHttpConfigurator.CreatePrimaryHandler);
     }
 
     private static void AddCache(WebApplicationBuilder builder)

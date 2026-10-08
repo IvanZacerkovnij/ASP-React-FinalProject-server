@@ -1,3 +1,4 @@
+using Threads.Application.DTOs.LinkPreviews;
 using Threads.Application.DTOs.Posts.Requests;
 using Threads.Application.Exceptions;
 using Threads.Application.Services.Posts;
@@ -13,7 +14,7 @@ public class PostInputMapperTests
         var exception = Assert.Throws<RequestValidationException>(() =>
             PostInputMapper.Create(Guid.NewGuid(), new CreatePostRequest()));
 
-        Assert.Equal("Post must contain content, media, poll, or embed.", exception.Message);
+        Assert.Equal("Post must contain content, media, poll, or link preview.", exception.Message);
     }
 
     [Fact]
@@ -32,11 +33,11 @@ public class PostInputMapperTests
                 Latitude = 50.45,
                 Longitude = 30.52
             },
-            Embed = new PostEmbedRequest
+            LinkPreview = new LinkPreviewRequest
             {
                 Url = " https://example.com ",
                 Title = " Title ",
-                Description = " Description "
+                ImageUrl = " https://example.com/image.jpg "
             },
             Poll = new CreatePostPollRequest
             {
@@ -54,6 +55,7 @@ public class PostInputMapperTests
         Assert.Equal("UA", result.LocationCountry);
         Assert.Equal("https://example.com", result.EmbedUrl);
         Assert.Equal("Title", result.EmbedTitle);
+        Assert.Equal("https://example.com/image.jpg", result.EmbedThumbnailUrl);
         Assert.NotNull(result.Poll);
         Assert.Equal(endsAt, result.Poll.EndsAt);
         Assert.Equal(["First", "Second"], result.Poll.Options.Select(option => option.Text));
@@ -108,7 +110,7 @@ public class PostInputMapperTests
     }
 
     [Fact]
-    public void ApplyMetadataChanges_WhenRemovalFlagsAreSet_ClearsLocationAndEmbed()
+    public void ApplyMetadataChanges_WhenNullLinkPreviewIsProvided_ClearsLinkPreview()
     {
         var post = new Post
         {
@@ -127,7 +129,7 @@ public class PostInputMapperTests
         PostInputMapper.ApplyMetadataChanges(post, new UpdatePostRequest
         {
             RemoveLocation = true,
-            RemoveEmbed = true
+            LinkPreview = null
         });
 
         Assert.Null(post.LocationName);
@@ -159,7 +161,7 @@ public class PostInputMapperTests
         var exception = Assert.Throws<RequestValidationException>(() =>
             PostInputMapper.ValidateState(new Post()));
 
-        Assert.Equal("Post must contain content, media, poll, or embed.", exception.Message);
+        Assert.Equal("Post must contain content, media, poll, or link preview.", exception.Message);
     }
 
     public static TheoryData<IReadOnlyCollection<string>, DateTimeOffset?, string> InvalidPollCases => new()

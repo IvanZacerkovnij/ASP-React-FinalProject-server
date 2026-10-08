@@ -45,6 +45,20 @@ public class UserConfigurator : IEntityTypeConfiguration<User>
 
         builder.Property(user => user.DateOfBirth)
             .HasColumnType("date");
+        
+        builder.Property(user => user.BirthDateVisibility)
+            .HasConversion<string>()
+            .HasMaxLength(10)
+            .IsRequired()
+            .HasDefaultValue(VisibilityLevel.OnlyMe)
+            .HasSentinel(VisibilityLevel.OnlyMe);
+
+        builder.Property(user => user.BirthYearVisibility)
+            .HasConversion<string>()
+            .HasMaxLength(10)
+            .IsRequired()
+            .HasDefaultValue(VisibilityLevel.OnlyMe)
+            .HasSentinel(VisibilityLevel.OnlyMe);
 
         builder.Property(user => user.Location)
             .HasMaxLength(255);

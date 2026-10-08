@@ -7,5 +7,6 @@ public enum PollVoteStatus
     PollNotFound = 2,
     InvalidOption = 3,
     AlreadyVoted = 4,
-    PollClosed = 5
+    PollClosed = 5,
+    CommentNotFound = 6
 }

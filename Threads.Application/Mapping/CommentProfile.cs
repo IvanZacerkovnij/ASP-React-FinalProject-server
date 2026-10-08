@@ -9,6 +9,12 @@ public class CommentProfile : Profile
     public CommentProfile()
     {
         CreateMap<Comment, CommentResponse>()
+            .ForMember(destination => destination.VersionId, options => options.MapFrom(source => source.CurrentVersionId))
+            .ForMember(destination => destination.Attachments, options => options.Ignore())
+            .ForMember(destination => destination.Poll, options => options.Ignore())
+            .ForMember(destination => destination.Location, options => options.Ignore())
+            .ForMember(destination => destination.LinkPreview, options => options.Ignore())
+            .ForMember(destination => destination.Quote, options => options.Ignore())
             .ForMember(destination => destination.LikesCount, options => options.MapFrom(source => source.CommentLikes.Count))
             .ForMember(destination => destination.IsLikedByCurrentUser, options => options.Ignore())
             .ForMember(destination => destination.RepliesCount, options => options.MapFrom(source => source.Replies.Count))
@@ -21,6 +27,15 @@ public class CommentProfile : Profile
             .ForMember(destination => destination.UpdatedAt, options => options.MapFrom(source => source.UpdatedAt));
 
         CreateMap<CreateCommentRequest, Comment>()
+            .ForMember(destination => destination.CurrentVersionId, options => options.Ignore())
+            .ForMember(destination => destination.LinkPreviewUrl, options => options.Ignore())
+            .ForMember(destination => destination.LinkPreviewTitle, options => options.Ignore())
+            .ForMember(destination => destination.LinkPreviewImageUrl, options => options.Ignore())
+            .ForMember(destination => destination.LocationName, options => options.Ignore())
+            .ForMember(destination => destination.LocationPlaceId, options => options.Ignore())
+            .ForMember(destination => destination.LocationCountry, options => options.Ignore())
+            .ForMember(destination => destination.LocationLatitude, options => options.Ignore())
+            .ForMember(destination => destination.LocationLongitude, options => options.Ignore())
             .ForMember(destination => destination.AuthorId, options => options.Ignore())
             .ForMember(destination => destination.Author, options => options.Ignore())
             .ForMember(destination => destination.Post, options => options.Ignore())
@@ -29,9 +44,21 @@ public class CommentProfile : Profile
             .ForMember(destination => destination.CommentLikes, options => options.Ignore())
             .ForMember(destination => destination.CommentBookmarks, options => options.Ignore())
             .ForMember(destination => destination.CommentReposts, options => options.Ignore())
-            .ForMember(destination => destination.CommentViews, options => options.Ignore());
+            .ForMember(destination => destination.CommentViews, options => options.Ignore())
+            .ForMember(destination => destination.Media, options => options.Ignore())
+            .ForMember(destination => destination.Poll, options => options.Ignore())
+            .ForMember(destination => destination.Versions, options => options.Ignore());
 
         CreateMap<UpdateCommentRequest, Comment>()
+            .ForMember(destination => destination.CurrentVersionId, options => options.Ignore())
+            .ForMember(destination => destination.LinkPreviewUrl, options => options.Ignore())
+            .ForMember(destination => destination.LinkPreviewTitle, options => options.Ignore())
+            .ForMember(destination => destination.LinkPreviewImageUrl, options => options.Ignore())
+            .ForMember(destination => destination.LocationName, options => options.Ignore())
+            .ForMember(destination => destination.LocationPlaceId, options => options.Ignore())
+            .ForMember(destination => destination.LocationCountry, options => options.Ignore())
+            .ForMember(destination => destination.LocationLatitude, options => options.Ignore())
+            .ForMember(destination => destination.LocationLongitude, options => options.Ignore())
             .ForMember(destination => destination.PostId, options => options.Ignore())
             .ForMember(destination => destination.AuthorId, options => options.Ignore())
             .ForMember(destination => destination.Author, options => options.Ignore())
@@ -42,6 +69,9 @@ public class CommentProfile : Profile
             .ForMember(destination => destination.CommentLikes, options => options.Ignore())
             .ForMember(destination => destination.CommentBookmarks, options => options.Ignore())
             .ForMember(destination => destination.CommentReposts, options => options.Ignore())
-            .ForMember(destination => destination.CommentViews, options => options.Ignore());
+            .ForMember(destination => destination.CommentViews, options => options.Ignore())
+            .ForMember(destination => destination.Media, options => options.Ignore())
+            .ForMember(destination => destination.Poll, options => options.Ignore())
+            .ForMember(destination => destination.Versions, options => options.Ignore());
     }
 }

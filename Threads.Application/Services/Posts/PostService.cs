@@ -1,6 +1,8 @@
 using Threads.Application.DTOs.Pagination;
 using Threads.Application.DTOs.Posts.Requests;
 using Threads.Application.DTOs.Posts.Responses;
+using Threads.Application.DTOs.Search;
+using Threads.Application.DTOs.Versions;
 using Threads.Application.Interfaces.Posts;
 
 namespace Threads.Application.Services.Posts;
@@ -10,15 +12,18 @@ public sealed class PostService : IPostService
     private readonly PostQueryService _postQueryService;
     private readonly PostManagementService _postManagementService;
     private readonly PostInteractionService _postInteractionService;
+    private readonly PostVersionService _postVersionService;
 
     public PostService(
         PostQueryService postQueryService,
         PostManagementService postManagementService,
-        PostInteractionService postInteractionService)
+        PostInteractionService postInteractionService,
+        PostVersionService postVersionService)
     {
         _postQueryService = postQueryService;
         _postManagementService = postManagementService;
         _postInteractionService = postInteractionService;
+        _postVersionService = postVersionService;
     }
 
     public Task<IReadOnlyCollection<PostResponse>> GetFeedAsync(
@@ -87,6 +92,14 @@ public sealed class PostService : IPostService
     }
 
     public Task<CursorPageResponse<PostResponse>> SearchAsync(
+        SearchPostsRequest request,
+        CancellationToken cancellationToken = default,
+        Guid? currentUserId = null)
+    {
+        return _postQueryService.SearchAsync(request, cancellationToken, currentUserId);
+    }
+
+    public Task<CursorPageResponse<PostResponse>> SearchAsync(
         string query,
         CursorPageRequest pagination,
         CancellationToken cancellationToken = default,
@@ -105,6 +118,19 @@ public sealed class PostService : IPostService
         Guid? currentUserId = null)
     {
         return _postQueryService.GetByIdAsync(id, cancellationToken, currentUserId);
+    }
+
+    public Task<EditHistoryResponse<PostResponse>?> GetEditHistoryAsync(
+        Guid id,
+        CursorPageRequest pagination,
+        CancellationToken cancellationToken = default,
+        Guid? currentUserId = null)
+    {
+        return _postVersionService.GetEditHistoryAsync(
+            id,
+            pagination,
+            cancellationToken,
+            currentUserId);
     }
 
     public Task<PostResponse> CreateAsync(

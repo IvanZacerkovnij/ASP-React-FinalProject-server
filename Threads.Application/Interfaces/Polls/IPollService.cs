@@ -9,4 +9,9 @@ public interface IPollService
         Guid postId,
         VotePollRequest request,
         CancellationToken cancellationToken = default);
+    Task<PollVoteResult> VoteCommentAsync(
+        Guid userId,
+        Guid commentId,
+        VotePollRequest request,
+        CancellationToken cancellationToken = default);
 }

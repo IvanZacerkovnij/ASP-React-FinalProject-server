@@ -56,14 +56,14 @@ public class MeController : ControllerBase
 
         if (currentUserId is null)
         {
-            return Unauthorized(new { message = "Invalid token claims." });
+            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
         }
 
         var user = await _userService.GetMeAsync(currentUserId.Value, cancellationToken);
 
         if (user is null)
         {
-            return NotFound(new { message = "User was not found." });
+            return this.ProblemResponse(StatusCodes.Status404NotFound, "User was not found.");
         }
         return Ok(user);
     }
@@ -78,7 +78,7 @@ public class MeController : ControllerBase
 
         if (currentUserId is null)
         {
-            return Unauthorized(new { message = "Invalid token claims." });
+            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
         }
 
         await using var avatarStream = request.Avatar?.OpenReadStream();
@@ -88,8 +88,10 @@ public class MeController : ControllerBase
         {
             DisplayName = request.DisplayName,
             Bio = request.Bio,
-            DateOfBirth = request.DateOfBirth,
-            RemoveDateOfBirth = request.RemoveDateOfBirth,
+            DateOfBirth = request.BirthDate,
+            BirthDateVisibility = request.BirthDateVisibility,
+            BirthYearVisibility = request.BirthYearVisibility,
+            RemoveDateOfBirth = request.RemoveBirthDate,
             RemoveLocation = request.RemoveLocation,
             Location = request.Location,
             RemoveAvatar = request.RemoveAvatar,
@@ -119,7 +121,7 @@ public class MeController : ControllerBase
         var user = await _userService.UpdateAsync(currentUserId.Value, updateRequest, avatar, banner, cancellationToken);
 
         return user is null
-            ? NotFound(new { message = "User was not found." })
+            ? this.ProblemResponse(StatusCodes.Status404NotFound, "User was not found.")
             : Ok(user);
     }
     
@@ -130,14 +132,14 @@ public class MeController : ControllerBase
 
         if (currentUserId is null)
         {
-            return Unauthorized(new { message = "Invalid token claims." });
+            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
         }
 
         var wasDeleted = await _userService.DeleteAsync(currentUserId.Value, cancellationToken);
 
         return wasDeleted
             ? NoContent()
-            : NotFound(new { message = "User was not found." });
+            : this.ProblemResponse(StatusCodes.Status404NotFound, "User was not found.");
     }
     
     [HttpGet("posts")]
@@ -149,7 +151,7 @@ public class MeController : ControllerBase
         
         if (currentUserId is null)
         {
-            return Unauthorized(new { message = "Invalid token claims." });
+            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
         }
         
         var posts = await _postService.GetByAuthorIdAsync(
@@ -169,7 +171,7 @@ public class MeController : ControllerBase
 
         if (currentUserId is null)
         {
-            return Unauthorized(new { message = "Invalid token claims." });
+            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
         }
 
         var likes = await _likeService.GetByUserIdAsync(
@@ -190,7 +192,7 @@ public class MeController : ControllerBase
 
         if (currentUserId is null)
         {
-            return Unauthorized(new { message = "Invalid token claims." });
+            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
         }
 
         var bookmarks = await _bookmarkService.GetByUserIdAsync(
@@ -211,7 +213,7 @@ public class MeController : ControllerBase
 
         if (currentUserId is null)
         {
-            return Unauthorized(new { message = "Invalid token claims." });
+            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
         }
 
         var reposts = await _repostService.GetByUserIdAsync(
@@ -233,7 +235,7 @@ public class MeController : ControllerBase
         
         if (currentUserId is null)
         {
-            return Unauthorized(new { message = "Invalid token claims." });
+            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
         }
         
         var result = await _authService.StartPasswordChangeAsync(currentUserId.Value, request, cancellationToken);
@@ -244,16 +246,10 @@ public class MeController : ControllerBase
             {
                 message = "Password change confirmation code has been sent to your email."
             }),
-            ChangePasswordStatus.UserNotFound => NotFound(new { message = "User was not found." }),
-            ChangePasswordStatus.InvalidNewPassword => BadRequest(new
-            {
-                message = "New password must be different from the current password."
-            }),
-            ChangePasswordStatus.InvalidCurrentPassword => BadRequest(new
-            {
-                message = "Current password is invalid."
-            }),
-            _ => BadRequest(new { message = "Unable to change password." })
+            ChangePasswordStatus.UserNotFound => this.ProblemResponse(StatusCodes.Status404NotFound, "User was not found."),
+            ChangePasswordStatus.InvalidNewPassword => this.ProblemResponse(StatusCodes.Status400BadRequest, "New password must be different from the current password."),
+            ChangePasswordStatus.InvalidCurrentPassword => this.ProblemResponse(StatusCodes.Status400BadRequest, "Current password is invalid."),
+            _ => this.ProblemResponse(StatusCodes.Status400BadRequest, "Unable to change password.")
         };
     }
 
@@ -267,7 +263,7 @@ public class MeController : ControllerBase
 
         if (currentUserId is null)
         {
-            return Unauthorized(new { message = "Invalid token claims." });
+            return this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid token claims.");
         }
 
         var result = await _authService.ConfirmPasswordChangeAsync(currentUserId.Value, request, cancellationToken);
@@ -278,13 +274,10 @@ public class MeController : ControllerBase
             {
                 message = "Password changed successfully."
             }),
-            ChangePasswordStatus.UserNotFound => NotFound(new { message = "User was not found." }),
-            ChangePasswordStatus.InvalidConfirmationCode => BadRequest(new { message = "Invalid confirmation code." }),
-            ChangePasswordStatus.NoPendingPasswordChange => Conflict(new
-            {
-                message = "There is no pending password change request."
-            }),
-            _ => BadRequest(new { message = "Unable to change password." })
+            ChangePasswordStatus.UserNotFound => this.ProblemResponse(StatusCodes.Status404NotFound, "User was not found."),
+            ChangePasswordStatus.InvalidConfirmationCode => this.ProblemResponse(StatusCodes.Status400BadRequest, "Invalid confirmation code."),
+            ChangePasswordStatus.NoPendingPasswordChange => this.ProblemResponse(StatusCodes.Status409Conflict, "There is no pending password change request."),
+            _ => this.ProblemResponse(StatusCodes.Status400BadRequest, "Unable to change password.")
         };
     }
 }

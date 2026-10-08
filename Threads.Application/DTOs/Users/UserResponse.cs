@@ -1,4 +1,5 @@
 using Threads.Application.DTOs.Locations;
+using Threads.Domain.Enums;
 
 namespace Threads.Application.DTOs.Users;
 
@@ -14,7 +15,11 @@ public class UserResponse
 
     public string? Bio { get; init; }
 
-    public DateOnly? DateOfBirth { get; init; }
+    public DateOnly? BirthDate { get; init; }
+
+    public VisibilityLevel BirthDateVisibility { get; init; } = VisibilityLevel.OnlyMe;
+
+    public VisibilityLevel BirthYearVisibility { get; init; } = VisibilityLevel.OnlyMe;
 
     public LocationResponse? Location { get; init; }
 

@@ -1,10 +1,12 @@
 using Microsoft.AspNetCore.Mvc;
 using Threads.Api.Extensions;
+using Threads.Application.DTOs.Comments;
 using Threads.Application.DTOs.Pagination;
 using Threads.Application.DTOs.Likes;
 using Threads.Application.DTOs.Posts.Responses;
 using Threads.Application.DTOs.Reposts;
 using Threads.Application.DTOs.Users;
+using Threads.Application.Interfaces.Comments;
 using Threads.Application.Interfaces.Likes;
 using Threads.Application.Interfaces.Posts;
 using Threads.Application.Interfaces.Reposts;
@@ -18,17 +20,20 @@ public class UsersController : ControllerBase
 {
     private readonly IUserService _userService;
     private readonly IPostService _postService;
+    private readonly ICommentService _commentService;
     private readonly ILikeService _likeService;
     private readonly IRepostService _repostService;
 
     public UsersController(
         IUserService userService,
         IPostService postService,
+        ICommentService commentService,
         ILikeService likeService,
         IRepostService repostService)
     {
         _userService = userService;
         _postService = postService;
+        _commentService = commentService;
         _likeService = likeService;
         _repostService = repostService;
     }
@@ -43,7 +48,7 @@ public class UsersController : ControllerBase
         var user = await _userService.GetByIdAsync(id, cancellationToken, currentUserId);
 
         return user is null
-            ? NotFound(new { message = "User was not found." })
+            ? this.ProblemResponse(StatusCodes.Status404NotFound, "User was not found.")
             : Ok(user);
     }
     [HttpGet("by-username/{username}")]
@@ -56,7 +61,7 @@ public class UsersController : ControllerBase
         var user = await _userService.GetByUsernameAsync(username, cancellationToken, currentUserId);
 
         return user is null
-            ? NotFound(new { message = "User was not found." })
+            ? this.ProblemResponse(StatusCodes.Status404NotFound, "User was not found.")
             : Ok(user);
     }
 
@@ -72,7 +77,7 @@ public class UsersController : ControllerBase
         
         if (user is null)
         {
-            return NotFound(new { message = "User was not found." });
+            return this.ProblemResponse(StatusCodes.Status404NotFound, "User was not found.");
         }
 
         var posts = await _postService.GetByAuthorIdAsync(
@@ -81,6 +86,29 @@ public class UsersController : ControllerBase
             cancellationToken,
             currentUserId);
         return Ok(posts);
+    }
+
+    [HttpGet("{username}/replies")]
+    public async Task<ActionResult<CursorPageResponse<CommentResponse>>> GetRepliesByUsername(
+        [FromRoute] string username,
+        [FromQuery] CursorPageRequest pagination,
+        CancellationToken cancellationToken)
+    {
+        var currentUserId = User.GetCurrentUserId();
+
+        var user = await _userService.GetByUsernameAsync(username, cancellationToken);
+
+        if (user is null)
+        {
+            return this.ProblemResponse(StatusCodes.Status404NotFound, "User was not found.");
+        }
+
+        var comments = await _commentService.GetByAuthorIdAsync(
+            user.Id,
+            pagination,
+            cancellationToken,
+            currentUserId);
+        return Ok(comments);
     }
 
     [HttpGet("{username}/likes")]
@@ -93,7 +121,7 @@ public class UsersController : ControllerBase
 
         if (user is null)
         {
-            return NotFound(new { message = "User was not found." });
+            return this.ProblemResponse(StatusCodes.Status404NotFound, "User was not found.");
         }
 
         var currentUserId = User.GetCurrentUserId();
@@ -116,7 +144,7 @@ public class UsersController : ControllerBase
 
         if (user is null)
         {
-            return NotFound(new { message = "User was not found." });
+            return this.ProblemResponse(StatusCodes.Status404NotFound, "User was not found.");
         }
 
         var currentUserId = User.GetCurrentUserId();

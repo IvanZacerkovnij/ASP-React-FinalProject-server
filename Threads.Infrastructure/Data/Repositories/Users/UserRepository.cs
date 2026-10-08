@@ -11,6 +11,10 @@ namespace Threads.Infrastructure.Data.Repositories.Users;
 
 public class UserRepository : IUserRepository
 {
+    private const double EarthRadiusKilometers = 6371d;
+    private const double NearRadiusKilometers = 50d;
+    private const double DegreesToRadians = Math.PI / 180d;
+
     private readonly ThreadsDbContext _dbContext;
 
     public UserRepository(ThreadsDbContext dbContext)
@@ -24,13 +28,73 @@ public class UserRepository : IUserRepository
         TextCursorPosition? cursor = null,
         CancellationToken cancellationToken = default)
     {
+        return await SearchAsync(
+            query,
+            null,
+            null,
+            limit,
+            cursor,
+            null,
+            cancellationToken);
+    }
+
+    public async Task<IReadOnlyCollection<UserSummaryReadModel>> SearchAsync(
+        string? query,
+        string? people,
+        string? location,
+        int limit,
+        TextCursorPosition? cursor = null,
+        Guid? currentUserId = null,
+        CancellationToken cancellationToken = default)
+    {
         var users = _dbContext.Users
-            .AsNoTracking()
-            .Where(user => EF
+            .AsNoTracking();
+
+        if (query is not null)
+        {
+            users = users.Where(user => EF
                 .Property<NpgsqlTsVector>(user, PostgresSearch.VectorProperty)
                 .Matches(EF.Functions.WebSearchToTsQuery(
                     PostgresSearch.Configuration,
                     query)));
+        }
+
+        if (people == "following")
+        {
+            if (!currentUserId.HasValue)
+            {
+                return [];
+            }
+
+            users = users.Where(user => _dbContext.Follows.Any(follow =>
+                follow.FollowerId == currentUserId.Value &&
+                follow.FollowingId == user.Id));
+        }
+
+        if (location == "near")
+        {
+            if (!currentUserId.HasValue)
+            {
+                return [];
+            }
+
+            users = users.Where(user =>
+                user.LocationLatitude.HasValue &&
+                user.LocationLongitude.HasValue &&
+                _dbContext.Users.Any(currentUser =>
+                    currentUser.Id == currentUserId.Value &&
+                    currentUser.LocationLatitude.HasValue &&
+                    currentUser.LocationLongitude.HasValue &&
+                    2d * EarthRadiusKilometers * Math.Asin(Math.Sqrt(
+                        Math.Pow(Math.Sin(
+                            (user.LocationLatitude.Value - currentUser.LocationLatitude.Value) *
+                            DegreesToRadians / 2d), 2d) +
+                        Math.Cos(currentUser.LocationLatitude.Value * DegreesToRadians) *
+                        Math.Cos(user.LocationLatitude.Value * DegreesToRadians) *
+                        Math.Pow(Math.Sin(
+                            (user.LocationLongitude.Value - currentUser.LocationLongitude.Value) *
+                            DegreesToRadians / 2d), 2d))) <= NearRadiusKilometers));
+        }
 
         if (cursor is not null)
         {
@@ -48,6 +112,7 @@ public class UserRepository : IUserRepository
                 Id = user.Id,
                 Username = user.Username,
                 DisplayName = user.DisplayName,
+                Bio = user.Bio,
                 LocationPlaceId = user.LocationPlaceId,
                 LocationName = user.Location,
                 LocationCountry = user.LocationCountry,
@@ -87,6 +152,8 @@ public class UserRepository : IUserRepository
                 DisplayName = user.DisplayName,
                 Bio = user.Bio,
                 DateOfBirth = user.DateOfBirth,
+                BirthDateVisibility = user.BirthDateVisibility,
+                BirthYearVisibility = user.BirthYearVisibility,
                 LocationPlaceId = user.LocationPlaceId,
                 LocationName = user.Location,
                 LocationCountry = user.LocationCountry,

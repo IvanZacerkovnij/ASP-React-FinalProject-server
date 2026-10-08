@@ -3,6 +3,7 @@ using System.ComponentModel.DataAnnotations;
 using Threads.Api.Requests.Validation;
 using Threads.Application.DTOs.Locations;
 using Threads.Application.DTOs.Validation;
+using Threads.Domain.Enums;
 
 namespace Threads.Api.Requests.Users;
 
@@ -15,10 +16,14 @@ public class UpdateCurrentUserRequest
     public string? Bio { get; set; }
 
     [NotInFutureDate]
-    public DateOnly? DateOfBirth { get; set; }
+    public DateOnly? BirthDate { get; set; }
+
+    public VisibilityLevel? BirthDateVisibility { get; set; }
+
+    public VisibilityLevel? BirthYearVisibility { get; set; }
 
     [DefaultValue(false)]
-    public bool RemoveDateOfBirth { get; set; }
+    public bool RemoveBirthDate { get; set; }
 
     [DefaultValue(false)]
     public bool RemoveLocation { get; set; }

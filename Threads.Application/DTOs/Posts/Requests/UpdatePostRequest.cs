@@ -1,5 +1,7 @@
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
+using Threads.Application.DTOs.LinkPreviews;
 using Threads.Application.DTOs.Validation;
 
 namespace Threads.Application.DTOs.Posts.Requests;
@@ -19,8 +21,18 @@ public class UpdatePostRequest
 
     public PostLocationRequest? Location { get; init; }
 
-    [DefaultValue(false)]
-    public bool RemoveEmbed { get; init; }
+    private LinkPreviewRequest? _linkPreview;
 
-    public PostEmbedRequest? Embed { get; init; }
+    public LinkPreviewRequest? LinkPreview
+    {
+        get => _linkPreview;
+        init
+        {
+            _linkPreview = value;
+            HasLinkPreviewValue = true;
+        }
+    }
+
+    [JsonIgnore]
+    public bool HasLinkPreviewValue { get; private init; }
 }

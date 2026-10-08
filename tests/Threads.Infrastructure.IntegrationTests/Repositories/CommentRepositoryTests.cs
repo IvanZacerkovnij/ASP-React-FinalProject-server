@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Threads.Application.DTOs.Pagination;
+using Threads.Domain.Entities;
 using Threads.Infrastructure.Data.Repositories.Comments;
 using Threads.Infrastructure.IntegrationTests.Infrastructure;
 
@@ -51,9 +52,138 @@ public sealed class CommentRepositoryTests : DatabaseTestBase
     }
 
     [Fact]
+    public async Task GetByAuthorIdAsync_FiltersOrdersAndAppliesExclusiveCursor()
+    {
+        var author = TestEntityFactory.CreateUser();
+        var otherAuthor = TestEntityFactory.CreateUser("other-author");
+        var post = TestEntityFactory.CreatePost(author);
+        var oldest = TestEntityFactory.CreateComment(
+            author,
+            post,
+            "oldest",
+            FirstTime,
+            Guid.Parse("00000000-0000-0000-0000-000000000010"));
+        var middle = TestEntityFactory.CreateComment(
+            author,
+            post,
+            "middle",
+            FirstTime.AddMinutes(1),
+            Guid.Parse("00000000-0000-0000-0000-000000000020"));
+        var lowerLatest = TestEntityFactory.CreateComment(
+            author,
+            post,
+            "lower latest",
+            FirstTime.AddMinutes(2),
+            Guid.Parse("00000000-0000-0000-0000-000000000001"));
+        var higherLatest = TestEntityFactory.CreateComment(
+            author,
+            post,
+            "higher latest",
+            FirstTime.AddMinutes(2),
+            Guid.Parse("00000000-0000-0000-0000-000000000002"));
+        var otherAuthorComment = TestEntityFactory.CreateComment(
+            otherAuthor,
+            post,
+            "must not be returned",
+            FirstTime.AddMinutes(3));
+
+        await using (var seedContext = Fixture.CreateContext())
+        {
+            seedContext.AddRange(
+                author,
+                otherAuthor,
+                post,
+                oldest,
+                middle,
+                lowerLatest,
+                higherLatest,
+                otherAuthorComment);
+            await seedContext.SaveChangesAsync();
+        }
+
+        await using var dbContext = Fixture.CreateContext();
+        var repository = new CommentRepository(dbContext);
+        var firstPage = await repository.GetByAuthorIdAsync(author.Id, limit: 1);
+        var afterHighest = await repository.GetByAuthorIdAsync(
+            author.Id,
+            limit: 1,
+            new CursorPosition(higherLatest.CreatedAt, higherLatest.Id));
+        var afterMiddle = await repository.GetByAuthorIdAsync(
+            author.Id,
+            limit: 2,
+            new CursorPosition(middle.CreatedAt, middle.Id));
+
+        Assert.Equal([higherLatest.Id, lowerLatest.Id], firstPage.Select(comment => comment.Id));
+        Assert.Equal([lowerLatest.Id, middle.Id], afterHighest.Select(comment => comment.Id));
+        Assert.Equal([oldest.Id], afterMiddle.Select(comment => comment.Id));
+        Assert.DoesNotContain(firstPage, comment => comment.Id == otherAuthorComment.Id);
+    }
+
+    [Fact]
+    public async Task GetThreadPartsAsync_ReturnsOrderedAncestorsAndPaginatedDirectReplies()
+    {
+        var author = TestEntityFactory.CreateUser();
+        var post = TestEntityFactory.CreatePost(author);
+        var root = TestEntityFactory.CreateComment(author, post, "root", FirstTime);
+        var parent = TestEntityFactory.CreateComment(
+            author,
+            post,
+            "parent",
+            FirstTime.AddMinutes(1),
+            parentComment: root);
+        var target = TestEntityFactory.CreateComment(
+            author,
+            post,
+            "target",
+            FirstTime.AddMinutes(2),
+            parentComment: parent);
+        var lowerReply = TestEntityFactory.CreateComment(
+            author,
+            post,
+            "lower reply",
+            FirstTime.AddMinutes(3),
+            Guid.Parse("00000000-0000-0000-0000-000000000001"),
+            target);
+        var higherReply = TestEntityFactory.CreateComment(
+            author,
+            post,
+            "higher reply",
+            FirstTime.AddMinutes(3),
+            Guid.Parse("00000000-0000-0000-0000-000000000002"),
+            target);
+        var nestedReply = TestEntityFactory.CreateComment(
+            author,
+            post,
+            "nested reply",
+            FirstTime.AddMinutes(4),
+            parentComment: lowerReply);
+
+        await using (var seedContext = Fixture.CreateContext())
+        {
+            seedContext.AddRange(author, post, root, parent, target, lowerReply, higherReply, nestedReply);
+            await seedContext.SaveChangesAsync();
+        }
+
+        await using var dbContext = Fixture.CreateContext();
+        var repository = new CommentRepository(dbContext);
+        var ancestors = await repository.GetAncestorsAsync(target.Id);
+        var firstPage = await repository.GetRepliesAsync(target.Id, limit: 1);
+        var afterLowerReply = await repository.GetRepliesAsync(
+            target.Id,
+            limit: 1,
+            new CursorPosition(lowerReply.CreatedAt, lowerReply.Id));
+
+        Assert.Equal([root.Id, parent.Id], ancestors.Select(comment => comment.Id));
+        Assert.Equal([lowerReply.Id, higherReply.Id], firstPage.Select(comment => comment.Id));
+        Assert.Equal([higherReply.Id], afterLowerReply.Select(comment => comment.Id));
+        Assert.DoesNotContain(firstPage, comment => comment.Id == nestedReply.Id);
+    }
+
+    [Fact]
     public async Task GetByPostIdAsync_OrdersAscendingAndAppliesExclusiveCursor()
     {
         var author = TestEntityFactory.CreateUser();
+        author.Bio = "Author bio";
         var post = TestEntityFactory.CreatePost(author);
         var otherPost = TestEntityFactory.CreatePost(author, "other post");
         var lowerFirst = TestEntityFactory.CreateComment(
@@ -91,6 +221,84 @@ public sealed class CommentRepositoryTests : DatabaseTestBase
 
         Assert.Equal([lowerFirst.Id, higherFirst.Id], firstPage.Select(comment => comment.Id));
         Assert.Equal([higherFirst.Id, last.Id], afterLowerFirst.Select(comment => comment.Id));
+        Assert.Equal("Author bio", firstPage.First().Author.Bio);
+    }
+
+    [Fact]
+    public async Task GetSummariesByIdsAsync_ReturnsDistinctExistingCommentsInRequestedOrder()
+    {
+        var author = TestEntityFactory.CreateUser();
+        var post = TestEntityFactory.CreatePost(author);
+        var first = TestEntityFactory.CreateComment(author, post, "first");
+        var second = TestEntityFactory.CreateComment(author, post, "second");
+        var missingId = Guid.NewGuid();
+
+        await using (var seedContext = Fixture.CreateContext())
+        {
+            seedContext.AddRange(author, post, first, second);
+            await seedContext.SaveChangesAsync();
+        }
+
+        await using var dbContext = Fixture.CreateContext();
+        var repository = new CommentRepository(dbContext);
+
+        var result = await repository.GetSummariesByIdsAsync(
+            [second.Id, missingId, first.Id, second.Id]);
+
+        Assert.Equal([second.Id, first.Id], result.Select(comment => comment.Id));
+    }
+
+    [Fact]
+    public async Task GetVersionsAsync_ReturnsOnlyCommentVersionsInStableChronologicalOrder()
+    {
+        var author = TestEntityFactory.CreateUser();
+        var post = TestEntityFactory.CreatePost(author);
+        var comment = TestEntityFactory.CreateComment(author, post);
+        var otherComment = TestEntityFactory.CreateComment(author, post, "other");
+        var versionTime = FirstTime;
+        var lowerId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+        var higherId = Guid.Parse("00000000-0000-0000-0000-000000000002");
+        comment.Versions.Add(new CommentVersion
+        {
+            Id = higherId,
+            CommentId = comment.Id,
+            Comment = comment,
+            SnapshotJson = "{}",
+            CreatedAt = versionTime
+        });
+        comment.Versions.Add(new CommentVersion
+        {
+            Id = lowerId,
+            CommentId = comment.Id,
+            Comment = comment,
+            SnapshotJson = "{}",
+            CreatedAt = versionTime
+        });
+        otherComment.Versions.Add(new CommentVersion
+        {
+            CommentId = otherComment.Id,
+            Comment = otherComment,
+            SnapshotJson = "{}",
+            CreatedAt = versionTime.AddMinutes(-1)
+        });
+
+        await using (var seedContext = Fixture.CreateContext())
+        {
+            seedContext.AddRange(author, post, comment, otherComment);
+            await seedContext.SaveChangesAsync();
+        }
+
+        await using var dbContext = Fixture.CreateContext();
+        var repository = new CommentRepository(dbContext);
+
+        var result = await repository.GetVersionsAsync(comment.Id, limit: 10);
+        var afterLowerId = await repository.GetVersionsAsync(
+            comment.Id,
+            limit: 10,
+            new CursorPosition(versionTime, lowerId));
+
+        Assert.Equal([lowerId, higherId], result.Select(version => version.Id));
+        Assert.Equal([higherId], afterLowerId.Select(version => version.Id));
     }
 
     [Fact]

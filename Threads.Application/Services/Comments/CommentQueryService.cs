@@ -18,6 +18,35 @@ public sealed class CommentQueryService
         _responseFactory = responseFactory;
     }
 
+    public async Task<CursorPageResponse<CommentResponse>> GetByAuthorIdAsync(
+        Guid authorId,
+        CursorPageRequest pagination,
+        CancellationToken cancellationToken = default,
+        Guid? currentUserId = null)
+    {
+        var cursor = CursorCodec.Decode(pagination.Cursor);
+        var comments = await _commentRepository.GetByAuthorIdAsync(
+            authorId,
+            pagination.Limit,
+            cursor,
+            currentUserId,
+            cancellationToken);
+        var hasMore = comments.Count > pagination.Limit;
+        var pageComments = comments.Take(pagination.Limit).ToList();
+        var items = pageComments
+            .Select(_responseFactory.Create)
+            .ToList();
+
+        return new CursorPageResponse<CommentResponse>
+        {
+            Items = items,
+            HasMore = hasMore,
+            NextCursor = hasMore
+                ? CursorCodec.Encode(pageComments[^1].CreatedAt, pageComments[^1].Id)
+                : null
+        };
+    }
+
     public async Task<CursorPageResponse<CommentResponse>> GetByPostIdAsync(
         Guid postId,
         CursorPageRequest pagination,

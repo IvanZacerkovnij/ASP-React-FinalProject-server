@@ -6,6 +6,7 @@ using Threads.Application.Interfaces.Auth;
 using Threads.Application.Interfaces.Security;
 using Threads.Application.Interfaces.Users;
 using Threads.Application.Services.Auth;
+using Threads.Application.UnitTests.Helpers;
 using Threads.Domain.Entities;
 
 namespace Threads.Application.UnitTests.Services.Auth;
@@ -63,7 +64,7 @@ public class PasswordRecoveryServiceTests
     [Fact]
     public async Task ForgotPasswordAsync_WhenUserIsInactive_DoesNotSendCode()
     {
-        var user = CreateUser(isActive: false);
+        var user = TestEntityFactory.CreateUser(isActive: false);
         _userRepository
             .GetByEmailAsync(user.Email, Arg.Any<CancellationToken>())
             .Returns(user);
@@ -82,7 +83,7 @@ public class PasswordRecoveryServiceTests
     [Fact]
     public async Task ForgotPasswordAsync_WhenUserIsActive_SavesHashedCodeAndSendsPlainCode()
     {
-        var user = CreateUser();
+        var user = TestEntityFactory.CreateUser();
         user.PendingPasswordHash = "stale-pending-hash";
         using var cancellationTokenSource = new CancellationTokenSource();
         var cancellationToken = cancellationTokenSource.Token;
@@ -257,21 +258,9 @@ public class PasswordRecoveryServiceTests
             });
     }
 
-    private static User CreateUser(bool isActive = true)
-    {
-        return new User
-        {
-            Id = Guid.NewGuid(),
-            Email = "user@example.com",
-            Username = "testuser",
-            PasswordHash = "current-password-hash",
-            IsActive = isActive
-        };
-    }
-
     private static User CreateUserWithResetCode()
     {
-        var user = CreateUser();
+        var user = TestEntityFactory.CreateUser();
         user.PasswordResetCodeHash = "reset-code-hash";
         user.PasswordResetCodeExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5);
         return user;

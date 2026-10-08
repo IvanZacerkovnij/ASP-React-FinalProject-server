@@ -9,6 +9,8 @@ public class UserShortResponse
     public required string Username { get; init; }
 
     public string? DisplayName { get; init; }
+    
+    public string? Bio { get; init; }
 
     public LocationResponse? Location { get; init; }
 

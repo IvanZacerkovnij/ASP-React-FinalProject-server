@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using NpgsqlTypes;
 using Threads.Application.DTOs.Pagination;
 using Threads.Application.DTOs.Posts.Models;
+using Threads.Application.DTOs.Quotes;
 using Threads.Application.DTOs.Users;
 using Threads.Application.Exceptions;
 using Threads.Application.Interfaces.Posts;
@@ -11,6 +12,10 @@ namespace Threads.Infrastructure.Data.Repositories.Posts;
 
 public class PostRepository : IPostRepository
 {
+    private const double EarthRadiusKilometers = 6371d;
+    private const double NearRadiusKilometers = 50d;
+    private const double DegreesToRadians = Math.PI / 180d;
+
     private readonly ThreadsDbContext _dbContext;
 
     public PostRepository(ThreadsDbContext dbContext)
@@ -34,6 +39,58 @@ public class PostRepository : IPostRepository
             postIds,
             currentUserId,
             cancellationToken: cancellationToken);
+    }
+
+    public Task<IReadOnlyCollection<PostSummaryReadModel>> GetSummariesByIdsAsync(
+        IReadOnlyCollection<Guid> ids,
+        Guid? currentUserId = null,
+        CancellationToken cancellationToken = default)
+    {
+        return GetByOrderedIdsAsync(
+            ids.Distinct().ToArray(),
+            currentUserId,
+            cancellationToken: cancellationToken);
+    }
+
+    public async Task<IReadOnlyCollection<PostVersion>> GetVersionsAsync(
+        Guid postId,
+        int limit,
+        CursorPosition? cursor = null,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _dbContext.PostVersions
+            .AsNoTracking()
+            .Where(version => version.PostId == postId);
+
+        if (cursor is not null)
+        {
+            query = query.Where(version => EF.Functions.GreaterThan(
+                ValueTuple.Create(version.CreatedAt, version.Id),
+                ValueTuple.Create(cursor.CreatedAt, cursor.Id)));
+        }
+
+        return await query
+            .OrderBy(version => version.CreatedAt)
+            .ThenBy(version => version.Id)
+            .Take(limit + 1)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyCollection<PostVersion>> GetVersionsByIdsAsync(
+        IReadOnlyCollection<Guid> versionIds,
+        CancellationToken cancellationToken = default)
+    {
+        var distinctIds = versionIds.Distinct().ToArray();
+
+        if (distinctIds.Length == 0)
+        {
+            return [];
+        }
+
+        return await _dbContext.PostVersions
+            .AsNoTracking()
+            .Where(version => distinctIds.Contains(version.Id))
+            .ToListAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyCollection<PostSummaryReadModel>> GetByAuthorIdAsync(
@@ -217,22 +274,175 @@ public class PostRepository : IPostRepository
         Guid? currentUserId = null,
         CancellationToken cancellationToken = default)
     {
-        var matchingAuthorIds = _dbContext.Users
-            .AsNoTracking()
-            .Where(user => EF
-                .Property<NpgsqlTsVector>(user, PostgresSearch.VectorProperty)
-                .Matches(EF.Functions.WebSearchToTsQuery(
-                    PostgresSearch.Configuration,
-                    query)))
-            .Select(user => user.Id);
+        return await SearchAsync(
+            query,
+            null,
+            null,
+            null,
+            [],
+            [],
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            limit,
+            cursor,
+            currentUserId,
+            cancellationToken);
+    }
+
+    public async Task<IReadOnlyCollection<PostSummaryReadModel>> SearchAsync(
+        string? query,
+        string? people,
+        string? location,
+        string? exactPhrase,
+        IReadOnlyCollection<string> anyWords,
+        IReadOnlyCollection<string> excludeWords,
+        string? from,
+        int? minReplies,
+        int? minLikes,
+        int? minReposts,
+        DateOnly? fromDate,
+        DateOnly? toDate,
+        bool? hasMedia,
+        int limit,
+        CursorPosition? cursor = null,
+        Guid? currentUserId = null,
+        CancellationToken cancellationToken = default)
+    {
         var posts = _dbContext.Posts
-            .AsNoTracking()
-            .Where(post =>
+            .AsNoTracking();
+
+        if (query is not null)
+        {
+            var matchingAuthorIds = _dbContext.Users
+                .AsNoTracking()
+                .Where(user => EF
+                    .Property<NpgsqlTsVector>(user, PostgresSearch.VectorProperty)
+                    .Matches(EF.Functions.WebSearchToTsQuery(
+                        PostgresSearch.Configuration,
+                        query)))
+                .Select(user => user.Id);
+            posts = posts.Where(post =>
                 EF.Property<NpgsqlTsVector>(post, PostgresSearch.VectorProperty)
                     .Matches(EF.Functions.WebSearchToTsQuery(
                         PostgresSearch.Configuration,
                         query)) ||
                 matchingAuthorIds.Contains(post.AuthorId));
+        }
+
+        if (people == "following")
+        {
+            if (!currentUserId.HasValue)
+            {
+                return [];
+            }
+
+            posts = posts.Where(post => _dbContext.Follows.Any(follow =>
+                follow.FollowerId == currentUserId.Value &&
+                follow.FollowingId == post.AuthorId));
+        }
+
+        if (location == "near")
+        {
+            if (!currentUserId.HasValue)
+            {
+                return [];
+            }
+
+            posts = posts.Where(post =>
+                post.LocationLatitude.HasValue &&
+                post.LocationLongitude.HasValue &&
+                _dbContext.Users.Any(currentUser =>
+                    currentUser.Id == currentUserId.Value &&
+                    currentUser.LocationLatitude.HasValue &&
+                    currentUser.LocationLongitude.HasValue &&
+                    2d * EarthRadiusKilometers * Math.Asin(Math.Sqrt(
+                        Math.Pow(Math.Sin(
+                            (post.LocationLatitude.Value - currentUser.LocationLatitude.Value) *
+                            DegreesToRadians / 2d), 2d) +
+                        Math.Cos(currentUser.LocationLatitude.Value * DegreesToRadians) *
+                        Math.Cos(post.LocationLatitude.Value * DegreesToRadians) *
+                        Math.Pow(Math.Sin(
+                            (post.LocationLongitude.Value - currentUser.LocationLongitude.Value) *
+                            DegreesToRadians / 2d), 2d))) <= NearRadiusKilometers));
+        }
+
+        if (exactPhrase is not null)
+        {
+            var normalizedPhrase = exactPhrase.ToLowerInvariant();
+            posts = posts.Where(post =>
+                post.Content != null && post.Content.ToLower().Contains(normalizedPhrase));
+        }
+
+        foreach (var word in excludeWords)
+        {
+            var excludedWord = word;
+            posts = posts.Where(post =>
+                post.Content == null || !post.Content.ToLower().Contains(excludedWord));
+        }
+
+        if (from is not null)
+        {
+            posts = posts.Where(post => post.Author.Username == from);
+        }
+
+        if (minReplies.HasValue)
+        {
+            posts = posts.Where(post => post.Comments.Count >= minReplies.Value);
+        }
+
+        if (minLikes.HasValue)
+        {
+            posts = posts.Where(post => post.PostLikes.Count >= minLikes.Value);
+        }
+
+        if (minReposts.HasValue)
+        {
+            posts = posts.Where(post => post.PostReposts.Count >= minReposts.Value);
+        }
+
+        if (fromDate.HasValue)
+        {
+            var fromUtc = new DateTimeOffset(
+                fromDate.Value.ToDateTime(TimeOnly.MinValue),
+                TimeSpan.Zero);
+            posts = posts.Where(post => post.CreatedAt >= fromUtc);
+        }
+
+        if (toDate.HasValue)
+        {
+            var toUtcExclusive = new DateTimeOffset(
+                toDate.Value.AddDays(1).ToDateTime(TimeOnly.MinValue),
+                TimeSpan.Zero);
+            posts = posts.Where(post => post.CreatedAt < toUtcExclusive);
+        }
+
+        if (hasMedia.HasValue)
+        {
+            posts = hasMedia.Value
+                ? posts.Where(post => post.Media.Any())
+                : posts.Where(post => !post.Media.Any());
+        }
+
+        if (anyWords.Count > 0)
+        {
+            IQueryable<Post>? matchingWords = null;
+            foreach (var word in anyWords)
+            {
+                var includedWord = word;
+                var wordQuery = posts.Where(post =>
+                    post.Content != null && post.Content.ToLower().Contains(includedWord));
+                matchingWords = matchingWords is null
+                    ? wordQuery
+                    : matchingWords.Union(wordQuery);
+            }
+
+            posts = matchingWords!;
+        }
 
         if (cursor is not null)
         {
@@ -263,6 +473,16 @@ public class PostRepository : IPostRepository
             .AnyAsync(post => post.Id == id, cancellationToken);
     }
 
+    public Task<bool> VersionExistsAsync(Guid postId, Guid versionId, CancellationToken cancellationToken = default)
+    {
+        return _dbContext.PostVersions
+            .AsNoTracking()
+            .AnyAsync(
+                version => version.PostId == postId &&
+                           version.Id == versionId,
+                cancellationToken);
+    }
+
     public async Task<PostContentReadModel?> GetContentByIdAsync(
         Guid id,
         CancellationToken cancellationToken = default)
@@ -273,6 +493,7 @@ public class PostRepository : IPostRepository
             .Select(post => new PostContentReadModel
             {
                 Id = post.Id,
+                VersionId = post.CurrentVersionId,
                 Content = post.Content,
                 AuthorId = post.AuthorId,
                 Media = post.Media
@@ -317,6 +538,14 @@ public class PostRepository : IPostRepository
                 EmbedTitle = post.EmbedTitle,
                 EmbedDescription = post.EmbedDescription,
                 EmbedThumbnailUrl = post.EmbedThumbnailUrl,
+                Quote = post.Quote == null
+                    ? null
+                    : new QuoteReadModel
+                    {
+                        TargetType = post.Quote.TargetType,
+                        TargetId = post.Quote.TargetId,
+                        TargetVersionId = post.Quote.TargetVersionId
+                    },
                 CreatedAt = post.CreatedAt,
                 UpdatedAt = post.UpdatedAt
             })
@@ -462,12 +691,14 @@ public class PostRepository : IPostRepository
             .Select(post => new PostSummaryReadModel
             {
                 Id = post.Id,
+                VersionId = post.CurrentVersionId,
                 Content = post.Content,
                 Author = new UserSummaryReadModel
                 {
                     Id = post.Author.Id,
                     Username = post.Author.Username,
                     DisplayName = post.Author.DisplayName,
+                    Bio = post.Author.Bio,
                     LocationPlaceId = post.Author.LocationPlaceId,
                     LocationName = post.Author.Location,
                     LocationCountry = post.Author.LocationCountry,
@@ -526,6 +757,14 @@ public class PostRepository : IPostRepository
                 EmbedTitle = post.EmbedTitle,
                 EmbedDescription = post.EmbedDescription,
                 EmbedThumbnailUrl = post.EmbedThumbnailUrl,
+                Quote = post.Quote == null
+                    ? null
+                    : new QuoteReadModel
+                    {
+                        TargetType = post.Quote.TargetType,
+                        TargetId = post.Quote.TargetId,
+                        TargetVersionId = post.Quote.TargetVersionId
+                    },
                 LikesCount = post.PostLikes.Count,
                 CommentsCount = post.Comments.Count,
                 RepostsCount = post.PostReposts.Count,
@@ -552,6 +791,7 @@ public class PostRepository : IPostRepository
         return query
             .AsSplitQuery()
             .Include(post => post.Author)
+            .Include(post => post.Quote)
             .Include(post => post.Media)
             .Include(post => post.Comments)
             .Include(post => post.PostLikes)

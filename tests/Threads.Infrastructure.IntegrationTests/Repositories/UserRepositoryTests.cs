@@ -205,6 +205,80 @@ public sealed class UserRepositoryTests : DatabaseTestBase
     }
 
     [Fact]
+    public async Task SearchAsync_FiltersFollowingAndSupportsFilterOnlySearch()
+    {
+        var current = TestEntityFactory.CreateUser("current");
+        var followed = TestEntityFactory.CreateUser("alpha-followed");
+        var notFollowed = TestEntityFactory.CreateUser("beta-not-followed");
+        var follow = TestEntityFactory.CreateFollow(current, followed);
+
+        await using (var seedContext = Fixture.CreateContext())
+        {
+            seedContext.AddRange(current, followed, notFollowed, follow);
+            await seedContext.SaveChangesAsync();
+        }
+
+        await using var dbContext = Fixture.CreateContext();
+        var result = await new UserRepository(dbContext).SearchAsync(
+            null,
+            "following",
+            null,
+            10,
+            currentUserId: current.Id);
+
+        Assert.Equal([followed.Id], result.Select(user => user.Id));
+    }
+
+    [Fact]
+    public async Task SearchAsync_FiltersNearUsersAndKeepsUsernameCursorOrdering()
+    {
+        var current = TestEntityFactory.CreateUser(
+            "current",
+            locationLatitude: 50.4501,
+            locationLongitude: 30.5234);
+        var nearAlpha = TestEntityFactory.CreateUser(
+            "alpha-near",
+            id: Guid.Parse("00000000-0000-0000-0000-000000000001"),
+            locationLatitude: 50.4547,
+            locationLongitude: 30.5238);
+        var nearBeta = TestEntityFactory.CreateUser(
+            "beta-near",
+            locationLatitude: 50.4017,
+            locationLongitude: 30.2525);
+        var far = TestEntityFactory.CreateUser(
+            "far-away",
+            locationLatitude: 49.8397,
+            locationLongitude: 24.0297);
+        var missingCoordinates = TestEntityFactory.CreateUser("missing-coordinates");
+
+        await using (var seedContext = Fixture.CreateContext())
+        {
+            seedContext.AddRange(current, nearAlpha, nearBeta, far, missingCoordinates);
+            await seedContext.SaveChangesAsync();
+        }
+
+        await using var dbContext = Fixture.CreateContext();
+        var repository = new UserRepository(dbContext);
+        var firstPage = await repository.SearchAsync(
+            null,
+            null,
+            "near",
+            1,
+            currentUserId: current.Id);
+        var afterAlpha = await repository.SearchAsync(
+            null,
+            null,
+            "near",
+            10,
+            new TextCursorPosition(nearAlpha.Username, nearAlpha.Id),
+            current.Id);
+
+        Assert.Equal([nearAlpha.Id, nearBeta.Id], firstPage.Select(user => user.Id));
+        Assert.Equal([nearBeta.Id, current.Id], afterAlpha.Select(user => user.Id));
+        Assert.DoesNotContain(firstPage, user => user.Id == far.Id || user.Id == missingCoordinates.Id);
+    }
+
+    [Fact]
     public async Task CaseInsensitiveLookups_AreIndependentOfCurrentCulture()
     {
         var user = TestEntityFactory.CreateUser("identity", "identity@example.com");

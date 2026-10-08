@@ -40,6 +40,39 @@ namespace Threads.Infrastructure.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid>("CurrentVersionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("LinkPreviewImageUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<string>("LinkPreviewTitle")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<string>("LinkPreviewUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<string>("LocationCountry")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<double?>("LocationLatitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("LocationLongitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("LocationName")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<string>("LocationPlaceId")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
                     b.Property<Guid?>("ParentCommentId")
                         .HasColumnType("uuid");
 
@@ -52,6 +85,9 @@ namespace Threads.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("AuthorId");
+
+                    b.HasIndex("CurrentVersionId")
+                        .IsUnique();
 
                     b.HasIndex("ParentCommentId");
 
@@ -120,6 +156,35 @@ namespace Threads.Infrastructure.Migrations
                     b.ToTable("CommentReposts", (string)null);
                 });
 
+            modelBuilder.Entity("Threads.Domain.Entities.CommentVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CommentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("SchemaVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("SnapshotJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CommentId", "CreatedAt");
+
+                    b.ToTable("CommentVersions", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_CommentVersions_SchemaVersion", "\"SchemaVersion\" > 0");
+                        });
+                });
+
             modelBuilder.Entity("Threads.Domain.Entities.CommentView", b =>
                 {
                     b.Property<Guid>("CommentId")
@@ -179,6 +244,9 @@ namespace Threads.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("CommentId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("ContentType")
                         .IsRequired()
                         .HasMaxLength(255)
@@ -199,6 +267,9 @@ namespace Threads.Infrastructure.Migrations
                         .HasColumnType("integer");
 
                     b.Property<Guid?>("PostId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ScheduledPostId")
                         .HasColumnType("uuid");
 
                     b.Property<long>("SizeInBytes")
@@ -241,13 +312,19 @@ namespace Threads.Infrastructure.Migrations
 
                     b.HasIndex("UploadedByUserId");
 
+                    b.HasIndex("CommentId", "SortOrder");
+
                     b.HasIndex("PostId", "SortOrder");
+
+                    b.HasIndex("ScheduledPostId", "SortOrder");
 
                     b.ToTable("Media", null, t =>
                         {
                             t.HasCheckConstraint("CK_Media_DurationSeconds", "\"DurationSeconds\" IS NULL OR \"DurationSeconds\" >= 0");
 
                             t.HasCheckConstraint("CK_Media_Height", "\"Height\" IS NULL OR \"Height\" >= 0");
+
+                            t.HasCheckConstraint("CK_Media_SingleTarget", "(\"PostId\" IS NOT NULL)::int + (\"CommentId\" IS NOT NULL)::int + (\"ScheduledPostId\" IS NOT NULL)::int <= 1");
 
                             t.HasCheckConstraint("CK_Media_SizeInBytes", "\"SizeInBytes\" >= 0");
 
@@ -313,13 +390,16 @@ namespace Threads.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("CommentId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset?>("EndsAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid>("PostId")
+                    b.Property<Guid?>("PostId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset?>("UpdatedAt")
@@ -327,10 +407,16 @@ namespace Threads.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CommentId")
+                        .IsUnique();
+
                     b.HasIndex("PostId")
                         .IsUnique();
 
-                    b.ToTable("Polls", (string)null);
+                    b.ToTable("Polls", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Polls_SingleTarget", "(\"PostId\" IS NOT NULL)::int + (\"CommentId\" IS NOT NULL)::int = 1");
+                        });
                 });
 
             modelBuilder.Entity("Threads.Domain.Entities.PollOption", b =>
@@ -413,6 +499,9 @@ namespace Threads.Infrastructure.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid>("CurrentVersionId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("EmbedDescription")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
@@ -457,6 +546,9 @@ namespace Threads.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CurrentVersionId")
+                        .IsUnique();
 
                     b.HasIndex("SearchVector")
                         .HasDatabaseName("IX_Posts_SearchVector");
@@ -508,6 +600,39 @@ namespace Threads.Infrastructure.Migrations
                     b.ToTable("PostLikes", (string)null);
                 });
 
+            modelBuilder.Entity("Threads.Domain.Entities.PostQuote", b =>
+                {
+                    b.Property<Guid>("PostId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("TargetId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TargetType")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<Guid>("TargetVersionId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("PostId");
+
+                    b.HasIndex("TargetType", "TargetId");
+
+                    b.ToTable("PostQuotes", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_PostQuotes_TargetId", "\"TargetId\" <> '00000000-0000-0000-0000-000000000000'");
+
+                            t.HasCheckConstraint("CK_PostQuotes_TargetType", "\"TargetType\" IN ('Post', 'Comment')");
+
+                            t.HasCheckConstraint("CK_PostQuotes_TargetVersionId", "\"TargetVersionId\" <> '00000000-0000-0000-0000-000000000000'");
+                        });
+                });
+
             modelBuilder.Entity("Threads.Domain.Entities.PostRepost", b =>
                 {
                     b.Property<Guid>("PostId")
@@ -526,6 +651,35 @@ namespace Threads.Infrastructure.Migrations
                     b.HasIndex("UserId", "CreatedAt", "PostId");
 
                     b.ToTable("PostReposts", (string)null);
+                });
+
+            modelBuilder.Entity("Threads.Domain.Entities.PostVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("PostId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("SchemaVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("SnapshotJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PostId", "CreatedAt");
+
+                    b.ToTable("PostVersions", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_PostVersions_SchemaVersion", "\"SchemaVersion\" > 0");
+                        });
                 });
 
             modelBuilder.Entity("Threads.Domain.Entities.PostView", b =>
@@ -584,6 +738,55 @@ namespace Threads.Infrastructure.Migrations
                     b.ToTable("RefreshTokens", (string)null);
                 });
 
+            modelBuilder.Entity("Threads.Domain.Entities.ScheduledPost", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AuthorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Content")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LinkPreviewImageUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<string>("LinkPreviewTitle")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<string>("LinkPreviewUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<DateTimeOffset>("ScheduledAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ScheduledAt", "Id");
+
+                    b.HasIndex("AuthorId", "ScheduledAt", "Id");
+
+                    b.ToTable("ScheduledPosts", (string)null);
+                });
+
             modelBuilder.Entity("Threads.Domain.Entities.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -601,6 +804,20 @@ namespace Threads.Infrastructure.Migrations
                     b.Property<string>("Bio")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
+
+                    b.Property<string>("BirthDateVisibility")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasDefaultValue("OnlyMe");
+
+                    b.Property<string>("BirthYearVisibility")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasDefaultValue("OnlyMe");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -775,6 +992,17 @@ namespace Threads.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Threads.Domain.Entities.CommentVersion", b =>
+                {
+                    b.HasOne("Threads.Domain.Entities.Comment", "Comment")
+                        .WithMany("Versions")
+                        .HasForeignKey("CommentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Comment");
+                });
+
             modelBuilder.Entity("Threads.Domain.Entities.CommentView", b =>
                 {
                     b.HasOne("Threads.Domain.Entities.Comment", "Comment")
@@ -815,9 +1043,19 @@ namespace Threads.Infrastructure.Migrations
 
             modelBuilder.Entity("Threads.Domain.Entities.Media", b =>
                 {
+                    b.HasOne("Threads.Domain.Entities.Comment", "Comment")
+                        .WithMany("Media")
+                        .HasForeignKey("CommentId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
                     b.HasOne("Threads.Domain.Entities.Post", "Post")
                         .WithMany("Media")
                         .HasForeignKey("PostId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("Threads.Domain.Entities.ScheduledPost", "ScheduledPost")
+                        .WithMany("Media")
+                        .HasForeignKey("ScheduledPostId")
                         .OnDelete(DeleteBehavior.Cascade);
 
                     b.HasOne("Threads.Domain.Entities.User", "UploadedByUser")
@@ -826,18 +1064,28 @@ namespace Threads.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.Navigation("Comment");
+
                     b.Navigation("Post");
+
+                    b.Navigation("ScheduledPost");
 
                     b.Navigation("UploadedByUser");
                 });
 
             modelBuilder.Entity("Threads.Domain.Entities.Poll", b =>
                 {
+                    b.HasOne("Threads.Domain.Entities.Comment", "Comment")
+                        .WithOne("Poll")
+                        .HasForeignKey("Threads.Domain.Entities.Poll", "CommentId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
                     b.HasOne("Threads.Domain.Entities.Post", "Post")
                         .WithOne("Poll")
                         .HasForeignKey("Threads.Domain.Entities.Poll", "PostId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("Comment");
 
                     b.Navigation("Post");
                 });
@@ -930,6 +1178,17 @@ namespace Threads.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Threads.Domain.Entities.PostQuote", b =>
+                {
+                    b.HasOne("Threads.Domain.Entities.Post", "Post")
+                        .WithOne("Quote")
+                        .HasForeignKey("Threads.Domain.Entities.PostQuote", "PostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Post");
+                });
+
             modelBuilder.Entity("Threads.Domain.Entities.PostRepost", b =>
                 {
                     b.HasOne("Threads.Domain.Entities.Post", "Post")
@@ -947,6 +1206,17 @@ namespace Threads.Infrastructure.Migrations
                     b.Navigation("Post");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Threads.Domain.Entities.PostVersion", b =>
+                {
+                    b.HasOne("Threads.Domain.Entities.Post", "Post")
+                        .WithMany("Versions")
+                        .HasForeignKey("PostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Post");
                 });
 
             modelBuilder.Entity("Threads.Domain.Entities.PostView", b =>
@@ -979,6 +1249,17 @@ namespace Threads.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Threads.Domain.Entities.ScheduledPost", b =>
+                {
+                    b.HasOne("Threads.Domain.Entities.User", "Author")
+                        .WithMany("ScheduledPosts")
+                        .HasForeignKey("AuthorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Author");
+                });
+
             modelBuilder.Entity("Threads.Domain.Entities.Comment", b =>
                 {
                     b.Navigation("CommentBookmarks");
@@ -989,7 +1270,13 @@ namespace Threads.Infrastructure.Migrations
 
                     b.Navigation("CommentViews");
 
+                    b.Navigation("Media");
+
+                    b.Navigation("Poll");
+
                     b.Navigation("Replies");
+
+                    b.Navigation("Versions");
                 });
 
             modelBuilder.Entity("Threads.Domain.Entities.Poll", b =>
@@ -1019,6 +1306,15 @@ namespace Threads.Infrastructure.Migrations
                     b.Navigation("PostReposts");
 
                     b.Navigation("PostViews");
+
+                    b.Navigation("Quote");
+
+                    b.Navigation("Versions");
+                });
+
+            modelBuilder.Entity("Threads.Domain.Entities.ScheduledPost", b =>
+                {
+                    b.Navigation("Media");
                 });
 
             modelBuilder.Entity("Threads.Domain.Entities.User", b =>
@@ -1050,6 +1346,8 @@ namespace Threads.Infrastructure.Migrations
                     b.Navigation("Posts");
 
                     b.Navigation("RefreshTokens");
+
+                    b.Navigation("ScheduledPosts");
 
                     b.Navigation("UploadedMedia");
                 });

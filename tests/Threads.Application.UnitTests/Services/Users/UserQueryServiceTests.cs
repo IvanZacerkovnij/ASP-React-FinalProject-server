@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using NSubstitute;
 using Threads.Application.DTOs.Pagination;
 using Threads.Application.DTOs.Users;
+using Threads.Application.DTOs.Search;
 using Threads.Application.Exceptions;
 using Threads.Application.Interfaces.Follows;
 using Threads.Application.Interfaces.Media;
@@ -10,6 +11,7 @@ using Threads.Application.Interfaces.Users;
 using Threads.Application.Services.Users;
 using Threads.Application.UnitTests.TestSupport;
 using Threads.Domain.Entities;
+using Threads.Domain.Enums;
 
 namespace Threads.Application.UnitTests.Services.Users;
 
@@ -113,6 +115,79 @@ public class UserQueryServiceTests
     }
 
     [Fact]
+    public async Task SearchAsync_WithFilters_ForwardsValuesViewerAndBuildsPage()
+    {
+        var currentUserId = Guid.NewGuid();
+        var users = new[] { CreateSummary("alpha"), CreateSummary("beta") };
+        _userRepository
+            .SearchAsync(
+                "query",
+                "following",
+                "near",
+                1,
+                null,
+                currentUserId,
+                Arg.Any<CancellationToken>())
+            .Returns(users);
+
+        var result = await _service.SearchAsync(
+            new SearchUsersRequest
+            {
+                Q = " query ",
+                People = " FOLLOWING ",
+                Location = " near ",
+                Limit = 1
+            },
+            currentUserId: currentUserId);
+
+        Assert.Equal(users[0].Id, Assert.Single(result.Items).Id);
+        Assert.True(result.HasMore);
+        Assert.NotNull(result.NextCursor);
+        await _userRepository.Received(1).SearchAsync(
+            "query",
+            "following",
+            "near",
+            1,
+            null,
+            currentUserId,
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SearchAsync_WithFilterOnly_CallsRepositoryWithoutQuery()
+    {
+        var currentUserId = Guid.NewGuid();
+
+        await _service.SearchAsync(
+            new SearchUsersRequest { People = "following" },
+            currentUserId: currentUserId);
+
+        await _userRepository.Received(1).SearchAsync(
+            null,
+            "following",
+            null,
+            20,
+            null,
+            currentUserId,
+            Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData("everyone", null)]
+    [InlineData(null, "worldwide")]
+    public async Task SearchAsync_WithUnknownFilter_ThrowsValidationError(
+        string? people,
+        string? location)
+    {
+        await Assert.ThrowsAsync<RequestValidationException>(() =>
+            _service.SearchAsync(new SearchUsersRequest
+            {
+                People = people,
+                Location = location
+            }));
+    }
+
+    [Fact]
     public async Task GetByIdAsync_WhenProfileDoesNotExist_ReturnsNullAndRemovesCacheEntry()
     {
         var userId = Guid.NewGuid();
@@ -153,6 +228,98 @@ public class UserQueryServiceTests
         Assert.True(result.IsFollowedByCurrentUser);
         Assert.Equal(3, result.FollowersCount);
         Assert.Equal("https://cdn.example/avatars/profile.jpg", result.AvatarUrl);
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_WhenViewerIsAnonymous_HidesNonPublicBirthDate()
+    {
+        var profile = CreateProfileWithBirthDate(VisibilityLevel.Followers, VisibilityLevel.Public);
+        SetupProfile(profile);
+
+        var result = await _service.GetByIdAsync(profile.Id);
+
+        Assert.NotNull(result);
+        Assert.Null(result.BirthDate);
+        Assert.Equal(VisibilityLevel.Followers, result.BirthDateVisibility);
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_WhenBirthDateIsPublic_ShowsBirthDateToAnonymousViewer()
+    {
+        var profile = CreateProfileWithBirthDate(VisibilityLevel.Public, VisibilityLevel.Public);
+        SetupProfile(profile);
+
+        var result = await _service.GetByIdAsync(profile.Id);
+
+        Assert.NotNull(result);
+        Assert.Equal(profile.DateOfBirth, result.BirthDate);
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_WhenViewerFollowsOwner_ShowsFollowersOnlyBirthDate()
+    {
+        var currentUserId = Guid.NewGuid();
+        var profile = CreateProfileWithBirthDate(VisibilityLevel.Followers, VisibilityLevel.Followers);
+        SetupProfile(profile);
+        SetupFollow(currentUserId, profile.Id);
+
+        var result = await _service.GetByIdAsync(profile.Id, currentUserId: currentUserId);
+
+        Assert.NotNull(result);
+        Assert.Equal(profile.DateOfBirth, result.BirthDate);
+        await _followRepository.DidNotReceive().GetByFollowerAndFollowingAsync(
+            profile.Id,
+            currentUserId,
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_WhenVisibilityIsMutualAndOnlyViewerFollows_HidesBirthDate()
+    {
+        var currentUserId = Guid.NewGuid();
+        var profile = CreateProfileWithBirthDate(VisibilityLevel.Mutual, VisibilityLevel.Mutual);
+        SetupProfile(profile);
+        SetupFollow(currentUserId, profile.Id);
+
+        var result = await _service.GetByIdAsync(profile.Id, currentUserId: currentUserId);
+
+        Assert.NotNull(result);
+        Assert.Null(result.BirthDate);
+        await _followRepository.Received(1).GetByFollowerAndFollowingAsync(
+            profile.Id,
+            currentUserId,
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_WhenFollowIsMutual_ShowsMutualBirthDate()
+    {
+        var currentUserId = Guid.NewGuid();
+        var profile = CreateProfileWithBirthDate(VisibilityLevel.Mutual, VisibilityLevel.Mutual);
+        SetupProfile(profile);
+        SetupFollow(currentUserId, profile.Id);
+        SetupFollow(profile.Id, currentUserId);
+
+        var result = await _service.GetByIdAsync(profile.Id, currentUserId: currentUserId);
+
+        Assert.NotNull(result);
+        Assert.Equal(profile.DateOfBirth, result.BirthDate);
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_WhenViewerIsOwner_ShowsOnlyMeBirthDate()
+    {
+        var profile = CreateProfileWithBirthDate(VisibilityLevel.OnlyMe, VisibilityLevel.OnlyMe);
+        SetupProfile(profile);
+
+        var result = await _service.GetByIdAsync(profile.Id, currentUserId: profile.Id);
+
+        Assert.NotNull(result);
+        Assert.Equal(profile.DateOfBirth, result.BirthDate);
+        await _followRepository.DidNotReceive().GetByFollowerAndFollowingAsync(
+            Arg.Any<Guid>(),
+            Arg.Any<Guid>(),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -216,6 +383,38 @@ public class UserQueryServiceTests
         await _userRepository.Received(1).GetIdByUsernameAsync(
             "missing",
             Arg.Any<CancellationToken>());
+    }
+
+    private void SetupProfile(UserProfileReadModel profile)
+    {
+        _userRepository
+            .GetProfileByIdAsync(profile.Id, Arg.Any<CancellationToken>())
+            .Returns(profile);
+    }
+
+    private void SetupFollow(Guid followerId, Guid followingId)
+    {
+        _followRepository
+            .GetByFollowerAndFollowingAsync(
+                followerId,
+                followingId,
+                Arg.Any<CancellationToken>())
+            .Returns(new Follow { FollowerId = followerId, FollowingId = followingId });
+    }
+
+    private static UserProfileReadModel CreateProfileWithBirthDate(
+        VisibilityLevel dateVisibility,
+        VisibilityLevel yearVisibility)
+    {
+        return new UserProfileReadModel
+        {
+            Id = Guid.NewGuid(),
+            Username = "testuser",
+            DateOfBirth = new DateOnly(2000, 1, 2),
+            BirthDateVisibility = dateVisibility,
+            BirthYearVisibility = yearVisibility,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
     }
 
     private static UserSummaryReadModel CreateSummary(string username)

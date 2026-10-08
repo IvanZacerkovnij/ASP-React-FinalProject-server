@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Threads.Application.DTOs.Comments;
 using Threads.Application.DTOs.Pagination;
+using Threads.Application.DTOs.Posts.Models;
 using Threads.Application.DTOs.Users;
+using Threads.Application.Exceptions;
 using Threads.Application.Interfaces.Comments;
 using Threads.Domain.Entities;
 
@@ -14,6 +16,33 @@ public class CommentRepository : ICommentRepository
     public CommentRepository(ThreadsDbContext dbContext)
     {
         _dbContext = dbContext;
+    }
+
+    public async Task<IReadOnlyCollection<CommentSummaryReadModel>> GetByAuthorIdAsync(
+        Guid authorId,
+        int limit,
+        CursorPosition? cursor = null,
+        Guid? currentUserId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _dbContext.Comments
+            .AsNoTracking()
+            .Where(comment => comment.AuthorId == authorId);
+
+        if (cursor is not null)
+        {
+            query = query.Where(comment => EF.Functions.LessThan(
+                ValueTuple.Create(comment.CreatedAt, comment.Id),
+                ValueTuple.Create(cursor.CreatedAt, cursor.Id)));
+        }
+
+        var pageQuery = query
+            .OrderByDescending(comment => comment.CreatedAt)
+            .ThenByDescending(comment => comment.Id)
+            .Take(limit + 1);
+
+        return await ProjectToSummaryReadModel(pageQuery, currentUserId)
+            .ToListAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyCollection<CommentSummaryReadModel>> GetByPostIdAsync(
@@ -43,11 +72,144 @@ public class CommentRepository : ICommentRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyCollection<CommentSummaryReadModel>> GetAncestorsAsync(
+        Guid commentId,
+        Guid? currentUserId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var ancestorIds = await _dbContext.Database.SqlQuery<Guid>(
+                $"""
+                WITH RECURSIVE "Ancestors" AS
+                (
+                    SELECT parent."Id", parent."ParentCommentId", 1 AS "Depth"
+                    FROM "Comments" AS target
+                    INNER JOIN "Comments" AS parent
+                        ON parent."Id" = target."ParentCommentId"
+                    WHERE target."Id" = {commentId}
+
+                    UNION ALL
+
+                    SELECT parent."Id", parent."ParentCommentId", ancestor."Depth" + 1
+                    FROM "Ancestors" AS ancestor
+                    INNER JOIN "Comments" AS parent
+                        ON parent."Id" = ancestor."ParentCommentId"
+                )
+                SELECT "Id" AS "Value"
+                FROM "Ancestors"
+                ORDER BY "Depth" DESC
+                """)
+            .ToListAsync(cancellationToken);
+
+        return await GetSummariesByIdsAsync(ancestorIds, currentUserId, cancellationToken);
+    }
+
+    public async Task<IReadOnlyCollection<CommentSummaryReadModel>> GetRepliesAsync(
+        Guid parentCommentId,
+        int limit,
+        CursorPosition? cursor = null,
+        Guid? currentUserId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _dbContext.Comments
+            .AsNoTracking()
+            .Where(comment => comment.ParentCommentId == parentCommentId);
+
+        if (cursor is not null)
+        {
+            query = query.Where(comment => EF.Functions.GreaterThan(
+                ValueTuple.Create(comment.CreatedAt, comment.Id),
+                ValueTuple.Create(cursor.CreatedAt, cursor.Id)));
+        }
+
+        var pageQuery = query
+            .OrderBy(comment => comment.CreatedAt)
+            .ThenBy(comment => comment.Id)
+            .Take(limit + 1);
+
+        return await ProjectToSummaryReadModel(pageQuery, currentUserId)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyCollection<CommentSummaryReadModel>> GetSummariesByIdsAsync(
+        IReadOnlyCollection<Guid> ids,
+        Guid? currentUserId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var distinctIds = ids.Distinct().ToArray();
+
+        if (distinctIds.Length == 0)
+        {
+            return [];
+        }
+
+        var comments = await ProjectToSummaryReadModel(
+                _dbContext.Comments
+                    .AsNoTracking()
+                    .Where(comment => distinctIds.Contains(comment.Id)),
+                currentUserId)
+            .ToListAsync(cancellationToken);
+        var commentOrder = distinctIds
+            .Select((id, index) => new { id, index })
+            .ToDictionary(item => item.id, item => item.index);
+
+        return comments
+            .OrderBy(comment => commentOrder[comment.Id])
+            .ToList();
+    }
+
+    public async Task<IReadOnlyCollection<CommentVersion>> GetVersionsAsync(
+        Guid commentId,
+        int limit,
+        CursorPosition? cursor = null,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _dbContext.CommentVersions
+            .AsNoTracking()
+            .Where(version => version.CommentId == commentId);
+
+        if (cursor is not null)
+        {
+            query = query.Where(version => EF.Functions.GreaterThan(
+                ValueTuple.Create(version.CreatedAt, version.Id),
+                ValueTuple.Create(cursor.CreatedAt, cursor.Id)));
+        }
+
+        return await query
+            .OrderBy(version => version.CreatedAt)
+            .ThenBy(version => version.Id)
+            .Take(limit + 1)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyCollection<CommentVersion>> GetVersionsByIdsAsync(
+        IReadOnlyCollection<Guid> versionIds,
+        CancellationToken cancellationToken = default)
+    {
+        var distinctIds = versionIds.Distinct().ToArray();
+
+        if (distinctIds.Length == 0)
+        {
+            return [];
+        }
+
+        return await _dbContext.CommentVersions
+            .AsNoTracking()
+            .Where(version => distinctIds.Contains(version.Id))
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<Comment?> GetByIdAsync(
         Guid id,
         CancellationToken cancellationToken = default)
     {
         return await _dbContext.Comments
+            .AsSplitQuery()
+            .Include(comment => comment.Media)
+            .Include(comment => comment.Poll)
+                .ThenInclude(poll => poll!.Options)
+                    .ThenInclude(option => option.Votes)
+            .Include(comment => comment.Poll)
+                .ThenInclude(poll => poll!.Votes)
             .FirstOrDefaultAsync(comment => comment.Id == id, cancellationToken);
     }
 
@@ -80,6 +242,15 @@ public class CommentRepository : ICommentRepository
         return _dbContext.Comments
             .AsNoTracking()
             .AnyAsync(comment => comment.Id == id, cancellationToken);
+    }
+    public Task<bool> VersionExistsAsync(Guid commentId, Guid versionId, CancellationToken cancellationToken = default)
+    {
+        return _dbContext.CommentVersions
+            .AsNoTracking()
+            .AnyAsync(
+                version => version.CommentId == commentId &&
+                           version.Id == versionId,
+                cancellationToken);
     }
 
     public async Task<IReadOnlyCollection<CommentSummaryReadModel>> GetBookmarkedByUserIdAsync(
@@ -220,17 +391,24 @@ public class CommentRepository : ICommentRepository
         var hasCurrentUser = currentUserId.HasValue;
         var effectiveCurrentUserId = currentUserId ?? Guid.Empty;
 
-        return query.Select(comment => new CommentSummaryReadModel
-        {
+        return query
+            .AsSplitQuery()
+            .Select(comment => new CommentSummaryReadModel
+            {
             Id = comment.Id,
+            VersionId = comment.CurrentVersionId,
             PostId = comment.PostId,
             ParentCommentId = comment.ParentCommentId,
             Content = comment.Content,
+            LinkPreviewUrl = comment.LinkPreviewUrl,
+            LinkPreviewTitle = comment.LinkPreviewTitle,
+            LinkPreviewImageUrl = comment.LinkPreviewImageUrl,
             Author = new UserSummaryReadModel
             {
                 Id = comment.Author.Id,
                 Username = comment.Author.Username,
                 DisplayName = comment.Author.DisplayName,
+                Bio = comment.Author.Bio,
                 LocationPlaceId = comment.Author.LocationPlaceId,
                 LocationName = comment.Author.Location,
                 LocationCountry = comment.Author.LocationCountry,
@@ -239,6 +417,52 @@ public class CommentRepository : ICommentRepository
                 AvatarObjectKey = comment.Author.AvatarObjectKey,
                 IsVerified = comment.Author.IsVerified
             },
+            Media = comment.Media
+                .OrderBy(media => media.SortOrder)
+                .Select(media => new PostMediaReadModel
+                {
+                    Id = media.Id,
+                    StorageKey = media.StorageKey,
+                    ThumbnailStorageKey = media.ThumbnailStorageKey,
+                    FileName = media.FileName,
+                    ContentType = media.ContentType,
+                    Type = media.Type,
+                    SizeInBytes = media.SizeInBytes,
+                    Width = media.Width,
+                    Height = media.Height,
+                    DurationSeconds = media.DurationSeconds,
+                    SortOrder = media.SortOrder
+                })
+                .ToList(),
+            Poll = comment.Poll == null
+                ? null
+                : new PostPollSummaryReadModel
+                {
+                    Id = comment.Poll.Id,
+                    EndsAt = comment.Poll.EndsAt,
+                    TotalVotes = comment.Poll.Votes.Count,
+                    SelectedOptionId = hasCurrentUser
+                        ? comment.Poll.Votes
+                            .Where(vote => vote.UserId == effectiveCurrentUserId)
+                            .Select(vote => (Guid?)vote.PollOptionId)
+                            .FirstOrDefault()
+                        : null,
+                    Options = comment.Poll.Options
+                        .OrderBy(option => option.Position)
+                        .Select(option => new PostPollOptionSummaryReadModel
+                        {
+                            Id = option.Id,
+                            Text = option.Text,
+                            Position = option.Position,
+                            VotesCount = option.Votes.Count
+                        })
+                        .ToList()
+                },
+            LocationPlaceId = comment.LocationPlaceId,
+            LocationName = comment.LocationName,
+            LocationCountry = comment.LocationCountry,
+            LocationLatitude = comment.LocationLatitude,
+            LocationLongitude = comment.LocationLongitude,
             LikesCount = comment.CommentLikes.Count,
             IsLikedByCurrentUser = hasCurrentUser &&
                 comment.CommentLikes.Any(like => like.UserId == effectiveCurrentUserId),
@@ -250,14 +474,19 @@ public class CommentRepository : ICommentRepository
                 comment.CommentReposts.Any(repost => repost.UserId == effectiveCurrentUserId),
             ViewsCount = comment.CommentViews.Count,
             CreatedAt = comment.CreatedAt,
-            UpdatedAt = comment.UpdatedAt
-        });
+                UpdatedAt = comment.UpdatedAt
+            });
     }
 
     public async Task AddAsync(Comment comment, CancellationToken cancellationToken = default)
     {
         await _dbContext.Comments.AddAsync(comment, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public void RemovePoll(Poll poll)
+    {
+        _dbContext.Polls.Remove(poll);
     }
 
     public async Task<int?> RecordViewAsync(
@@ -295,7 +524,14 @@ public class CommentRepository : ICommentRepository
             _dbContext.Comments.Update(comment);
         }
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new ConflictException("One or more media items were modified by another request.");
+        }
     }
 
     public async Task DeleteAsync(Comment comment, CancellationToken cancellationToken = default)
