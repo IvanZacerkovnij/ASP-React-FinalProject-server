@@ -368,4 +368,54 @@ public sealed class CommentRepositoryTests : DatabaseTestBase
         Assert.Equal("Updated content", stored.Content);
         Assert.Equal(updatedAt, stored.UpdatedAt);
     }
+
+    [Fact]
+    public async Task UpdateAsync_WhenMediaConcurrencyTokenIsStaleWithoutOverlap_RetriesUpdate()
+    {
+        var author = TestEntityFactory.CreateUser();
+        var post = TestEntityFactory.CreatePost(author);
+        var comment = TestEntityFactory.CreateComment(author, post, "Original comment");
+        var media = new Media
+        {
+            StorageKey = "media/comment-concurrency.jpg",
+            FileName = "image.jpg",
+            ContentType = "image/jpeg",
+            SizeInBytes = 100,
+            UploadedByUserId = author.Id,
+            UploadedByUser = author,
+            CommentId = comment.Id,
+            Comment = comment
+        };
+        comment.Media.Add(media);
+
+        await using (var seedContext = Fixture.CreateContext())
+        {
+            seedContext.AddRange(author, post, comment);
+            await seedContext.SaveChangesAsync();
+        }
+
+        await using var staleContext = Fixture.CreateContext();
+        var staleRepository = new CommentRepository(staleContext);
+        var staleComment = await staleRepository.GetByIdAsync(comment.Id);
+        Assert.NotNull(staleComment);
+        var staleMedia = Assert.Single(staleComment.Media);
+
+        await using (var concurrentContext = Fixture.CreateContext())
+        {
+            var concurrentMedia = await concurrentContext.Medias.SingleAsync(item => item.Id == media.Id);
+            concurrentMedia.UpdatedAt = DateTimeOffset.UtcNow;
+            await concurrentContext.SaveChangesAsync();
+        }
+
+        staleComment.Content = "Updated comment";
+        staleMedia.SortOrder = 1;
+        await staleRepository.UpdateAsync(staleComment);
+
+        await using var verificationContext = Fixture.CreateContext();
+        var storedComment = await verificationContext.Comments.AsNoTracking().SingleAsync(item => item.Id == comment.Id);
+        var storedMedia = await verificationContext.Medias.AsNoTracking().SingleAsync(item => item.Id == media.Id);
+        Assert.Equal("Updated comment", storedComment.Content);
+        Assert.Equal(1, storedMedia.SortOrder);
+        Assert.NotNull(storedMedia.UpdatedAt);
+    }
 }

@@ -645,15 +645,10 @@ public class PostRepository : IPostRepository
     public async Task AddAsync(Post post, CancellationToken cancellationToken = default)
     {
         await _dbContext.Posts.AddAsync(post, cancellationToken);
-
-        try
-        {
-            await _dbContext.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            throw new ConflictException("One or more media items were modified by another request.");
-        }
+        await ConcurrencySaveChanges.SaveAsync(
+            _dbContext,
+            "post",
+            cancellationToken);
     }
 
     public async Task UpdateAsync(Post post, CancellationToken cancellationToken = default)
@@ -663,14 +658,19 @@ public class PostRepository : IPostRepository
             _dbContext.Posts.Update(post);
         }
 
-        try
+        var currentVersion = post.Versions.SingleOrDefault(version =>
+            version.Id == post.CurrentVersionId);
+
+        if (currentVersion is not null &&
+            _dbContext.Entry(currentVersion).State != EntityState.Added)
         {
-            await _dbContext.SaveChangesAsync(cancellationToken);
+            await _dbContext.PostVersions.AddAsync(currentVersion, cancellationToken);
         }
-        catch (DbUpdateConcurrencyException)
-        {
-            throw new ConflictException("One or more media items were modified by another request.");
-        }
+
+        await ConcurrencySaveChanges.SaveAsync(
+            _dbContext,
+            "post",
+            cancellationToken);
     }
 
     public async Task DeleteAsync(Post post, CancellationToken cancellationToken = default)

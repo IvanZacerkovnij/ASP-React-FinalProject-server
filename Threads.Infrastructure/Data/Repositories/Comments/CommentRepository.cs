@@ -524,14 +524,19 @@ public class CommentRepository : ICommentRepository
             _dbContext.Comments.Update(comment);
         }
 
-        try
+        var currentVersion = comment.Versions.SingleOrDefault(version =>
+            version.Id == comment.CurrentVersionId);
+
+        if (currentVersion is not null &&
+            _dbContext.Entry(currentVersion).State != EntityState.Added)
         {
-            await _dbContext.SaveChangesAsync(cancellationToken);
+            await _dbContext.CommentVersions.AddAsync(currentVersion, cancellationToken);
         }
-        catch (DbUpdateConcurrencyException)
-        {
-            throw new ConflictException("One or more media items were modified by another request.");
-        }
+
+        await ConcurrencySaveChanges.SaveAsync(
+            _dbContext,
+            "comment",
+            cancellationToken);
     }
 
     public async Task DeleteAsync(Comment comment, CancellationToken cancellationToken = default)

@@ -218,6 +218,40 @@ public sealed class PostRepositoryTests : DatabaseTestBase
     }
 
     [Fact]
+    public async Task UpdateAsync_WhenMediaConcurrencyTokenIsStaleWithoutOverlap_RetriesUpdate()
+    {
+        var author = TestEntityFactory.CreateUser();
+        var post = TestEntityFactory.CreatePost(author, "Original content");
+        var media = TestEntityFactory.CreatePostMedia(author, post, "media/post-concurrency.jpg");
+        post.Media.Add(media);
+        await SeedAsync(author, post);
+
+        await using var staleContext = Fixture.CreateContext();
+        var staleRepository = new PostRepository(staleContext);
+        var stalePost = await staleRepository.GetByIdAsync(post.Id);
+        Assert.NotNull(stalePost);
+        var staleMedia = Assert.Single(stalePost.Media);
+
+        await using (var concurrentContext = Fixture.CreateContext())
+        {
+            var concurrentMedia = await concurrentContext.Medias.SingleAsync(item => item.Id == media.Id);
+            concurrentMedia.UpdatedAt = DateTimeOffset.UtcNow;
+            await concurrentContext.SaveChangesAsync();
+        }
+
+        stalePost.Content = "Updated content";
+        staleMedia.SortOrder = 1;
+        await staleRepository.UpdateAsync(stalePost);
+
+        await using var verificationContext = Fixture.CreateContext();
+        var storedPost = await verificationContext.Posts.AsNoTracking().SingleAsync(item => item.Id == post.Id);
+        var storedMedia = await verificationContext.Medias.AsNoTracking().SingleAsync(item => item.Id == media.Id);
+        Assert.Equal("Updated content", storedPost.Content);
+        Assert.Equal(1, storedMedia.SortOrder);
+        Assert.NotNull(storedMedia.UpdatedAt);
+    }
+
+    [Fact]
     public async Task RecordViewAsync_WhenCalledConcurrently_IsIdempotent()
     {
         var author = TestEntityFactory.CreateUser();
