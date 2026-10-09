@@ -839,6 +839,12 @@ namespace Threads.Infrastructure.Migrations
                 columns: new[] { "AuthorId", "CreatedAt", "Id" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_Posts_CreatedAt_Id",
+                table: "Posts",
+                columns: new[] { "CreatedAt", "Id" },
+                filter: "\"DeletedAt\" IS NULL");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Posts_CurrentVersionId",
                 table: "Posts",
                 column: "CurrentVersionId",

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Threads.Application.Exceptions;
 using Threads.Application.Interfaces.Media;
+using Threads.Application.Services.Common;
 using Threads.Domain.Entities;
 using MediaEntity = Threads.Domain.Entities.Media;
 
@@ -28,6 +29,8 @@ public sealed class CommentMediaManager
         IReadOnlyCollection<Guid> mediaIds,
         CancellationToken cancellationToken = default)
     {
+        MediaAttachmentPolicy.ValidateCount(mediaIds);
+
         var distinctMediaIds = mediaIds.Distinct().ToArray();
 
         if (distinctMediaIds.Length != mediaIds.Count)

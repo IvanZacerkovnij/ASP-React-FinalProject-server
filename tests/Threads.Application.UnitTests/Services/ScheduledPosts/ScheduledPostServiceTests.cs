@@ -121,6 +121,7 @@ public sealed class ScheduledPostServiceTests
             {
                 Content = " updated ",
                 LinkPreview = null,
+                HasLinkPreviewValue = true,
                 ScheduledAt = newScheduledAt
             });
 

@@ -1,15 +1,16 @@
 using System.ComponentModel.DataAnnotations;
 using Threads.Application.DTOs.LinkPreviews;
 using Threads.Application.DTOs.Validation;
+using Threads.Application.Services.Common;
 
 namespace Threads.Application.DTOs.ScheduledPosts;
 
 public sealed class CreateScheduledPostRequest
 {
-    [StringLength(2000, MinimumLength = 1)]
+    [StringLength(PostContentPolicy.MaximumLength, MinimumLength = PostContentPolicy.MinimumLength)]
     public string? Content { get; init; }
 
-    [Required, MaxLength(20), UniqueNotEmptyGuids]
+    [Required, MaxLength(MediaAttachmentPolicy.MaximumCount), UniqueNotEmptyGuids]
     public IReadOnlyCollection<Guid> MediaIds { get; init; } = [];
 
     public LinkPreviewRequest? LinkPreview { get; init; }

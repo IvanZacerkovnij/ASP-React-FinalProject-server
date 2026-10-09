@@ -65,12 +65,12 @@ public class PostInputMapperTests
     [Fact]
     public void Create_WhenContentExceedsLimit_ThrowsRequestValidationException()
     {
-        var request = new CreatePostRequest { Content = new string('x', 2001) };
+        var request = new CreatePostRequest { Content = new string('x', 301) };
 
         var exception = Assert.Throws<RequestValidationException>(() =>
             PostInputMapper.Create(Guid.NewGuid(), request));
 
-        Assert.Equal("Post content must be 2000 characters or less.", exception.Message);
+        Assert.Equal("Post content must be 300 characters or less.", exception.Message);
     }
 
     [Fact]

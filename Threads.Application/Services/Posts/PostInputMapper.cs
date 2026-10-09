@@ -8,7 +8,6 @@ namespace Threads.Application.Services.Posts;
 
 internal static class PostInputMapper
 {
-    private const int MaxContentLength = 2000;
     private const int MaxLocationNameLength = 255;
     private const int MaxLocationCountryLength = 255;
     private const int MaxLocationIdLength = 1024;
@@ -133,7 +132,7 @@ internal static class PostInputMapper
     {
         return InputNormalizer.NormalizeOptional(
             content,
-            MaxContentLength,
+            PostContentPolicy.MaximumLength,
             "Post content");
     }
 

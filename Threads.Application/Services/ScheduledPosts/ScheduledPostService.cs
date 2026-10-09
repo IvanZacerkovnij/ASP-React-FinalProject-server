@@ -85,15 +85,17 @@ public sealed class ScheduledPostService : IScheduledPostService
     {
         RequestValidator.Validate(request);
         var scheduledPost = await GetOwnedAsync(id, currentUserId, cancellationToken);
-        var content = request.HasContentValue ? request.Content : scheduledPost.Content;
+        var content = request.HasContentValue || request.Content is not null
+            ? request.Content
+            : scheduledPost.Content;
         var mediaIds = request.MediaIds ?? scheduledPost.Media
             .OrderBy(media => media.SortOrder)
             .Select(media => media.Id)
             .ToArray();
-        var linkPreview = request.HasLinkPreviewValue
+        var linkPreview = request.HasLinkPreviewValue || request.LinkPreview is not null
             ? request.LinkPreview
             : CreateLinkPreviewRequest(scheduledPost);
-        var scheduledAt = request.HasScheduledAtValue
+        var scheduledAt = request.HasScheduledAtValue || request.ScheduledAt.HasValue
             ? request.ScheduledAt ?? throw new RequestValidationException("Scheduled time is required.")
             : scheduledPost.ScheduledAt;
         var normalizedPost = CreateNormalizedPost(

@@ -565,10 +565,10 @@ namespace Threads.Infrastructure.Migrations
 
                     NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("SearchVector"), "gin");
 
-                    b.HasIndex("AuthorId", "CreatedAt", "Id");
-
                     b.HasIndex("CreatedAt", "Id")
                         .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.HasIndex("AuthorId", "CreatedAt", "Id");
 
                     b.ToTable("Posts", (string)null);
                 });

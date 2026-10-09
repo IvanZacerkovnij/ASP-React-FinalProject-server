@@ -2,15 +2,16 @@ using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using Threads.Application.DTOs.LinkPreviews;
 using Threads.Application.DTOs.Validation;
+using Threads.Application.Services.Common;
 
 namespace Threads.Application.DTOs.Posts.Requests;
 
 public class UpdatePostRequest
 {
-    [StringLength(300, MinimumLength = 1)]
+    [StringLength(PostContentPolicy.MaximumLength, MinimumLength = PostContentPolicy.MinimumLength)]
     public string? Content { get; init; }
 
-    [UniqueNotEmptyGuids]
+    [MaxLength(MediaAttachmentPolicy.MaximumCount), UniqueNotEmptyGuids]
     public IReadOnlyCollection<Guid>? MediaIds { get; init; }
 
     [DefaultValue(false)]

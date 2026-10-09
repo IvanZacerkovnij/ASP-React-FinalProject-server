@@ -2,58 +2,30 @@ using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 using Threads.Application.DTOs.LinkPreviews;
 using Threads.Application.DTOs.Validation;
+using Threads.Application.Services.Common;
 
 namespace Threads.Application.DTOs.ScheduledPosts;
 
+[JsonConverter(typeof(UpdateScheduledPostRequestConverter))]
 public sealed class UpdateScheduledPostRequest
 {
-    private string? _content;
-
-    [StringLength(2000, MinimumLength = 1)]
-    public string? Content
-    {
-        get => _content;
-        init
-        {
-            _content = value;
-            HasContentValue = true;
-        }
-    }
+    [StringLength(PostContentPolicy.MaximumLength, MinimumLength = PostContentPolicy.MinimumLength)]
+    public string? Content { get; init; }
 
     [JsonIgnore]
-    public bool HasContentValue { get; private init; }
+    public bool HasContentValue { get; init; }
 
-    [MaxLength(20), UniqueNotEmptyGuids]
+    [MaxLength(MediaAttachmentPolicy.MaximumCount), UniqueNotEmptyGuids]
     public IReadOnlyCollection<Guid>? MediaIds { get; init; }
 
-    private LinkPreviewRequest? _linkPreview;
-
-    public LinkPreviewRequest? LinkPreview
-    {
-        get => _linkPreview;
-        init
-        {
-            _linkPreview = value;
-            HasLinkPreviewValue = true;
-        }
-    }
+    public LinkPreviewRequest? LinkPreview { get; init; }
 
     [JsonIgnore]
-    public bool HasLinkPreviewValue { get; private init; }
-
-    private DateTimeOffset? _scheduledAt;
+    public bool HasLinkPreviewValue { get; init; }
 
     [FutureDateTime]
-    public DateTimeOffset? ScheduledAt
-    {
-        get => _scheduledAt;
-        init
-        {
-            _scheduledAt = value;
-            HasScheduledAtValue = true;
-        }
-    }
+    public DateTimeOffset? ScheduledAt { get; init; }
 
     [JsonIgnore]
-    public bool HasScheduledAtValue { get; private init; }
+    public bool HasScheduledAtValue { get; init; }
 }
