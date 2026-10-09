@@ -85,18 +85,28 @@ public sealed partial class AdministrationRepository
         int limit,
         CancellationToken cancellationToken = default)
     {
-        return await _dbContext.Reports
+        var groups = await _dbContext.Reports
             .AsNoTracking()
             .GroupBy(report => new { report.TargetType, report.TargetId })
-            .Select(group => new ReportGroup(
+            .Select(group => new
+            {
                 group.Key.TargetType,
                 group.Key.TargetId,
-                group.Count(),
-                group.Max(report => report.CreatedAt)))
+                Count = group.Count(),
+                LatestSignal = group.Max(report => report.CreatedAt)
+            })
             .OrderByDescending(group => group.LatestSignal)
             .ThenByDescending(group => group.TargetId)
             .Take(limit)
             .ToListAsync(cancellationToken);
+
+        return groups
+            .Select(group => new ReportGroup(
+                group.TargetType,
+                group.TargetId,
+                group.Count,
+                group.LatestSignal))
+            .ToArray();
     }
 
     private static async Task<IReadOnlyCollection<DailyCount>> GetDailyCountsAsync(
