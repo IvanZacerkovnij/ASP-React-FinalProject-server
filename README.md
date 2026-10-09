@@ -303,7 +303,7 @@ OpenAPI і Swagger UI підключені для всіх середовищ:
 - JWT Bearer використовує `ClaimTypes.Role` для перевірки ролі користувача
 - policy `Admin` дозволяє доступ користувачам із роллю `Admin`
 - усі `/api/admin/*` endpoints захищені атрибутом `[Authorize(Policy = AuthorizationPolicies.Admin)]`
-- `GET /api/me` повертає контрактну роль `USER` або `ADMIN`
+- `GET /api/me` повертає контрактну роль `User` або `Admin`
 - blocked/deleted user не проходить login, refresh і перевірку вже виданого access token
 
 ## Обробка помилок
@@ -533,7 +533,7 @@ Endpoint-и з однаковою named policy використовують сп
 | `POST` | `/api/comments/{id}/report` | Так | Поскаржитися на коментар |
 | `POST` | `/api/users/{id}/report` | Так | Поскаржитися на користувача |
 
-Адміністративні маршрути потребують ролі `ADMIN`:
+Адміністративні маршрути потребують ролі `Admin`:
 
 | Method | Route | Призначення |
 |---|---|---|

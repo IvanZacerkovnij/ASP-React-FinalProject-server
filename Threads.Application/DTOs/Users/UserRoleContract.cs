@@ -4,8 +4,8 @@ namespace Threads.Application.DTOs.Users;
 
 public static class UserRoleContract
 {
-    public const string User = "USER";
-    public const string Admin = "ADMIN";
+    public const string User = nameof(UserRole.User);
+    public const string Admin = nameof(UserRole.Admin);
 
     public static string Serialize(UserRole role)
     {
