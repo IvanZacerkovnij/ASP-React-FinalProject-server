@@ -634,6 +634,8 @@ Scheduled post підтримує текст, media attachments і link preview.
 
 Звичайний post також може містити quote на post або comment із фіксацією конкретного `QuotedTargetVersionId`. Edit history повертає immutable snapshots, тому старі версії не змінюються разом із поточним контентом.
 
+Під час `PUT /api/posts/{id}` поля `"removePoll": true`, `"removeLocation": true` і `"removeLinkPreview": true` видаляють відповідні metadata. Одночасна передача remove-прапорця та нового значення відхиляється з `400 Bad Request`.
+
 Повторний конкурентний vote не створює дублікат: `PollRepository` перехоплює лише PostgreSQL `UniqueViolation` для constraint `IX_PollVotes_PollId_UserId` і повертає сервісу `false`. Інші помилки БД не маскуються як повторне голосування.
 
 ### Comments

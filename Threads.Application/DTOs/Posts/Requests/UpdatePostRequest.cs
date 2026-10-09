@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
-using System.Text.Json.Serialization;
 using Threads.Application.DTOs.LinkPreviews;
 using Threads.Application.DTOs.Validation;
 
@@ -14,6 +13,9 @@ public class UpdatePostRequest
     [UniqueNotEmptyGuids]
     public IReadOnlyCollection<Guid>? MediaIds { get; init; }
 
+    [DefaultValue(false)]
+    public bool RemovePoll { get; init; }
+
     public CreatePostPollRequest? Poll { get; init; }
 
     [DefaultValue(false)]
@@ -21,18 +23,8 @@ public class UpdatePostRequest
 
     public PostLocationRequest? Location { get; init; }
 
-    private LinkPreviewRequest? _linkPreview;
+    [DefaultValue(false)]
+    public bool RemoveLinkPreview { get; init; }
 
-    public LinkPreviewRequest? LinkPreview
-    {
-        get => _linkPreview;
-        init
-        {
-            _linkPreview = value;
-            HasLinkPreviewValue = true;
-        }
-    }
-
-    [JsonIgnore]
-    public bool HasLinkPreviewValue { get; private init; }
+    public LinkPreviewRequest? LinkPreview { get; init; }
 }

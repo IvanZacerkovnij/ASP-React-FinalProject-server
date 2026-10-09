@@ -84,6 +84,7 @@ public interface IPostRepository
         CancellationToken cancellationToken = default);
     Task<int?> RecordViewAsync(Guid id, Guid viewerId, CancellationToken cancellationToken = default);
     Task AddAsync(Post post, CancellationToken cancellationToken = default);
+    void RemovePoll(Poll poll);
     Task UpdateAsync(Post post, CancellationToken cancellationToken = default);
     Task DeleteAsync(Post post, CancellationToken cancellationToken = default);
 }

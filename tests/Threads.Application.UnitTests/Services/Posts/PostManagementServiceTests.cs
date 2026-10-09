@@ -196,6 +196,34 @@ public class PostManagementServiceTests
     }
 
     [Fact]
+    public async Task UpdateAsync_WhenRemovalFlagsAreProvided_ClearsPollLocationAndLinkPreview()
+    {
+        var post = PostServiceTestContext.CreatePost();
+        var poll = new Poll { PostId = post.Id };
+        post.Poll = poll;
+        post.LocationName = "Kyiv";
+        post.EmbedUrl = "https://example.com";
+        _context.PostRepository
+            .GetByIdAsync(post.Id, Arg.Any<CancellationToken>())
+            .Returns(post);
+
+        await _service.UpdateAsync(
+            post.Id,
+            post.AuthorId,
+            new UpdatePostRequest
+            {
+                RemovePoll = true,
+                RemoveLocation = true,
+                RemoveLinkPreview = true
+            });
+
+        Assert.Null(post.Poll);
+        Assert.Null(post.LocationName);
+        Assert.Null(post.EmbedUrl);
+        _context.PostRepository.Received(1).RemovePoll(poll);
+    }
+
+    [Fact]
     public async Task DeleteAsync_WhenPostDoesNotExist_ThrowsNotFoundException()
     {
         await Assert.ThrowsAsync<NotFoundException>(() =>

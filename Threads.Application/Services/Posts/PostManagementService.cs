@@ -98,7 +98,13 @@ public sealed class PostManagementService
                 cancellationToken);
         }
 
-        PostInputMapper.ApplyMetadataChanges(post, request);
+        var removedPoll = PostInputMapper.ApplyMetadataChanges(post, request);
+
+        if (removedPoll is not null)
+        {
+            _postRepository.RemovePoll(removedPoll);
+        }
+
         PostInputMapper.ValidateState(post);
 
         post.CurrentVersionId = Guid.NewGuid();

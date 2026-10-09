@@ -88,6 +88,57 @@ public sealed class PostUpdateEndpointTests : DatabaseTestBase
                 version.CommentId == createdComment.Id));
     }
 
+    [Fact]
+    public async Task UpdatePost_WithRemoveLocation_ClearsLocation()
+    {
+        using var factory = new ThreadsApiFactory(Fixture);
+        using var client = factory.CreateClient();
+        var session = await RegisterAndVerifyAsync(factory, client);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            session.AccessToken);
+
+        var createResponse = await client.PostAsJsonAsync(
+            "/api/posts",
+            new CreatePostRequest
+            {
+                Content = "Post with location",
+                Location = new PostLocationRequest
+                {
+                    Id = "kyiv-id",
+                    Name = "Kyiv",
+                    Country = "Ukraine",
+                    Latitude = 50.45,
+                    Longitude = 30.52
+                }
+            });
+        Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
+        var createdPost = await createResponse.Content.ReadFromJsonAsync<PostResponse>();
+        Assert.NotNull(createdPost);
+        Assert.NotNull(createdPost.Location);
+
+        var updateResponse = await client.PutAsJsonAsync(
+            $"/api/posts/{createdPost.Id}",
+            new UpdatePostRequest { RemoveLocation = true });
+
+        Assert.True(
+            updateResponse.IsSuccessStatusCode,
+            await updateResponse.Content.ReadAsStringAsync());
+        var updatedPost = await updateResponse.Content.ReadFromJsonAsync<PostResponse>();
+        Assert.NotNull(updatedPost);
+        Assert.Null(updatedPost.Location);
+
+        await using var verificationContext = Fixture.CreateContext();
+        var persistedPost = await verificationContext.Posts
+            .AsNoTracking()
+            .SingleAsync(post => post.Id == createdPost.Id);
+        Assert.Null(persistedPost.LocationName);
+        Assert.Null(persistedPost.LocationPlaceId);
+        Assert.Null(persistedPost.LocationCountry);
+        Assert.Null(persistedPost.LocationLatitude);
+        Assert.Null(persistedPost.LocationLongitude);
+    }
+
     private static async Task<AuthResponse> RegisterAndVerifyAsync(
         ThreadsApiFactory factory,
         HttpClient client)

@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Threads.Application.DTOs.LinkPreviews;
 using Threads.Application.DTOs.Posts.Requests;
 using Threads.Application.Exceptions;
 using Threads.Application.Services.LinkPreviews;
@@ -35,24 +34,22 @@ public sealed class LinkPreviewResponseFactoryTests
     }
 
     [Fact]
-    public void UpdatePostRequest_TracksWhetherNullLinkPreviewWasProvided()
+    public void UpdatePostRequest_DeserializesRemovalFlags()
     {
-        var omitted = JsonSerializer.Deserialize<UpdatePostRequest>("{}", WebOptions());
-        var cleared = JsonSerializer.Deserialize<UpdatePostRequest>(
-            "{\"linkPreview\":null}",
-            WebOptions());
-        var provided = JsonSerializer.Deserialize<UpdatePostRequest>(
-            "{\"linkPreview\":{\"url\":\"https://example.com\"}}",
+        var request = JsonSerializer.Deserialize<UpdatePostRequest>(
+            """
+            {
+              "removePoll": true,
+              "removeLocation": true,
+              "removeLinkPreview": true
+            }
+            """,
             WebOptions());
 
-        Assert.NotNull(omitted);
-        Assert.False(omitted.HasLinkPreviewValue);
-        Assert.NotNull(cleared);
-        Assert.True(cleared.HasLinkPreviewValue);
-        Assert.Null(cleared.LinkPreview);
-        Assert.NotNull(provided);
-        Assert.True(provided.HasLinkPreviewValue);
-        Assert.Equal("https://example.com", provided.LinkPreview?.Url);
+        Assert.NotNull(request);
+        Assert.True(request.RemovePoll);
+        Assert.True(request.RemoveLocation);
+        Assert.True(request.RemoveLinkPreview);
     }
 
     private static JsonSerializerOptions WebOptions()

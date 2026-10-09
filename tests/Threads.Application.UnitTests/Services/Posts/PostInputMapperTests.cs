@@ -110,7 +110,7 @@ public class PostInputMapperTests
     }
 
     [Fact]
-    public void ApplyMetadataChanges_WhenNullLinkPreviewIsProvided_ClearsLinkPreview()
+    public void ApplyMetadataChanges_WhenRemovalFlagsAreProvided_ClearsMetadata()
     {
         var post = new Post
         {
@@ -128,8 +128,9 @@ public class PostInputMapperTests
 
         PostInputMapper.ApplyMetadataChanges(post, new UpdatePostRequest
         {
+            RemovePoll = true,
             RemoveLocation = true,
-            LinkPreview = null
+            RemoveLinkPreview = true
         });
 
         Assert.Null(post.LocationName);
@@ -141,6 +142,31 @@ public class PostInputMapperTests
         Assert.Null(post.EmbedTitle);
         Assert.Null(post.EmbedDescription);
         Assert.Null(post.EmbedThumbnailUrl);
+    }
+
+    [Fact]
+    public void ApplyMetadataChanges_WhenRemovalAndValueAreProvided_ThrowsRequestValidationException()
+    {
+        var post = new Post { Content = "content" };
+
+        Assert.Throws<RequestValidationException>(() =>
+            PostInputMapper.ApplyMetadataChanges(post, new UpdatePostRequest
+            {
+                RemoveLocation = true,
+                Location = new PostLocationRequest { Name = "Kyiv" }
+            }));
+        Assert.Throws<RequestValidationException>(() =>
+            PostInputMapper.ApplyMetadataChanges(post, new UpdatePostRequest
+            {
+                RemoveLinkPreview = true,
+                LinkPreview = new LinkPreviewRequest { Url = "https://example.com" }
+            }));
+        Assert.Throws<RequestValidationException>(() =>
+            PostInputMapper.ApplyMetadataChanges(post, new UpdatePostRequest
+            {
+                RemovePoll = true,
+                Poll = new CreatePostPollRequest { Options = ["One", "Two"] }
+            }));
     }
 
     [Fact]

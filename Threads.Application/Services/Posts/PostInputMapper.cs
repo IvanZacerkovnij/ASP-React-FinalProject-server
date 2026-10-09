@@ -40,8 +40,12 @@ internal static class PostInputMapper
         }
     }
 
-    public static void ApplyMetadataChanges(Post post, UpdatePostRequest request)
+    public static Poll? ApplyMetadataChanges(Post post, UpdatePostRequest request)
     {
+        ValidateMetadataChanges(request);
+
+        Poll? removedPoll = null;
+
         if (request.RemoveLocation)
         {
             ClearLocation(post);
@@ -51,19 +55,21 @@ internal static class PostInputMapper
             ApplyLocation(post, request.Location);
         }
 
-        if (request.HasLinkPreviewValue)
+        if (request.RemoveLinkPreview)
         {
-            if (request.LinkPreview is null)
-            {
-                ClearLinkPreview(post);
-            }
-            else
-            {
-                ApplyLinkPreview(post, request.LinkPreview);
-            }
+            ClearLinkPreview(post);
+        }
+        else if (request.LinkPreview is not null)
+        {
+            ApplyLinkPreview(post, request.LinkPreview);
         }
 
-        if (request.Poll is not null)
+        if (request.RemovePoll)
+        {
+            removedPoll = post.Poll;
+            post.Poll = null;
+        }
+        else if (request.Poll is not null)
         {
             if (post.Poll is not null)
             {
@@ -71,6 +77,29 @@ internal static class PostInputMapper
             }
 
             post.Poll = MapPoll(request.Poll);
+        }
+
+        return removedPoll;
+    }
+
+    private static void ValidateMetadataChanges(UpdatePostRequest request)
+    {
+        if (request.RemovePoll && request.Poll is not null)
+        {
+            throw new RequestValidationException(
+                "Poll cannot be provided when poll removal is requested.");
+        }
+
+        if (request.RemoveLocation && request.Location is not null)
+        {
+            throw new RequestValidationException(
+                "Location cannot be provided when location removal is requested.");
+        }
+
+        if (request.RemoveLinkPreview && request.LinkPreview is not null)
+        {
+            throw new RequestValidationException(
+                "Link preview cannot be provided when link preview removal is requested.");
         }
     }
 

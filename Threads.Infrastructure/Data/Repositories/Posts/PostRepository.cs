@@ -651,6 +651,11 @@ public class PostRepository : IPostRepository
             cancellationToken);
     }
 
+    public void RemovePoll(Poll poll)
+    {
+        _dbContext.Polls.Remove(poll);
+    }
+
     public async Task UpdateAsync(Post post, CancellationToken cancellationToken = default)
     {
         if (_dbContext.Entry(post).State == EntityState.Detached)
