@@ -117,9 +117,13 @@ public sealed class PostUpdateEndpointTests : DatabaseTestBase
         Assert.NotNull(createdPost);
         Assert.NotNull(createdPost.Location);
 
-        var updateResponse = await client.PutAsJsonAsync(
+        using var updateContent = new StringContent(
+            """{"removeLocation":true}""",
+            System.Text.Encoding.UTF8,
+            "application/json");
+        var updateResponse = await client.PutAsync(
             $"/api/posts/{createdPost.Id}",
-            new UpdatePostRequest { RemoveLocation = true });
+            updateContent);
 
         Assert.True(
             updateResponse.IsSuccessStatusCode,
@@ -127,6 +131,12 @@ public sealed class PostUpdateEndpointTests : DatabaseTestBase
         var updatedPost = await updateResponse.Content.ReadFromJsonAsync<PostResponse>();
         Assert.NotNull(updatedPost);
         Assert.Null(updatedPost.Location);
+
+        var getResponse = await client.GetAsync($"/api/posts/{createdPost.Id}");
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+        var persistedResponse = await getResponse.Content.ReadFromJsonAsync<PostResponse>();
+        Assert.NotNull(persistedResponse);
+        Assert.Null(persistedResponse.Location);
 
         await using var verificationContext = Fixture.CreateContext();
         var persistedPost = await verificationContext.Posts
