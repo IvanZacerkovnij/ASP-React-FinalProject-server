@@ -481,6 +481,9 @@ Endpoint-и з однаковою named policy використовують сп
 | `Avatar` / `Banner` | `File` | Зображення до `10 MB` |
 | `RemoveAvatar` / `RemoveBanner` | `bool` | Видалити avatar / banner |
 
+У `multipart/form-data` локація передається окремими form-полями `Location.Name`,
+`Location.Id`, `Location.Country`, `Location.Latitude` і `Location.Longitude`.
+
 #### Видимість дати народження
 
 `VisibilityLevel` передається і повертається рядком у snake_case:

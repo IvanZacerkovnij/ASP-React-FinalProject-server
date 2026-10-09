@@ -66,6 +66,40 @@ public sealed class ProfileEndpointsTests : DatabaseTestBase
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    [Fact]
+    public async Task UpdateMe_WithLocationFormFields_PersistsLocation()
+    {
+        using var factory = new ThreadsApiFactory(Fixture);
+        using var client = factory.CreateClient();
+        var session = await RegisterAndVerifyAsync(factory, client);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            session.AccessToken);
+        using var form = new MultipartFormDataContent
+        {
+            { new StringContent("lviv-id"), "Location.Id" },
+            { new StringContent("Lviv"), "Location.Name" },
+            { new StringContent("Ukraine"), "Location.Country" },
+            { new StringContent("49"), "Location.Latitude" },
+            { new StringContent("24"), "Location.Longitude" }
+        };
+
+        var updateResponse = await client.PutAsync("/api/me", form);
+
+        Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
+        var updated = await ReadJsonAsync(updateResponse);
+        var location = updated.GetProperty("location");
+        Assert.Equal("lviv-id", location.GetProperty("id").GetString());
+        Assert.Equal("Lviv", location.GetProperty("name").GetString());
+        Assert.Equal("Ukraine", location.GetProperty("country").GetString());
+        Assert.Equal(49, location.GetProperty("latitude").GetDouble());
+        Assert.Equal(24, location.GetProperty("longitude").GetDouble());
+
+        var meResponse = await client.GetAsync("/api/me");
+        var me = await ReadJsonAsync(meResponse);
+        Assert.Equal("Lviv", me.GetProperty("location").GetProperty("name").GetString());
+    }
+
     private static MultipartFormDataContent CreateProfileForm(
         string birthDateVisibility,
         string birthYearVisibility)
