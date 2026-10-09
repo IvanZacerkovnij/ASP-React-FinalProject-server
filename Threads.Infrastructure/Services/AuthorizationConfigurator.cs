@@ -10,6 +10,6 @@ public static class AuthorizationConfigurator
     {
         options.AddPolicy(
             AuthorizationPolicies.Admin,
-            policy => policy.RequireRole(nameof(UserRole.Admin).ToLower()));
+            policy => policy.RequireRole(nameof(UserRole.Admin).ToUpper()));
     }
 }
