@@ -7,6 +7,7 @@ using Threads.Application.DTOs.Users;
 using Threads.Application.Interfaces.Comments;
 using Threads.Application.Interfaces.Media;
 using Threads.Application.Interfaces.Posts;
+using Threads.Application.Interfaces.Recommendations;
 using Threads.Application.Interfaces.Users;
 using Threads.Application.Services.Posts;
 using Threads.Application.Services.Comments;
@@ -54,10 +55,13 @@ internal sealed class PostServiceTestContext
             ResponseFactory,
             commentQueryService,
             Cache,
-            Substitute.For<ILogger<PostQueryService>>());
+            Substitute.For<ILogger<PostQueryService>>(),
+            RecommendationService);
     }
 
     public IPostRepository PostRepository { get; } = Substitute.For<IPostRepository>();
+
+    public IRecommendationService RecommendationService { get; } = Substitute.For<IRecommendationService>();
 
     public ICommentRepository CommentRepository { get; } = Substitute.For<ICommentRepository>();
 

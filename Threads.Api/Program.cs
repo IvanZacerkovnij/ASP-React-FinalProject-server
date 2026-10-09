@@ -14,6 +14,7 @@ using Threads.Application.Interfaces.Locations;
 using Threads.Application.Interfaces.Polls;
 using Threads.Application.Interfaces.Posts;
 using Threads.Application.Interfaces.Reposts;
+using Threads.Application.Interfaces.Recommendations;
 using Threads.Application.Interfaces.ScheduledPosts;
 using Threads.Application.Interfaces.Security;
 using Threads.Application.Interfaces.Users;
@@ -21,6 +22,7 @@ using Threads.Application.Interfaces.Likes;
 using Threads.Application.Interfaces.LinkPreviews;
 using Threads.Application.Interfaces.Versions;
 using Threads.Application.Mapping;
+using Threads.Application.Recommendations;
 using Threads.Application.Services.Auth;
 using Threads.Application.Services.Admin;
 using Threads.Application.Services.Comments;
@@ -28,6 +30,7 @@ using Threads.Application.Services.Follows;
 using Threads.Application.Services.Interactions;
 using Threads.Application.Services.Media;
 using Threads.Application.Services.Posts;
+using Threads.Application.Services.Recommendations;
 using Threads.Application.Services.ScheduledPosts;
 using Threads.Application.Services.Users;
 using Threads.Application.Services.Versions;
@@ -42,6 +45,7 @@ using Threads.Infrastructure.Data.Repositories.Media;
 using Threads.Infrastructure.Data.Repositories.PendingRegistrations;
 using Threads.Infrastructure.Data.Repositories.Polls;
 using Threads.Infrastructure.Data.Repositories.Posts;
+using Threads.Infrastructure.Data.Repositories.Recommendations;
 using Threads.Infrastructure.Data.Repositories.Reposts;
 using Threads.Infrastructure.Data.Repositories.ScheduledPosts;
 using Threads.Infrastructure.Data.Repositories.RefreshTokens;
@@ -56,6 +60,7 @@ public class Program
 {
     private static void AddRepositories(WebApplicationBuilder builder)
     {
+        builder.Services.AddScoped<IRecommendationRepository, RecommendationRepository>();
         builder.Services.AddScoped<IUserRepository, UserRepository>();
         builder.Services.AddScoped<IAdministrationRepository, AdministrationRepository>();
         builder.Services.AddScoped<IPostRepository, PostRepository>();
@@ -83,6 +88,15 @@ public class Program
 
     private static void AddServices(WebApplicationBuilder builder)
     {
+        builder.Services.AddDataProtection();
+        builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddOptions<RecommendationOptions>()
+            .Bind(builder.Configuration.GetSection("Recommendations"))
+            .ValidateDataAnnotations()
+            .Validate(options => options.HasValidWeights(), "View weight must be weaker than explicit signals and ResultLimit must not exceed CandidateLimit.")
+            .ValidateOnStart();
+        builder.Services.AddScoped<IRecommendationService, RecommendationService>();
+        builder.Services.AddSingleton<IRecommendationCursorProtector, RecommendationCursorProtector>();
         builder.Services.AddScoped<UserQueryService>();
         builder.Services.AddScoped<IAdministrationService, AdministrationService>();
         builder.Services.AddScoped<UserProfileService>();

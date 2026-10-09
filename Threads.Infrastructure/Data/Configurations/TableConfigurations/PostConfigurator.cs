@@ -49,6 +49,8 @@ public class PostConfigurator : IEntityTypeConfiguration<Post>
         builder.HasIndex(post => post.DeletedAt);
 
         builder.HasIndex(post => new { post.AuthorId, post.CreatedAt, post.Id });
+        builder.HasIndex(post => new { post.CreatedAt, post.Id })
+            .HasFilter("\"DeletedAt\" IS NULL");
 
         builder.Property<NpgsqlTsVector>(PostgresSearch.VectorProperty)
             .IsGeneratedTsVectorColumn(

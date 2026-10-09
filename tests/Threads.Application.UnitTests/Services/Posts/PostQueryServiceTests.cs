@@ -15,7 +15,7 @@ public class PostQueryServiceTests
     private readonly PostServiceTestContext _context = new();
 
     [Fact]
-    public async Task GetFeedAsync_RequestsTenPostsAndMapsResponses()
+    public async Task GetFeedAsync_RequestsTenRecommendedPostsAndPassesViewerAndCancellation()
     {
         var currentUserId = Guid.NewGuid();
         var posts = new[]
@@ -25,17 +25,18 @@ public class PostQueryServiceTests
         };
         using var cancellationTokenSource = new CancellationTokenSource();
         var cancellationToken = cancellationTokenSource.Token;
-        _context.PostRepository
-            .GetRandomAsync(10, currentUserId, cancellationToken)
-            .Returns(posts);
+        _context.RecommendationService
+            .GetFeedAsync(currentUserId, 10, cancellationToken)
+            .Returns(posts.Select(_context.ResponseFactory.Create).ToArray());
 
         var result = await _context.QueryService.GetFeedAsync(cancellationToken, currentUserId);
 
         Assert.Equal(posts.Select(post => post.Id), result.Select(post => post.Id));
+        await _context.RecommendationService.Received(1).GetFeedAsync(currentUserId, 10, cancellationToken);
     }
 
     [Fact]
-    public async Task GetFeedAsync_WhenPostQuotesComment_ReturnsCurrentCommentAndVersionState()
+    public async Task GetByAuthorIdAsync_WhenPostQuotesComment_ReturnsCurrentCommentAndVersionState()
     {
         var capturedVersionId = Guid.NewGuid();
         var currentVersionId = Guid.NewGuid();
@@ -67,13 +68,13 @@ public class PostQueryServiceTests
             }
         };
         _context.PostRepository
-            .GetRandomAsync(10, null, Arg.Any<CancellationToken>())
+            .GetByAuthorIdAsync(source.Author.Id, 20, null, null, Arg.Any<CancellationToken>())
             .Returns([source]);
         _context.CommentRepository
             .GetSummaryByIdAsync(comment.Id, null, Arg.Any<CancellationToken>())
             .Returns(comment);
 
-        var result = Assert.Single(await _context.QueryService.GetFeedAsync());
+        var result = Assert.Single((await _context.QueryService.GetByAuthorIdAsync(source.Author.Id, new CursorPageRequest())).Items);
 
         Assert.NotNull(result.Quote);
         Assert.True(result.Quote.HasNewVersion);
@@ -83,7 +84,7 @@ public class PostQueryServiceTests
     }
 
     [Fact]
-    public async Task GetFeedAsync_WhenPostQuotesPost_DoesNotExpandNestedQuote()
+    public async Task GetByAuthorIdAsync_WhenPostQuotesPost_DoesNotExpandNestedQuote()
     {
         var target = CreateContent();
         target = new PostContentReadModel
@@ -117,7 +118,7 @@ public class PostQueryServiceTests
             }
         };
         _context.PostRepository
-            .GetRandomAsync(10, null, Arg.Any<CancellationToken>())
+            .GetByAuthorIdAsync(source.Author.Id, 20, null, null, Arg.Any<CancellationToken>())
             .Returns([source]);
         _context.PostRepository
             .GetContentByIdAsync(target.Id, Arg.Any<CancellationToken>())
@@ -133,7 +134,7 @@ public class PostQueryServiceTests
                 Username = "target-author"
             });
 
-        var result = Assert.Single(await _context.QueryService.GetFeedAsync());
+        var result = Assert.Single((await _context.QueryService.GetByAuthorIdAsync(source.Author.Id, new CursorPageRequest())).Items);
 
         Assert.NotNull(result.Quote);
         Assert.False(result.Quote.HasNewVersion);
@@ -142,7 +143,7 @@ public class PostQueryServiceTests
     }
 
     [Fact]
-    public async Task GetFeedAsync_WhenQuoteTargetIsUnavailable_PreservesQuoteMetadata()
+    public async Task GetByAuthorIdAsync_WhenQuoteTargetIsUnavailable_PreservesQuoteMetadata()
     {
         var targetId = Guid.NewGuid();
         var targetVersionId = Guid.NewGuid();
@@ -162,10 +163,10 @@ public class PostQueryServiceTests
             }
         };
         _context.PostRepository
-            .GetRandomAsync(10, null, Arg.Any<CancellationToken>())
+            .GetByAuthorIdAsync(source.Author.Id, 20, null, null, Arg.Any<CancellationToken>())
             .Returns([source]);
 
-        var result = Assert.Single(await _context.QueryService.GetFeedAsync());
+        var result = Assert.Single((await _context.QueryService.GetByAuthorIdAsync(source.Author.Id, new CursorPageRequest())).Items);
 
         Assert.NotNull(result.Quote);
         Assert.Equal(targetId, result.Quote.TargetId);

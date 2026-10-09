@@ -167,6 +167,14 @@ public sealed class AdministrationEndpointsTests : DatabaseTestBase
             Assert.Equal(30, document.RootElement.GetProperty("activity").GetProperty("30d")
                 .GetProperty("posts").GetArrayLength());
         }
+
+        var tables = await adminClient.GetAsync("/api/admin/dashboard/tables?limit=5");
+        Assert.Equal(HttpStatusCode.OK, tables.StatusCode);
+        using (var document = JsonDocument.Parse(await tables.Content.ReadAsStringAsync()))
+        {
+            Assert.Equal(3, document.RootElement.GetProperty("latestUsers").GetArrayLength());
+            Assert.Single(document.RootElement.GetProperty("latestReports").EnumerateArray());
+        }
     }
 
     [Fact]

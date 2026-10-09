@@ -6,7 +6,7 @@ namespace Threads.Application.DTOs.Posts.Requests;
 
 public class CreatePostRequest
 {
-    [StringLength(2000, MinimumLength = 1)]
+    [StringLength(300, MinimumLength = 1)]
     public string? Content { get; init; }
 
     [Required, MaxLength(20), UniqueNotEmptyGuids]

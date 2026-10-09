@@ -8,6 +8,7 @@ using Threads.Application.DTOs.Users;
 using Threads.Application.Interfaces.Comments;
 using Threads.Application.Interfaces.Media;
 using Threads.Application.Interfaces.Posts;
+using Threads.Application.Interfaces.Recommendations;
 using Threads.Application.Interfaces.Users;
 using Threads.Application.Services.Comments;
 using Threads.Application.Services.Posts;
@@ -37,7 +38,8 @@ internal sealed class InteractionTestContext
             postResponseFactory,
             CommentQueryService,
             Substitute.For<HybridCache>(),
-            Substitute.For<ILogger<PostQueryService>>());
+            Substitute.For<ILogger<PostQueryService>>(),
+            Substitute.For<IRecommendationService>());
     }
 
     public IPostRepository PostRepository { get; } = Substitute.For<IPostRepository>();

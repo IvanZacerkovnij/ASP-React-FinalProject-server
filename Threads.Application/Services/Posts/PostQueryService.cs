@@ -8,6 +8,7 @@ using Threads.Application.DTOs.Search;
 using Threads.Application.DTOs.Quotes;
 using Threads.Application.Exceptions;
 using Threads.Application.Interfaces.Posts;
+using Threads.Application.Interfaces.Recommendations;
 using Threads.Application.Interfaces.Users;
 using Threads.Application.Services.Comments;
 using Threads.Application.Services.Common;
@@ -27,6 +28,7 @@ public sealed class PostQueryService
     private readonly CommentQueryService _commentQueryService;
     private readonly HybridCache _cache;
     private readonly ILogger<PostQueryService> _logger;
+    private readonly IRecommendationService _recommendationService;
 
     public PostQueryService(
         IPostRepository postRepository,
@@ -34,7 +36,8 @@ public sealed class PostQueryService
         PostResponseFactory responseFactory,
         CommentQueryService commentQueryService,
         HybridCache cache,
-        ILogger<PostQueryService> logger)
+        ILogger<PostQueryService> logger,
+        IRecommendationService recommendationService)
     {
         _postRepository = postRepository;
         _userService = userService;
@@ -42,18 +45,14 @@ public sealed class PostQueryService
         _commentQueryService = commentQueryService;
         _cache = cache;
         _logger = logger;
+        _recommendationService = recommendationService;
     }
 
-    public async Task<IReadOnlyCollection<PostResponse>> GetFeedAsync(
+    public Task<IReadOnlyCollection<PostResponse>> GetFeedAsync(
         CancellationToken cancellationToken = default,
         Guid? currentUserId = null)
     {
-        var posts = await _postRepository.GetRandomAsync(
-            FeedSize,
-            currentUserId,
-            cancellationToken);
-
-        return await CreateResponsesAsync(posts, currentUserId, cancellationToken);
+        return _recommendationService.GetFeedAsync(currentUserId, FeedSize, cancellationToken);
     }
 
     public async Task<CursorPageResponse<PostResponse>> GetByAuthorIdAsync(
