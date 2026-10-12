@@ -26,6 +26,8 @@ public interface IUserRepository
         IReadOnlyCollection<Guid> ids,
         CancellationToken cancellationToken = default);
     Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default);
+    Task<User?> GetByGoogleSubjectAsync(string subject, CancellationToken cancellationToken = default);
+    Task<bool> TryLinkGoogleAsync(Guid userId, string subject, CancellationToken cancellationToken = default);
     Task<User?> GetByUsernameAsync(string username, CancellationToken cancellationToken = default);
     Task<Guid?> GetIdByUsernameAsync(string username, CancellationToken cancellationToken = default);
     Task AddAsync(User user, CancellationToken cancellationToken = default);

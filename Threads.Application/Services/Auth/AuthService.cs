@@ -8,17 +8,20 @@ public sealed class AuthService : IAuthService
 {
     private readonly RegistrationService _registrationService;
     private readonly SessionService _sessionService;
+    private readonly GoogleAuthService _googleAuthService;
     private readonly PasswordRecoveryService _passwordRecoveryService;
     private readonly PasswordChangeService _passwordChangeService;
 
     public AuthService(
         RegistrationService registrationService,
         SessionService sessionService,
+        GoogleAuthService googleAuthService,
         PasswordRecoveryService passwordRecoveryService,
         PasswordChangeService passwordChangeService)
     {
         _registrationService = registrationService;
         _sessionService = sessionService;
+        _googleAuthService = googleAuthService;
         _passwordRecoveryService = passwordRecoveryService;
         _passwordChangeService = passwordChangeService;
     }
@@ -38,6 +41,21 @@ public sealed class AuthService : IAuthService
         CancellationToken cancellationToken = default)
     {
         return _sessionService.RefreshTokenAsync(request, cancellationToken);
+    }
+
+    public Task<AuthResponse?> LoginWithGoogleAsync(
+        GoogleLoginRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        return _googleAuthService.LoginAsync(request, cancellationToken);
+    }
+
+    public Task<bool> LinkGoogleAsync(
+        Guid userId,
+        GoogleLoginRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        return _googleAuthService.LinkAsync(userId, request, cancellationToken);
     }
 
     public Task<bool> LogoutAsync(LogoutRequest request, CancellationToken cancellationToken = default)

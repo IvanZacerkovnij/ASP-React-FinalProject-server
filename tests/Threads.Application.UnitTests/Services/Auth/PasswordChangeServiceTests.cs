@@ -131,7 +131,7 @@ public class PasswordChangeServiceTests
             .GetByIdAsync(user.Id, Arg.Any<CancellationToken>())
             .Returns(user);
         _passwordHasher
-            .VerifyPassword(request.CurrentPassword, user.PasswordHash)
+            .VerifyPassword(request.CurrentPassword, user.PasswordHash!)
             .Returns(false);
 
         var result = await _service.StartPasswordChangeAsync(user.Id, request);
@@ -153,7 +153,7 @@ public class PasswordChangeServiceTests
             .GetByIdAsync(user.Id, Arg.Any<CancellationToken>())
             .Returns(user);
         _passwordHasher
-            .VerifyPassword(Arg.Any<string>(), user.PasswordHash)
+            .VerifyPassword(Arg.Any<string>(), user.PasswordHash!)
             .Returns(true);
 
         var result = await _service.StartPasswordChangeAsync(user.Id, request);
@@ -177,10 +177,10 @@ public class PasswordChangeServiceTests
             .GetByIdAsync(user.Id, Arg.Any<CancellationToken>())
             .Returns(user);
         _passwordHasher
-            .VerifyPassword(request.CurrentPassword, user.PasswordHash)
+            .VerifyPassword(request.CurrentPassword, user.PasswordHash!)
             .Returns(true);
         _passwordHasher
-            .VerifyPassword(request.NewPassword, user.PasswordHash)
+            .VerifyPassword(request.NewPassword, user.PasswordHash!)
             .Returns(false);
         _passwordHasher.HashPassword(request.NewPassword).Returns("new-password-hash");
         _authCodeHasher

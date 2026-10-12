@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Threads.Api.Extensions;
@@ -20,6 +21,35 @@ public class AuthController : ControllerBase
     public AuthController(IAuthService authService)
     {
         _authService = authService;
+    }
+
+    [HttpPost("google")]
+    [EnableRateLimiting(RateLimiterConfigurator.LoginPolicyName)]
+    [ProducesResponseType<AuthResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<AuthResponse>> GoogleLogin(
+        [FromBody] GoogleLoginRequest request,
+        CancellationToken cancellationToken)
+    {
+        var response = await _authService.LoginWithGoogleAsync(request, cancellationToken);
+        return response is null
+            ? this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid Google credentials.")
+            : Ok(response);
+    }
+
+    [Authorize]
+    [HttpPost("google/link")]
+    [EnableRateLimiting(RateLimiterConfigurator.LoginPolicyName)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> LinkGoogle(
+        [FromBody] GoogleLoginRequest request,
+        CancellationToken cancellationToken)
+    {
+        var linked = await _authService.LinkGoogleAsync(User.GetRequiredCurrentUserId(), request, cancellationToken);
+        return linked
+            ? NoContent()
+            : this.ProblemResponse(StatusCodes.Status401Unauthorized, "Invalid Google credentials.");
     }
 
     [HttpPost("register")]

@@ -158,6 +158,8 @@ Jwt__Audience=threads-client
 Jwt__Key=your-very-long-secret-key
 Jwt__AccessTokenLifetimeMinutes=60
 
+Google__ClientId=your-web-client-id.apps.googleusercontent.com
+
 AuthCodes__HashKey=PASTE_BASE64_OUTPUT_HERE
 
 AWS__S3__Region=eu-central-1
@@ -408,6 +410,8 @@ Endpoint-и з однаковою named policy використовують сп
 |---|---|---|---|
 | `POST` | `/api/auth/register` | Ні | Створити pending registration і надіслати verification code |
 | `POST` | `/api/auth/login` | Ні | Увійти й отримати access та refresh tokens |
+| `POST` | `/api/auth/google` | Ні | Увійти через Google або створити новий акаунт |
+| `POST` | `/api/auth/google/link` | Так | Прив'язати Google до поточного акаунта |
 | `POST` | `/api/auth/refresh` | Ні | Оновити пару tokens за refresh token |
 | `POST` | `/api/auth/logout` | Ні | Відкликати refresh token |
 | `POST` | `/api/auth/forgot-password` | Ні | Надіслати password reset code |
@@ -415,6 +419,35 @@ Endpoint-и з однаковою named policy використовують сп
 | `POST` | `/api/auth/reset-password` | Ні | Скинути пароль за підтвердженим code |
 | `POST` | `/api/auth/verify-email` | Ні | Підтвердити email і створити користувача |
 | `POST` | `/api/auth/resend-verification-code` | Ні | Повторно надіслати email verification code |
+
+#### Вхід через Google
+
+Налаштуй OAuth client типу `Web application` у Google Cloud та додай origin фронтенду до `Authorized JavaScript origins`. Для локальної розробки додай `http://localhost` і адресу з фактичним портом, наприклад `http://localhost:5173`. Для Google Identity Services з JavaScript callback поле `Authorized redirect URIs` можна залишити порожнім. Налаштуй consent screen і test users, якщо застосунок у тестовому режимі.
+
+Задай `Google__ClientId` у `.env`. Docker Compose уже передає `.env` контейнеру API через `env_file`; після зміни конфігурації пересоздай контейнер. Для запуску поза Docker передай `Google:ClientId` через environment variables або User Secrets. Client Secret для цього сценарію не потрібен. Якщо Client ID не налаштований, Google endpoints повертають `500 ProblemDetails`; інші способи входу залишаються доступними.
+
+Фронтенд використовує той самий Client ID у Google Identity Services. Після успішного входу надішли отримане `credential` (Google ID token) через HTTPS:
+
+```http
+POST /api/auth/google
+Content-Type: application/json
+
+{ "idToken": "GOOGLE_ID_TOKEN" }
+```
+
+API перевіряє RSA-підпис, алгоритм `RS256`, issuer Google, audience, строк дії, `azp` за його наявності та `email_verified`. Ключі отримуються через Google OpenID Connect discovery і кешуються спільним `ConfigurationManager`; невідомий signing key запускає оновлення кешу для наступних запитів. Google має бути доступним для початкового завантаження та оновлення ключів; збій завантаження повертає `502 ProblemDetails`. Невалідний токен повертає `401`, невалідний request — `400`. Google-токени й credentials не логуються.
+
+Зв'язок з акаунтом зберігається за унікальним Google `sub` (`User.GoogleSubject`), а не за email. Повторний вхід повертає той самий акаунт, навіть якщо Google email змінився; локальний email автоматично не змінюється. Неактивні, видалені або непідтверджені акаунти не можуть увійти. Пошук за Google `sub` навмисно включає такі акаунти, щоб не створювати новий акаунт замість заблокованого.
+
+Для нового Google-користувача API генерує унікальний username виду `user_<guid>`, встановлює `IsVerified = true` і залишає `PasswordHash = null`. Автоматична реєстрація доступна для підтвердженого Gmail або Google Workspace email (`hd` присутній). Для сторонньої пошти без `hd` API повертає `400`: спочатку потрібно пройти локальну реєстрацію з перевіркою email, потім прив'язати Google. Це враховує те, що Google не гарантує поточне володіння сторонньою поштою лише за `email_verified`.
+
+Якщо email уже зайнятий, Google-вхід повертає `409` і не прив'язує акаунти автоматично. Увійди звичайним способом і надішли той самий request body на `POST /api/auth/google/link` з власним Bearer access token. Успіх — `204`; повторне прив'язування того самого Google-акаунта також — `204`. Прив'язування вже зайнятого Google `sub` або заміна на інший Google-акаунт повертає `409`. Google email може відрізнятися від локального: доступ до обох акаунтів підтверджується окремо. Унікальний індекс та умовний атомарний UPDATE захищають від конкурентного прив'язування. Конкурентна перша реєстрація може повернути `409`; повторний вхід використовує вже створений акаунт.
+
+Успішний Google-вхід повертає звичайний `AuthResponse` (`userId`, `username`, `accessToken`, `refreshToken`, `accessTokenExpiresAt`). Для наступних API-запитів використовуй власний access token API. Refresh/logout працюють як для звичайного входу. Google-акаунт без пароля не може увійти через password login або змінити пароль з current password; встановити локальний пароль можна через наявний email password-reset flow.
+
+Перед використанням нових endpoints створи й застосуй власну EF Core міграцію: nullable `User.PasswordHash`, nullable `User.GoogleSubject` довжиною 255 та унікальний індекс для `GoogleSubject`. Файли міграції та model snapshot навмисно не змінені. Інтеграційні тести потребують цієї міграції; вони застосовують її лише до PostgreSQL Testcontainers.
+
+Офіційні джерела: [налаштування Google Identity Services](https://developers.google.com/identity/gsi/web/guides/get-google-api-clientid), [перевірка Google ID token](https://developers.google.com/identity/gsi/web/guides/verify-google-id-token).
 
 ### Users
 

@@ -72,7 +72,7 @@ public class SessionServiceTests
             .GetByEmailAsync("user@example.com", Arg.Any<CancellationToken>())
             .Returns(user);
         _passwordHasher
-            .VerifyPassword(request.Password, user.PasswordHash)
+            .VerifyPassword(request.Password, user.PasswordHash!)
             .Returns(true);
         _tokenService.GenerateRefreshToken().Returns("refresh-token");
         _tokenService.GenerateAccessToken(user).Returns("access-token");
@@ -132,7 +132,7 @@ public class SessionServiceTests
             .GetByUsernameAsync(user.Username, Arg.Any<CancellationToken>())
             .Returns(user);
         _passwordHasher
-            .VerifyPassword(request.Password, user.PasswordHash)
+            .VerifyPassword(request.Password, user.PasswordHash!)
             .Returns(false);
 
         var result = await _service.LoginAsync(request);
@@ -298,6 +298,24 @@ public class SessionServiceTests
         await _refreshTokenRepository.Received(1).UpdateAsync(
             refreshToken,
             Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task LoginAsync_WhenUserHasNoPassword_DoesNotCallPasswordHasher()
+    {
+        var user = TestEntityFactory.CreateUser();
+        user.PasswordHash = null;
+        _userRepository.GetByEmailAsync(user.Email, Arg.Any<CancellationToken>()).Returns(user);
+
+        var result = await _service.LoginAsync(new LoginRequest
+        {
+            EmailOrUsername = user.Email,
+            Password = "Password123!"
+        });
+
+        Assert.Null(result);
+        _passwordHasher.DidNotReceive().VerifyPassword(Arg.Any<string>(), Arg.Any<string>());
+        await _refreshTokenRepository.DidNotReceive().AddAsync(Arg.Any<RefreshToken>(), Arg.Any<CancellationToken>());
     }
 
     private static string Hash(string value)

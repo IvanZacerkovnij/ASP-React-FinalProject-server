@@ -217,6 +217,35 @@ public class UserRepository : IUserRepository
             .FirstOrDefaultAsync(user => user.Email.ToLower() == normalizedEmail, cancellationToken);
     }
 
+    public Task<User?> GetByGoogleSubjectAsync(string subject, CancellationToken cancellationToken = default)
+    {
+        return _dbContext.Users
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .SingleOrDefaultAsync(user => user.GoogleSubject == subject, cancellationToken);
+    }
+
+    public async Task<bool> TryLinkGoogleAsync(
+        Guid userId,
+        string subject,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var updated = await _dbContext.Users
+                .Where(user => user.Id == userId && user.IsVerified &&
+                    (user.GoogleSubject == null || user.GoogleSubject == subject))
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(user => user.GoogleSubject, subject)
+                    .SetProperty(user => user.UpdatedAt, DateTimeOffset.UtcNow), cancellationToken);
+            return updated == 1;
+        }
+        catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.UniqueViolation)
+        {
+            throw new ConflictException("This Google account is already linked to another user.");
+        }
+    }
+
     public async Task<User?> GetByUsernameAsync(string username, CancellationToken cancellationToken = default)
     {
         var normalizedUsername = username.ToLowerInvariant();
@@ -249,11 +278,14 @@ public class UserRepository : IUserRepository
             when (exception.InnerException is PostgresException
                   {
                       SqlState: PostgresErrorCodes.UniqueViolation,
-                      ConstraintName: "IX_Users_Email" or "IX_Users_Username"
+                      ConstraintName: "IX_Users_Email" or "IX_Users_Username" or "IX_Users_GoogleSubject"
                   })
         {
             _dbContext.Entry(user).State = EntityState.Detached;
-            throw new ConflictException("User with this email or username already exists.");
+            throw new ConflictException(exception.InnerException is PostgresException
+                { ConstraintName: "IX_Users_GoogleSubject" }
+                ? "This Google account is already linked to another user."
+                : "User with this email or username already exists.");
         }
     }
 

@@ -23,8 +23,13 @@ public class UserConfigurator : IEntityTypeConfiguration<User>
             .HasMaxLength(255);
 
         builder.Property(user => user.PasswordHash)
-            .IsRequired()
             .HasMaxLength(512);
+
+        builder.Property(user => user.GoogleSubject)
+            .HasMaxLength(255);
+
+        builder.HasIndex(user => user.GoogleSubject)
+            .IsUnique();
         
         builder.Property(u => u.Role)
             .IsRequired()

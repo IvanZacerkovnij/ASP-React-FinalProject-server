@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.IdentityModel.Protocols;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Resend;
 using Threads.Api.ExceptionHandling;
 using Threads.Api.Middleware;
@@ -129,6 +131,7 @@ public class Program
         builder.Services.AddScoped<IMediaService, MediaService>();
         builder.Services.AddScoped<RegistrationService>();
         builder.Services.AddScoped<SessionService>();
+        builder.Services.AddScoped<GoogleAuthService>();
         builder.Services.AddScoped<PasswordRecoveryService>();
         builder.Services.AddScoped<PasswordChangeService>();
         builder.Services.AddScoped<RefreshTokenManager>();
@@ -163,6 +166,11 @@ public class Program
     private static void AddSecurityServices(WebApplicationBuilder builder)
     {
         builder.Services.AddSingleton<IAuthCodeHasher, AuthCodeHasher>();
+        builder.Services.AddSingleton<IConfigurationManager<OpenIdConnectConfiguration>>(
+            new ConfigurationManager<OpenIdConnectConfiguration>(
+                "https://accounts.google.com/.well-known/openid-configuration",
+                new OpenIdConnectConfigurationRetriever()));
+        builder.Services.AddScoped<IGoogleTokenValidator, GoogleTokenValidator>();
         builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
         builder.Services.AddScoped<ITokenService, JwtTokenService>();
 

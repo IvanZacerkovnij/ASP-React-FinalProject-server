@@ -42,7 +42,8 @@ public sealed class SessionService
         var user = await GetUserByEmailOrUsernameAsync(normalizedIdentity, cancellationToken);
 
         if (!CanUserLogin(user) ||
-            !_passwordHasher.VerifyPassword(normalizedPassword, user!.PasswordHash))
+            user!.PasswordHash is null ||
+            !_passwordHasher.VerifyPassword(normalizedPassword, user.PasswordHash))
         {
             _logger.LogWarning("Login failed for user {UserId}", user?.Id);
             return null;

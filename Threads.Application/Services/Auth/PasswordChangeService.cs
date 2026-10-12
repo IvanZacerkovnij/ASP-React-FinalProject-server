@@ -55,7 +55,7 @@ public sealed class PasswordChangeService
             return CreateResult(ChangePasswordStatus.UserNotFound);
         }
 
-        if (!_passwordHasher.VerifyPassword(normalizedCurrentPassword, user.PasswordHash))
+        if (user.PasswordHash is null || !_passwordHasher.VerifyPassword(normalizedCurrentPassword, user.PasswordHash))
         {
             _logger.LogWarning("Password change rejected for user {UserId}: invalid current password", userId);
             return CreateResult(ChangePasswordStatus.InvalidCurrentPassword);
