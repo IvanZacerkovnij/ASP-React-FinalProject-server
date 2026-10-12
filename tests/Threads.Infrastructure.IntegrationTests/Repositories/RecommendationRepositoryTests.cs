@@ -38,7 +38,7 @@ public sealed class RecommendationRepositoryTests(PostgreSqlFixture fixture) : D
 
         var result = await CreateRepository(context).RankPostsAsync(viewer.Id, Now);
 
-        Assert.Equal(new[] { popular.Id, fresh.Id }, result);
+        Assert.Equal(new[] { popular.Id, fresh.Id, old.Id }, result);
     }
 
     [Fact]
@@ -59,7 +59,7 @@ public sealed class RecommendationRepositoryTests(PostgreSqlFixture fixture) : D
 
         var result = await CreateRepository(context).RankPostsAsync(viewer.Id, Now);
 
-        Assert.Equal(new[] { discovery.Id, other.Id }, result);
+        Assert.Equal(new[] { discovery.Id, other.Id, seed.Id }, result);
     }
 
     [Fact]
@@ -80,7 +80,7 @@ public sealed class RecommendationRepositoryTests(PostgreSqlFixture fixture) : D
 
         var result = await CreateRepository(context).RankPostsAsync(viewer.Id, Now);
 
-        Assert.Equal(new[] { first.Id, alternative.Id, second.Id }, result);
+        Assert.Equal(new[] { first.Id, alternative.Id, second.Id, history.Id }, result);
         Assert.Equal(result.Count, result.Distinct().Count());
     }
 
@@ -272,7 +272,7 @@ public sealed class RecommendationRepositoryTests(PostgreSqlFixture fixture) : D
         await context.SaveChangesAsync();
         var repository = CreateRepository(context);
         var recommendedIds = (await repository.RankPostsAsync(viewer.Id, Now)).ToHashSet();
-        var authorsByPost = posts.ToDictionary(post => post.Id, post => post.AuthorId);
+        var authorsByPost = posts.Append(old).ToDictionary(post => post.Id, post => post.AuthorId);
         var selections = new HashSet<string>();
 
         for (var iteration = 0; iteration < 12; iteration++)
@@ -281,17 +281,66 @@ public sealed class RecommendationRepositoryTests(PostgreSqlFixture fixture) : D
             Assert.Equal(10, feed.Count);
             Assert.Equal(10, feed.Distinct().Count());
             Assert.All(feed, id => Assert.Contains(id, recommendedIds));
+            Assert.DoesNotContain(old.Id, feed);
             Assert.Equal(10, feed.Select(id => authorsByPost[id]).Distinct().Count());
             selections.Add(string.Join(",", feed.Order()));
         }
 
         Assert.True(selections.Count > 1);
         var guestFeed = await repository.GetFeedIdsAsync(null, 50, Now);
-        Assert.Equal(posts.Length + 1, guestFeed.Count);
+        Assert.Equal(posts.Length + 2, guestFeed.Count);
         Assert.Contains(own.Id, guestFeed);
         Assert.DoesNotContain(blocked.Id, guestFeed);
         Assert.DoesNotContain(deleted.Id, guestFeed);
-        Assert.DoesNotContain(old.Id, guestFeed);
+        Assert.Contains(old.Id, guestFeed);
+    }
+
+    [Theory]
+    [InlineData(false, 0)]
+    [InlineData(false, 3)]
+    [InlineData(true, 0)]
+    [InlineData(true, 3)]
+    public async Task Posts_RandomFallbackFillsMissingResultsAndPreservesAccessRules(bool guest, int recentCount)
+    {
+        var viewer = TestEntityFactory.CreateUser("fallback-viewer");
+        var author = TestEntityFactory.CreateUser("fallback-author");
+        var inactive = TestEntityFactory.CreateUser("fallback-inactive");
+        inactive.IsActive = false;
+        var deletedAuthor = TestEntityFactory.CreateUser("fallback-deleted-author");
+        deletedAuthor.DeletedAt = Now;
+        var recent = Enumerable.Range(0, recentCount)
+            .Select(index => TestEntityFactory.CreatePost(author, createdAt: Now.AddHours(-index))).ToArray();
+        var old = Enumerable.Range(0, 60)
+            .Select(index => TestEntityFactory.CreatePost(author, createdAt: Now.AddDays(-40 - index))).ToArray();
+        var own = TestEntityFactory.CreatePost(viewer, createdAt: Now.AddDays(-40));
+        var blocked = TestEntityFactory.CreatePost(inactive, createdAt: Now.AddDays(-40));
+        var removedAuthorPost = TestEntityFactory.CreatePost(deletedAuthor, createdAt: Now.AddDays(-40));
+        var removedPost = TestEntityFactory.CreatePost(author, createdAt: Now.AddDays(-40));
+        removedPost.DeletedAt = Now;
+        var future = TestEntityFactory.CreatePost(author, createdAt: Now.AddDays(1));
+        await using var context = Fixture.CreateContext();
+        context.AddRange(viewer, author, inactive, deletedAuthor, own, blocked, removedAuthorPost, removedPost, future);
+        context.Posts.AddRange(recent.Concat(old));
+        await context.SaveChangesAsync();
+        var repository = CreateRepository(context, new RecommendationOptions { CandidateLimit = 50, ResultLimit = 50 });
+        var available = recent.Concat(old).Select(post => post.Id).ToHashSet();
+        if (guest)
+        {
+            available.Add(own.Id);
+        }
+
+        var feed = await repository.GetFeedIdsAsync(guest ? null : viewer.Id, 10, Now);
+
+        Assert.Equal(10, feed.Count);
+        Assert.Equal(10, feed.Distinct().Count());
+        Assert.All(feed, id => Assert.Contains(id, available));
+        Assert.All(recent, post => Assert.Contains(post.Id, feed));
+        var ranked = await repository.RankPostsAsync(viewer.Id, Now);
+        Assert.Equal(50, ranked.Count);
+        Assert.Equal(50, ranked.Distinct().Count());
+        Assert.All(ranked, id => Assert.Contains(id, available));
+        Assert.DoesNotContain(own.Id, ranked);
+        Assert.Equal(recent.Select(post => post.Id), ranked.Take(recentCount));
     }
 
     [Fact]
@@ -300,6 +349,7 @@ public sealed class RecommendationRepositoryTests(PostgreSqlFixture fixture) : D
         await using var context = Fixture.CreateContext();
         var repository = CreateRepository(context, new RecommendationOptions { CandidateLimit = 50, ResultLimit = 50 });
         Assert.Empty(await repository.GetFeedIdsAsync(null, 10, Now));
+        Assert.Empty(await repository.RankPostsAsync(Guid.NewGuid(), Now));
         var author = TestEntityFactory.CreateUser("author");
         var posts = Enumerable.Range(1, 60).Select(index => TestEntityFactory.CreatePost(
             author, createdAt: Now.AddHours(-1), id: new Guid($"00000000-0000-0000-0000-{index:D12}"))).ToArray();

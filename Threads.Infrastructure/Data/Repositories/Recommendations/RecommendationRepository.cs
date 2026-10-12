@@ -120,14 +120,38 @@ public sealed class RecommendationRepository(ThreadsDbContext dbContext, IOption
             )
             """;
 
+    private const string PostFallbackSql = """
+            , fallback_candidates AS MATERIALIZED (
+                SELECT p.* FROM visible_posts p
+                WHERE (@viewer IS NULL OR p."AuthorId" <> @viewer)
+                    AND (SELECT COUNT(*) FROM selected_posts) < @selection_limit
+                    AND NOT EXISTS (SELECT 1 FROM selected_posts selected WHERE selected."Id" = p."Id")
+                ORDER BY p."CreatedAt" DESC, p."Id" DESC LIMIT @candidate_limit
+            ), fallback_posts AS MATERIALIZED (
+                SELECT *, RANDOM() AS priority FROM fallback_candidates
+                ORDER BY priority, "Id" DESC
+                LIMIT GREATEST(0, @selection_limit - (SELECT COUNT(*) FROM selected_posts))
+            ), combined_posts AS (
+                SELECT "Id", "AuthorId", "CreatedAt", priority, 0 AS source_order FROM selected_posts
+                UNION ALL
+                SELECT "Id", "AuthorId", "CreatedAt", priority, 1 AS source_order FROM fallback_posts
+            )
+            """;
+
     public async Task<IReadOnlyCollection<Guid>> RankPostsAsync(
         Guid userId, DateTimeOffset asOf, CancellationToken cancellationToken = default)
     {
         const string selectionSql = """
-            SELECT "Id" FROM diversified
-            ORDER BY author_rank, score DESC, "CreatedAt" DESC, "Id" DESC LIMIT @result_limit
+            , selected_posts AS MATERIALIZED (
+                SELECT *, ROW_NUMBER() OVER (
+                    ORDER BY author_rank, score DESC, "CreatedAt" DESC, "Id" DESC
+                )::double precision AS priority FROM diversified
+                ORDER BY priority LIMIT @result_limit
+            )
             """;
-        return await RankAsync(GraphSql + PostRankingSql + selectionSql, userId, asOf, cancellationToken);
+        return await RankAsync(GraphSql + PostRankingSql + selectionSql + PostFallbackSql +
+            "SELECT \"Id\" FROM combined_posts ORDER BY source_order, priority, \"Id\" DESC",
+            userId, asOf, cancellationToken);
     }
 
     public async Task<IReadOnlyCollection<Guid>> GetFeedIdsAsync(
@@ -144,11 +168,21 @@ public sealed class RecommendationRepository(ThreadsDbContext dbContext, IOption
                 SELECT *, ROW_NUMBER() OVER (
                     PARTITION BY "AuthorId" ORDER BY priority, "Id" DESC
                 ) AS random_author_rank FROM sampled
+            ), selected_posts AS MATERIALIZED (
+                SELECT * FROM randomized
+                ORDER BY random_author_rank, priority, "Id" DESC LIMIT @feed_count
             )
-            SELECT "Id" FROM randomized
-            ORDER BY random_author_rank, priority, "Id" DESC LIMIT @feed_count
             """;
-        return await RankAsync(GraphSql + PostRankingSql + selectionSql, userId, asOf, cancellationToken, count);
+        const string mixedSelectionSql = """
+            , mixed AS (
+                SELECT *, ROW_NUMBER() OVER (
+                    PARTITION BY "AuthorId" ORDER BY priority, "Id" DESC
+                ) AS mixed_author_rank FROM combined_posts
+            )
+            SELECT "Id" FROM mixed ORDER BY mixed_author_rank, priority, "Id" DESC
+            """;
+        return await RankAsync(GraphSql + PostRankingSql + selectionSql + PostFallbackSql + mixedSelectionSql,
+            userId, asOf, cancellationToken, count);
     }
 
     public async Task<IReadOnlyCollection<Guid>> RankUsersAsync(
@@ -202,6 +236,7 @@ public sealed class RecommendationRepository(ThreadsDbContext dbContext, IOption
         {
             ["viewer"] = userId.HasValue ? userId.Value : DBNull.Value, ["now"] = asOf,
             ["feed_count"] = count ?? _options.ResultLimit,
+            ["selection_limit"] = count ?? _options.ResultLimit,
             ["history_since"] = asOf.AddDays(-_options.HistoryWindowDays),
             ["post_since"] = asOf.AddDays(-_options.PostWindowDays),
             ["candidate_limit"] = _options.CandidateLimit, ["history_limit"] = _options.HistoryLimit,

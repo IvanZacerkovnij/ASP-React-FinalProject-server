@@ -59,7 +59,7 @@ public sealed class RecommendationEndpointsTests(PostgreSqlFixture fixture) : Da
         var author = TestEntityFactory.CreateUser("author");
         var first = TestEntityFactory.CreatePost(author, createdAt: now);
         var second = TestEntityFactory.CreatePost(author, createdAt: now.AddMinutes(-1));
-        var third = TestEntityFactory.CreatePost(author, createdAt: now.AddMinutes(-2));
+        var third = TestEntityFactory.CreatePost(author, createdAt: now.AddDays(-40));
         var target = TestEntityFactory.CreateComment(author, third, createdAt: now.AddMinutes(-3));
         await using (var context = Fixture.CreateContext())
         {
@@ -172,16 +172,16 @@ public sealed class RecommendationEndpointsTests(PostgreSqlFixture fixture) : Da
 
         var publicFeed = await client.GetFromJsonAsync<PostResponse[]>("/api/posts/feed");
         Assert.NotNull(publicFeed);
-        Assert.Equal(3, publicFeed.Length);
+        Assert.Equal(4, publicFeed.Length);
         Assert.Contains(publicFeed, post => post.Id == own.Id);
         Assert.All(publicFeed, post => Assert.False(post.IsLikedByCurrentUser));
         Authenticate(factory, client, viewer);
         var personalFeed = await client.GetFromJsonAsync<PostResponse[]>("/api/posts/feed");
 
         Assert.NotNull(personalFeed);
-        Assert.Equal(2, personalFeed.Length);
+        Assert.Equal(3, personalFeed.Length);
         Assert.DoesNotContain(personalFeed, post => post.Id == own.Id);
-        Assert.DoesNotContain(personalFeed, post => post.Id == old.Id);
+        Assert.Contains(personalFeed, post => post.Id == old.Id);
         var quoted = Assert.Single(personalFeed, post => post.Id == first.Id);
         Assert.True(quoted.IsLikedByCurrentUser);
         Assert.NotNull(quoted.Quote?.Target);

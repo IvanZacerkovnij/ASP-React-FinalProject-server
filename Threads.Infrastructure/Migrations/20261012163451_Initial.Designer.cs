@@ -13,7 +13,7 @@ using Threads.Infrastructure.Data;
 namespace Threads.Infrastructure.Migrations
 {
     [DbContext(typeof(ThreadsDbContext))]
-    [Migration("20261009175758_Initial")]
+    [Migration("20261012163451_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -928,6 +928,10 @@ namespace Threads.Infrastructure.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
 
+                    b.Property<string>("GoogleSubject")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
@@ -953,7 +957,6 @@ namespace Threads.Infrastructure.Migrations
                         .HasColumnType("character varying(1024)");
 
                     b.Property<string>("PasswordHash")
-                        .IsRequired()
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)");
 
@@ -992,6 +995,9 @@ namespace Threads.Infrastructure.Migrations
                     b.HasIndex("DeletedAt");
 
                     b.HasIndex("Email")
+                        .IsUnique();
+
+                    b.HasIndex("GoogleSubject")
                         .IsUnique();
 
                     b.HasIndex("SearchVector")

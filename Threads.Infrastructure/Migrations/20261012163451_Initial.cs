@@ -38,7 +38,8 @@ namespace Threads.Infrastructure.Migrations
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     Username = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
                     Email = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
-                    PasswordHash = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
+                    PasswordHash = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
+                    GoogleSubject = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
                     PasswordResetCodeHash = table.Column<string>(type: "character varying(44)", maxLength: 44, nullable: true),
                     PasswordResetCodeExpiresAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     PendingPasswordHash = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
@@ -936,6 +937,12 @@ namespace Threads.Infrastructure.Migrations
                 name: "IX_Users_Email",
                 table: "Users",
                 column: "Email",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Users_GoogleSubject",
+                table: "Users",
+                column: "GoogleSubject",
                 unique: true);
 
             migrationBuilder.CreateIndex(
