@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using Npgsql;
 using NpgsqlTypes;
 using Threads.Application.DTOs.Users;
+using Threads.Application.DTOs.Recommendations;
 using Threads.Application.Interfaces.Recommendations;
 using Threads.Application.Recommendations;
 
@@ -12,6 +13,30 @@ public sealed class RecommendationRepository(ThreadsDbContext dbContext, IOption
     : IRecommendationRepository
 {
     private readonly RecommendationOptions _options = options.Value;
+
+    public async Task<IReadOnlyCollection<TrendReadModel>> GetTrendsAsync(
+        int limit, DateTimeOffset asOf, CancellationToken cancellationToken = default)
+    {
+        return await dbContext.Database.SqlQuery<TrendReadModel>($"""
+            WITH candidates AS MATERIALIZED (
+                SELECT p."Id", p."Content", p."CreatedAt" FROM "Posts" p
+                JOIN "Users" u ON u."Id" = p."AuthorId"
+                WHERE p."DeletedAt" IS NULL AND u."DeletedAt" IS NULL AND u."IsActive"
+                    AND p."CreatedAt" BETWEEN {asOf.AddDays(-_options.PostWindowDays)} AND {asOf}
+                ORDER BY p."CreatedAt" DESC, p."Id" DESC LIMIT {_options.CandidateLimit}
+            ), topics AS (
+                SELECT DISTINCT p."Id", p."CreatedAt", lower(matches.parts[2]) AS topic
+                FROM candidates p
+                CROSS JOIN LATERAL regexp_matches(
+                    p."Content", '(^|[^[:alnum:]_#])#([[:alnum:]_]+)', 'g') AS matches(parts)
+                WHERE char_length(matches.parts[2]) <= 99
+            )
+            SELECT topic AS "Topic", count(*)::integer AS "PostsCount"
+            FROM topics GROUP BY topic
+            ORDER BY count(*) DESC, max("CreatedAt") DESC, topic COLLATE "C" ASC
+            LIMIT {limit}
+            """).ToListAsync(cancellationToken);
+    }
 
     private const string GraphSql = """
         WITH active_users AS MATERIALIZED (

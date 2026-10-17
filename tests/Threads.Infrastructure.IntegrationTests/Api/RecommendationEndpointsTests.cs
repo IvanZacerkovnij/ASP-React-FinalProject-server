@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
+using Threads.Application.DTOs.Recommendations;
 using Microsoft.Extensions.DependencyInjection;
 using Threads.Application.DTOs.Pagination;
 using Threads.Application.DTOs.Posts.Responses;
@@ -17,6 +19,7 @@ public sealed class RecommendationEndpointsTests(PostgreSqlFixture fixture) : Da
     [Theory]
     [InlineData("posts")]
     [InlineData("users")]
+    [InlineData("trends")]
     public async Task Recommendations_RequireAuthentication(string kind)
     {
         using var factory = new ThreadsApiFactory(Fixture);
@@ -31,6 +34,9 @@ public sealed class RecommendationEndpointsTests(PostgreSqlFixture fixture) : Da
     [Theory]
     [InlineData("posts?limit=0")]
     [InlineData("users?limit=51")]
+    [InlineData("trends?limit=0")]
+    [InlineData("trends?limit=51")]
+    [InlineData("trends?limit=abc")]
     [InlineData("posts?cursor=invalid")]
     [InlineData("users?cursor=invalid")]
     public async Task Recommendations_InvalidRequestReturnsProblemDetails(string query)
@@ -49,6 +55,83 @@ public sealed class RecommendationEndpointsTests(PostgreSqlFixture fixture) : Da
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task Trends_ReturnsTopicContractWithDefaultAndExplicitLimitAndEmptyFallback()
+    {
+        var viewer = TestEntityFactory.CreateUser("viewer");
+        await using (var context = Fixture.CreateContext())
+        {
+            context.Users.Add(viewer);
+            await context.SaveChangesAsync();
+        }
+        using var factory = new ThreadsApiFactory(Fixture);
+        using var client = factory.CreateClient();
+        Authenticate(factory, client, viewer);
+
+        var empty = await client.GetFromJsonAsync<TrendRecommendationsResponse>("/api/recommendations/trends");
+        Assert.NotNull(empty);
+        Assert.Empty(empty.Items);
+        await using (var context = Fixture.CreateContext())
+        {
+            context.Posts.Add(new Post
+            {
+                AuthorId = viewer.Id,
+                Content = string.Join(" ", Enumerable.Range(1, 12).Select(index => $"#topic{index}")),
+                CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-1)
+            });
+            await context.SaveChangesAsync();
+        }
+
+        var response = await client.GetAsync("/api/recommendations/trends");
+        response.EnsureSuccessStatusCode();
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Single(json.RootElement.EnumerateObject());
+        var items = json.RootElement.GetProperty("items");
+        Assert.Equal(10, items.GetArrayLength());
+        foreach (var item in items.EnumerateArray())
+        {
+            Assert.Equal(5, item.EnumerateObject().Count());
+            Assert.Equal("hashtag:" + item.GetProperty("query").GetString(), item.GetProperty("id").GetString());
+            Assert.Equal("#" + item.GetProperty("query").GetString(), item.GetProperty("title").GetString());
+            Assert.False(string.IsNullOrWhiteSpace(item.GetProperty("context").GetString()));
+            Assert.Equal(1, item.GetProperty("postsCount").GetInt32());
+        }
+        var limited = await client.GetFromJsonAsync<TrendRecommendationsResponse>("/api/recommendations/trends?limit=1");
+        Assert.NotNull(limited);
+        Assert.Single(limited.Items);
+    }
+
+    [Fact]
+    public async Task Trends_OpenApiDescribesEndpointLimitAndResponseDto()
+    {
+        using var factory = new ThreadsApiFactory(Fixture);
+        using var client = factory.CreateClient();
+        using var document = JsonDocument.Parse(await client.GetStringAsync("/openapi/v1.json"));
+        var operation = document.RootElement.GetProperty("paths").GetProperty("/api/Recommendations/trends").GetProperty("get");
+        var parameter = Assert.Single(operation.GetProperty("parameters").EnumerateArray(),
+            parameter => parameter.GetProperty("name").GetString() == "limit");
+        var schema = parameter.GetProperty("schema");
+        Assert.Equal(10, schema.GetProperty("default").GetInt32());
+        Assert.Equal(1, schema.GetProperty("minimum").GetInt32());
+        Assert.Equal(50, schema.GetProperty("maximum").GetInt32());
+        var schemas = document.RootElement.GetProperty("components").GetProperty("schemas");
+        Assert.True(schemas.GetProperty("TrendRecommendationsResponse").GetProperty("properties").TryGetProperty("items", out _));
+        var trendSchema = schemas.GetProperty("TrendRecommendation");
+        var properties = trendSchema.GetProperty("properties");
+        foreach (var name in new[] { "id", "title", "context", "query", "postsCount" })
+        {
+            Assert.True(properties.TryGetProperty(name, out _));
+        }
+        Assert.Equal(new[] { "context", "id", "query", "title" },
+            trendSchema.GetProperty("required").EnumerateArray().Select(property => property.GetString()).Order());
+        var countType = properties.GetProperty("postsCount").GetProperty("type");
+        var countTypes = countType.ValueKind == JsonValueKind.Array
+            ? countType.EnumerateArray().Select(type => type.GetString()).ToArray()
+            : [countType.GetString()];
+        Assert.Equal(new[] { "integer" }, countTypes);
+        Assert.Contains("TrendRecommendationsResponse", operation.GetProperty("responses").GetProperty("200").ToString());
     }
 
     [Fact]

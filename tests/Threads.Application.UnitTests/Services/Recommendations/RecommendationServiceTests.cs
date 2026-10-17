@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Threads.Application.DTOs.Recommendations;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using Threads.Application.DTOs.Comments;
@@ -42,6 +43,33 @@ public sealed class RecommendationServiceTests
             _posts.CommentRepository, _posts.ResponseFactory,
             new CommentResponseFactory(userFactory, _posts.ObjectStorageService), userFactory,
             Options.Create(new RecommendationOptions()), time);
+    }
+
+    [Fact]
+    public async Task Trends_MapsTopicsToSearchContractAndPassesCancellation()
+    {
+        using var cancellation = new CancellationTokenSource();
+        _repository.GetTrendsAsync(10, _now, cancellation.Token)
+            .Returns([new TrendReadModel { Topic = "україна", PostsCount = 3 }]);
+
+        var response = await _service.GetTrendsAsync(10, cancellation.Token);
+
+        var trend = Assert.Single(response.Items);
+        Assert.Equal("hashtag:україна", trend.Id);
+        Assert.Equal("#україна", trend.Title);
+        Assert.Equal("україна", trend.Query);
+        Assert.False(string.IsNullOrWhiteSpace(trend.Context));
+        Assert.Equal(3, trend.PostsCount);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(51)]
+    public async Task Trends_RejectsInvalidLimit(int limit)
+    {
+        await Assert.ThrowsAsync<RequestValidationException>(() => _service.GetTrendsAsync(limit));
+        await _repository.DidNotReceive().GetTrendsAsync(
+            Arg.Any<int>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

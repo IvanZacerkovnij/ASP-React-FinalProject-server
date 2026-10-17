@@ -12,6 +12,35 @@ public sealed class RecommendationRepositoryTests(PostgreSqlFixture fixture) : D
     private static readonly DateTimeOffset Now = new(2026, 10, 9, 12, 0, 0, TimeSpan.Zero);
 
     [Fact]
+    public async Task Trends_CountsDistinctVisibleRecentPostsNormalizesTopicsAndLimitsResults()
+    {
+        var author = TestEntityFactory.CreateUser("author");
+        var inactive = TestEntityFactory.CreateUser("inactive");
+        inactive.IsActive = false;
+        var deletedAuthor = TestEntityFactory.CreateUser("deleted-author");
+        deletedAuthor.DeletedAt = Now;
+        var deleted = TestEntityFactory.CreatePost(author, "#hidden", Now.AddHours(-1));
+        deleted.DeletedAt = Now;
+        await using var context = Fixture.CreateContext();
+        context.AddRange(author, inactive, deletedAuthor, deleted,
+            TestEntityFactory.CreatePost(author, "#Україна #УКРАЇНА #dotnet", Now.AddHours(-1)),
+            TestEntityFactory.CreatePost(author, "#україна #alpha #beta", Now.AddHours(-2)),
+            TestEntityFactory.CreatePost(author, "#hidden", Now.AddDays(-31)),
+            TestEntityFactory.CreatePost(author, "#hidden", Now.AddHours(1)),
+            TestEntityFactory.CreatePost(inactive, "#hidden", Now.AddHours(-1)),
+            TestEntityFactory.CreatePost(deletedAuthor, "#hidden", Now.AddHours(-1)));
+        await context.SaveChangesAsync();
+
+        var repository = CreateRepository(context);
+        var trends = await repository.GetTrendsAsync(50, Now);
+
+        Assert.Equal(new[] { "україна", "dotnet", "alpha", "beta" }, trends.Select(trend => trend.Topic));
+        Assert.Equal(2, trends.First().PostsCount);
+        Assert.All(trends.Skip(1), trend => Assert.Equal(1, trend.PostsCount));
+        Assert.Equal("україна", Assert.Single(await repository.GetTrendsAsync(1, Now)).Topic);
+    }
+
+    [Fact]
     public async Task Posts_ColdStartRanksPopularFreshPostsAndExcludesInaccessibleContent()
     {
         var viewer = TestEntityFactory.CreateUser("viewer");

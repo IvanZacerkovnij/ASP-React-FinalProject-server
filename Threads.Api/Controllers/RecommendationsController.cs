@@ -1,7 +1,9 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Threads.Application.DTOs.Pagination;
 using Threads.Application.DTOs.Posts.Responses;
+using Threads.Application.DTOs.Recommendations;
 using Threads.Application.DTOs.Users;
 using Threads.Application.Interfaces.Recommendations;
 using Threads.Api.Extensions;
@@ -16,6 +18,15 @@ namespace Threads.Api.Controllers;
 [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
 public sealed class RecommendationsController(IRecommendationService service) : ControllerBase
 {
+    [HttpGet("trends")]
+    [ProducesResponseType<TrendRecommendationsResponse>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<TrendRecommendationsResponse>> GetTrends(
+        [FromQuery, Range(1, 50)] int limit = 10,
+        CancellationToken cancellationToken = default)
+    {
+        return Ok(await service.GetTrendsAsync(limit, cancellationToken));
+    }
+
     [HttpGet("posts")]
     [ProducesResponseType<CursorPageResponse<PostResponse>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<CursorPageResponse<PostResponse>>> GetPosts(

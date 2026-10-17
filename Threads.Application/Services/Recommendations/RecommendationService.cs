@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Threads.Application.DTOs.Recommendations;
 using Microsoft.Extensions.Options;
 using Threads.Application.DTOs.Pagination;
 using Threads.Application.DTOs.Posts.Responses;
@@ -28,6 +29,26 @@ public sealed class RecommendationService(
     IOptions<RecommendationOptions> options,
     TimeProvider timeProvider) : IRecommendationService
 {
+    public async Task<TrendRecommendationsResponse> GetTrendsAsync(
+        int limit, CancellationToken cancellationToken = default)
+    {
+        if (limit is < 1 or > 50)
+        {
+            throw new RequestValidationException("Trend limit must be between 1 and 50.");
+        }
+
+        var trends = await repository.GetTrendsAsync(limit, timeProvider.GetUtcNow(), cancellationToken);
+        return new TrendRecommendationsResponse
+        {
+            Items = trends.Select(trend => new TrendRecommendation
+            {
+                Id = $"hashtag:{trend.Topic}", Title = $"#{trend.Topic}",
+                Context = "Популярне серед останніх дописів", Query = trend.Topic,
+                PostsCount = trend.PostsCount
+            }).ToArray()
+        };
+    }
+
     public async Task<IReadOnlyCollection<PostResponse>> GetFeedAsync(
         Guid? userId, int count, CancellationToken cancellationToken = default)
     {
