@@ -21,8 +21,8 @@ public class MediaService : IMediaService
         "video/webm"
     };
 
-    private const long MaxImageSizeInBytes = 10 * 1024 * 1024;
-    private const long MaxVideoSizeInBytes = 100 * 1024 * 1024;
+    private const long MaxImageSizeInBytes = 50 * 1024 * 1024;
+    private const long MaxVideoSizeInBytes = 256 * 1024 * 1024;
 
     private readonly IMediaRepository _mediaRepository;
     private readonly IMediaProcessingService _mediaProcessingService;

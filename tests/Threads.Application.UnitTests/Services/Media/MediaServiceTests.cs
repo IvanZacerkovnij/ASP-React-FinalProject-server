@@ -86,8 +86,8 @@ public class MediaServiceTests
     [InlineData("image.png", "", 1, "Content type is required.")]
     [InlineData("image.png", "image/png", 0, "File must not be empty.")]
     [InlineData("image.txt", "text/plain", 1, "Unsupported media content type.")]
-    [InlineData("image.png", "image/png", 10485761, "File is too large.")]
-    [InlineData("video.mp4", "video/mp4", 104857601, "File is too large.")]
+    [InlineData("image.png", "image/png", 50 * 1024 * 1024 + 1, "File is too large.")]
+    [InlineData("video.mp4", "video/mp4", 256 * 1024 * 1024 + 1, "File is too large.")]
     public async Task UploadAsync_WhenInputIsInvalid_ThrowsRequestValidationException(
         string fileName,
         string contentType,
@@ -111,8 +111,10 @@ public class MediaServiceTests
             Arg.Any<CancellationToken>());
     }
 
-    [Fact]
-    public async Task UploadAsync_WhenImageIsValid_UploadsAndPersistsMedia()
+    [Theory]
+    [InlineData(3)]
+    [InlineData(50 * 1024 * 1024)]
+    public async Task UploadAsync_WhenImageIsValid_UploadsAndPersistsMedia(long sizeInBytes)
     {
         var userId = Guid.NewGuid();
         await using var content = new MemoryStream([1, 2, 3]);
@@ -133,7 +135,7 @@ public class MediaServiceTests
             content,
             "../unsafe/PHOTO.PNG",
             "image/png",
-            content.Length,
+            sizeInBytes,
             cancellationToken);
 
         Assert.NotNull(addedMedia);
@@ -154,8 +156,10 @@ public class MediaServiceTests
             cancellationToken);
     }
 
-    [Fact]
-    public async Task UploadAsync_WhenVideoIsProcessed_UsesProcessedFileAndThumbnail()
+    [Theory]
+    [InlineData(3)]
+    [InlineData(256 * 1024 * 1024)]
+    public async Task UploadAsync_WhenVideoIsProcessed_UsesProcessedFileAndThumbnail(long sizeInBytes)
     {
         var processedPath = Path.Combine(Path.GetTempPath(), $"processed-{Guid.NewGuid():N}.mp4");
         var thumbnailPath = Path.Combine(Path.GetTempPath(), $"thumbnail-{Guid.NewGuid():N}.jpg");
@@ -188,7 +192,7 @@ public class MediaServiceTests
             content,
             "clip.mov",
             "video/quicktime",
-            content.Length);
+            sizeInBytes);
 
         Assert.Equal("video", result.Type);
         Assert.Equal("video/mp4", result.MimeType);

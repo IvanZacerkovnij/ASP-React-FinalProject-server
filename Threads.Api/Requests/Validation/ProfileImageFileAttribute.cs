@@ -5,7 +5,7 @@ namespace Threads.Api.Requests.Validation;
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter)]
 public sealed class ProfileImageFileAttribute : ValidationAttribute
 {
-    private const long MaxImageSizeInBytes = 10 * 1024 * 1024;
+    private const long MaxImageSizeInBytes = 50 * 1024 * 1024;
 
     private static readonly HashSet<string> AllowedContentTypes = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -15,7 +15,7 @@ public sealed class ProfileImageFileAttribute : ValidationAttribute
     };
 
     public ProfileImageFileAttribute()
-        : base("The {0} field must be a supported, non-empty image of at most 10 MB.")
+        : base("The {0} field must be a supported, non-empty image of at most 50 MB.")
     {
     }
 

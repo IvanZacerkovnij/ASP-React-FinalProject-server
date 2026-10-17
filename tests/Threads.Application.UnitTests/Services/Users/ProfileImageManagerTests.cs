@@ -21,7 +21,7 @@ public class ProfileImageManagerTests
 
     [Theory]
     [InlineData(0, "image/png", "Avatar file must not be empty.")]
-    [InlineData(10485761, "image/png", "Avatar file is too large.")]
+    [InlineData(50 * 1024 * 1024 + 1, "image/png", "Avatar file is too large.")]
     [InlineData(1, "image/gif", "Avatar content type is not supported.")]
     public async Task UploadAvatarAsync_WhenFileIsInvalid_ThrowsRequestValidationException(
         long sizeInBytes,
@@ -49,11 +49,14 @@ public class ProfileImageManagerTests
     }
 
     [Theory]
-    [InlineData(true, "avatar")]
-    [InlineData(false, "banner")]
+    [InlineData(true, "avatar", 2)]
+    [InlineData(false, "banner", 2)]
+    [InlineData(true, "avatar", 50 * 1024 * 1024)]
+    [InlineData(false, "banner", 50 * 1024 * 1024)]
     public async Task UploadMethods_WhenFileIsValid_UploadWithNormalizedObjectKey(
         bool isAvatar,
-        string expectedKind)
+        string expectedKind,
+        long sizeInBytes)
     {
         var userId = Guid.NewGuid();
         await using var content = new MemoryStream([1, 2]);
@@ -64,7 +67,7 @@ public class ProfileImageManagerTests
             Content = content,
             FileName = "IMAGE.PNG",
             ContentType = "image/png",
-            SizeInBytes = content.Length
+            SizeInBytes = sizeInBytes
         };
 
         var objectKey = isAvatar

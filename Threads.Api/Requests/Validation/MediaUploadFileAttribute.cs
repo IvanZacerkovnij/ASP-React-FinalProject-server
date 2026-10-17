@@ -5,8 +5,8 @@ namespace Threads.Api.Requests.Validation;
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter)]
 public sealed class MediaUploadFileAttribute : ValidationAttribute
 {
-    private const long MaxImageSizeInBytes = 10 * 1024 * 1024;
-    private const long MaxVideoSizeInBytes = 100 * 1024 * 1024;
+    private const long MaxImageSizeInBytes = 50 * 1024 * 1024;
+    private const long MaxVideoSizeInBytes = 256 * 1024 * 1024;
 
     private static readonly IReadOnlyDictionary<string, long> MaxSizesByContentType =
         new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase)

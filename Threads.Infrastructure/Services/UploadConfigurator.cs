@@ -5,7 +5,7 @@ namespace Threads.Infrastructure.Services;
 
 public static class UploadConfigurator
 {
-    private const long MaxUploadSizeInBytes = 104_857_600;
+    private const long MaxUploadSizeInBytes = 257 * 1024 * 1024;
 
     public static void Configure(KestrelServerOptions options)
     {
@@ -18,6 +18,6 @@ public static class UploadConfigurator
     {
         ArgumentNullException.ThrowIfNull(options);
 
-        options.MultipartBodyLengthLimit = MaxUploadSizeInBytes;
+        options.MultipartBodyLengthLimit = 256 * 1024 * 1024;
     }
 }

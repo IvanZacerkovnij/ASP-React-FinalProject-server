@@ -14,7 +14,7 @@ public sealed class ProfileImageManager
         "image/webp"
     };
 
-    private const long MaxImageSizeInBytes = 10 * 1024 * 1024;
+    private const long MaxImageSizeInBytes = 50 * 1024 * 1024;
 
     private readonly IObjectStorageService _objectStorageService;
     private readonly ILogger<ProfileImageManager> _logger;
