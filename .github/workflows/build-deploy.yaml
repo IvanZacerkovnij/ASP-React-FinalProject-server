@@ -32,19 +32,16 @@ jobs:
             echo "STEP 3: pulling repository"
             git pull --ff-only origin main
 
-            echo "STEP 4: configuring nginx"
-            sudo bash "$HOME/threads/deploy/configure-nginx.sh"
-
-            echo "STEP 5: writing environment"
+            echo "STEP 4: writing environment"
             cat > .env <<'EOF'
             ${{ secrets.APP_ENV_FILE }}
             EOF
 
-            echo "STEP 6: stopping old containers"
+            echo "STEP 5: stopping old containers"
             docker compose down --remove-orphans
 
-            echo "STEP 7: building and starting containers"
+            echo "STEP 6: building and starting containers"
             docker compose up -d --build
 
-            echo "STEP 8: checking deployment"
+            echo "STEP 7: checking deployment"
             docker compose ps

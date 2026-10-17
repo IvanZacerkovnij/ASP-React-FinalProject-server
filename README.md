@@ -922,7 +922,7 @@ dotnet test tests/Threads.Application.UnitTests
 - конфіг `deploy/nginx/threads.conf` проксіює трафік на `127.0.0.1:7001`
 - Nginx передає `X-Forwarded-For` і `X-Forwarded-Proto`; API довіряє лише proxy з `ReverseProxy__KnownProxy`
 - forwarded headers обробляються до authentication та rate limiting, тому IP-based policies використовують адресу клієнта, а не Docker gateway
-- GitHub Actions workflow `.github/workflows/build-deploy.yaml` запускається на push у `main` (або вручну): підключається до сервера по SSH, робить `git pull`, оновлює nginx, записує `.env` із secret `APP_ENV_FILE` і перезбирає контейнери через `docker compose up -d --build`
+- GitHub Actions workflow `.github/workflows/build-deploy.yaml` запускається на push у `main` (або вручну): підключається до сервера по SSH, робить `git pull`, записує `.env` із secret `APP_ENV_FILE` і перезбирає контейнери через `docker compose up -d --build`. Nginx налаштовується окремо на сервері; workflow не викликає `sudo` й не перезаписує його конфігурацію.
 - workflow не запускає тести й не застосовує EF Core migrations: перед push у `main` потрібно локально виконати `dotnet test`, а migrations застосувати окремо
 
 ### HTTPS для API
@@ -937,7 +937,9 @@ sudo bash deploy/setup-https.sh
 
 Скрипт встановлює Certbot за потреби, налаштовує HTTP webroot для ACME challenge та отримує сертифікат Let's Encrypt, приймаючи умови сервісу й реєструючи ACME-акаунт без email. Потім вмикає HTTPS і `certbot.timer` для автопоновлення. Hook перевіряє та перезавантажує Nginx після поновлення сертифіката. Сертифікати та приватні ключі зберігаються лише на сервері в `/etc/letsencrypt`.
 
-Deploy workflow викликає `deploy/configure-nginx.sh`: за наявності сертифіката встановлює `threads-https.conf`, інакше — початковий HTTP-конфіг `threads.conf`. Тому наступні деплої зберігають HTTPS. HTTP-запити перенаправляються на HTTPS зі збереженням методу; ACME challenge залишається доступним через HTTP для поновлення. Внутрішнє з'єднання Nginx з API залишається `http://127.0.0.1:7001`.
+Скрипт першого налаштування викликає `deploy/configure-nginx.sh`: за наявності сертифіката встановлює `threads-https.conf`, інакше — початковий HTTP-конфіг `threads.conf`. Запускай `setup-https.sh` вручну через SSH з користувача, який має право виконувати `sudo`, або від root через `bash deploy/setup-https.sh`. GitHub Actions не налаштовує Nginx і не потребує для нього `NOPASSWD`: наступні деплої зберігають встановлений серверний конфіг. Після зміни файлів Nginx у репозиторії застосуй їх окремо через `sudo bash deploy/configure-nginx.sh`.
+
+HTTP-запити перенаправляються на HTTPS зі збереженням методу; ACME challenge залишається доступним через HTTP для поновлення. Внутрішнє з'єднання Nginx з API залишається `http://127.0.0.1:7001`.
 
 Перевірки на сервері після налаштування:
 
