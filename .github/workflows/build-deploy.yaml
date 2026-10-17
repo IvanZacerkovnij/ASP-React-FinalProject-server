@@ -33,12 +33,7 @@ jobs:
             git pull --ff-only origin main
 
             echo "STEP 4: configuring nginx"
-            sudo cp "$HOME/threads/deploy/nginx/threads.conf" /etc/nginx/sites-available/threads
-            sudo ln -sf /etc/nginx/sites-available/threads /etc/nginx/sites-enabled/threads
-
-            sudo nginx -t
-            sudo systemctl enable nginx
-            sudo systemctl restart nginx
+            sudo bash "$HOME/threads/deploy/configure-nginx.sh"
 
             echo "STEP 5: writing environment"
             cat > .env <<'EOF'

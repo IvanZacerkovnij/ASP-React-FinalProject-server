@@ -925,6 +925,29 @@ dotnet test tests/Threads.Application.UnitTests
 - GitHub Actions workflow `.github/workflows/build-deploy.yaml` запускається на push у `main` (або вручну): підключається до сервера по SSH, робить `git pull`, оновлює nginx, записує `.env` із secret `APP_ENV_FILE` і перезбирає контейнери через `docker compose up -d --build`
 - workflow не запускає тести й не застосовує EF Core migrations: перед push у `main` потрібно локально виконати `dotnet test`, а migrations застосувати окремо
 
+### HTTPS для API
+
+Публічна адреса API: `https://chips-backend.duckdns.org/api`. На фронтенді заміни базову адресу `http://167.233.249.116/api` на цю HTTPS-адресу та повторно розгорни фронтенд; шляхи endpoint-ів залишаються незмінними.
+
+DNS-запис `chips-backend.duckdns.org` має вказувати на `167.233.249.116`. На сервері Ubuntu з Nginx відкрий вхідні TCP-порти `80` і `443` у firewall сервера та провайдера. Для першого налаштування виконай у каталозі репозиторію на сервері:
+
+```bash
+sudo bash deploy/setup-https.sh
+```
+
+Скрипт встановлює Certbot за потреби, налаштовує HTTP webroot для ACME challenge та отримує сертифікат Let's Encrypt, приймаючи умови сервісу й реєструючи ACME-акаунт без email. Потім вмикає HTTPS і `certbot.timer` для автопоновлення. Hook перевіряє та перезавантажує Nginx після поновлення сертифіката. Сертифікати та приватні ключі зберігаються лише на сервері в `/etc/letsencrypt`.
+
+Deploy workflow викликає `deploy/configure-nginx.sh`: за наявності сертифіката встановлює `threads-https.conf`, інакше — початковий HTTP-конфіг `threads.conf`. Тому наступні деплої зберігають HTTPS. HTTP-запити перенаправляються на HTTPS зі збереженням методу; ACME challenge залишається доступним через HTTP для поновлення. Внутрішнє з'єднання Nginx з API залишається `http://127.0.0.1:7001`.
+
+Перевірки на сервері після налаштування:
+
+```bash
+sudo nginx -t
+sudo certbot renew --dry-run
+systemctl status certbot.timer
+curl -I https://chips-backend.duckdns.org/swagger/index.html
+```
+
 ## Примітки
 
 - README описує фактичні контролери, маршрути й конфігурацію, які є в коді зараз.
