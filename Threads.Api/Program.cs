@@ -179,7 +179,7 @@ public class Program
 
         builder.Services.AddAuthorization(AuthorizationConfigurator.Configure);
 
-        builder.Services.AddCors(CORSConfigurator.Configure);
+        builder.Services.AddCors(options => CORSConfigurator.Configure(options, builder.Configuration));
     }
 
     private static void AddUploadConfiguration(WebApplicationBuilder builder)

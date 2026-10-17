@@ -272,7 +272,7 @@ API стартує після успішного healthcheck Redis. Для Redis
 
 ### CORS
 
-Поточна policy `AllowAll` дозволяє будь-які origin, method і header. Секція `Cors:AllowedOrigins` є в `appsettings.json`, але зараз не використовується для обмеження policy, тому змінні `Cors__AllowedOrigins__*` не впливають на поведінку API.
+Policy `AllowAll` (історична назва) дозволяє будь-які method і header лише для origin зі списку `Cors:AllowedOrigins`. За замовчуванням дозволено `https://chirp-seven-sigma.vercel.app`. Адреси вказуються без шляху, query string і завершального `/`. Список можна перевизначити через змінні середовища `Cors__AllowedOrigins__0`, `Cors__AllowedOrigins__1` тощо; для локальної розробки додай потрібний origin через локальну конфігурацію. Origin поза списком не отримують дозволу CORS.
 
 ### База даних
 
