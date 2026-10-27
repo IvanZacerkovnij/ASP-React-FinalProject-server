@@ -15,7 +15,10 @@ public static class CORSConfigurator
         
         options.AddPolicy(FrontendCorsPolicyName, policy =>
         {
-            policy.WithOrigins(allowedOrigins)
+            // policy.WithOrigins(allowedOrigins)
+            //     .AllowAnyMethod()
+            //     .AllowAnyHeader();
+            policy.AllowAnyOrigin()
                 .AllowAnyMethod()
                 .AllowAnyHeader();
         });
