@@ -9,14 +9,11 @@ public static class CORSConfigurator
     
     public static void Configure(CorsOptions options, IConfiguration configuration)
     {
-        var allowedOrigins = configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
-
         options.AddPolicy(FrontendCorsPolicyName, policy =>
         {
-            policy.AllowAnyOrigin();
-            // policy.WithOrigins(allowedOrigins)
-            //     .AllowAnyMethod()
-            //     .AllowAnyHeader();
+            policy.AllowAnyOrigin()
+                .AllowAnyMethod()
+                .AllowAnyHeader();
         });
     }
 }
