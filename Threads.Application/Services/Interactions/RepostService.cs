@@ -108,7 +108,10 @@ public class RepostService : IRepostService
             PostId = postId
         };
 
-        return await _repostRepository.TryAddAsync(repost, cancellationToken);
+        var added = await _repostRepository.TryAddAsync(repost, cancellationToken);
+        await _postRepository.RecordViewAsync(postId, userId, cancellationToken);
+
+        return added;
     }
     
     public async Task<bool> AddCommentRepostAsync(Guid userId, Guid commentId, CancellationToken cancellationToken = default)
@@ -126,7 +129,10 @@ public class RepostService : IRepostService
             CommentId = commentId
         };
 
-        return await _repostRepository.TryAddAsync(repost, cancellationToken);
+        var added = await _repostRepository.TryAddAsync(repost, cancellationToken);
+        await _commentRepository.RecordViewAsync(commentId, userId, cancellationToken);
+
+        return added;
     }
 
     public Task<bool> RemovePostRepostAsync(Guid userId, Guid postId, CancellationToken cancellationToken = default)

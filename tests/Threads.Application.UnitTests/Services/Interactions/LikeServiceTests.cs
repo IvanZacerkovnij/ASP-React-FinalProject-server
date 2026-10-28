@@ -61,27 +61,34 @@ public class LikeServiceTests
         await _likeRepository.DidNotReceive().TryAddAsync(
             Arg.Any<PostLike>(),
             Arg.Any<CancellationToken>());
+        await _context.PostRepository.DidNotReceive().RecordViewAsync(
+            Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
 
-    [Fact]
-    public async Task AddPostLikeAsync_WhenPostExists_ForwardsLikeToRepository()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task AddPostLikeAsync_WhenPostExists_RecordsViewEvenForDuplicate(bool added)
     {
         var userId = Guid.NewGuid();
         var postId = Guid.NewGuid();
+        using var cancellationTokenSource = new CancellationTokenSource();
+        var cancellationToken = cancellationTokenSource.Token;
         PostLike? addedLike = null;
         _context.PostRepository.ExistsAsync(postId, Arg.Any<CancellationToken>()).Returns(true);
         _likeRepository
             .TryAddAsync(
                 Arg.Do<PostLike>(like => addedLike = like),
                 Arg.Any<CancellationToken>())
-            .Returns(true);
+            .Returns(added);
 
-        var result = await _service.AddPostLikeAsync(userId, postId);
+        var result = await _service.AddPostLikeAsync(userId, postId, cancellationToken);
 
-        Assert.True(result);
+        Assert.Equal(added, result);
         Assert.NotNull(addedLike);
         Assert.Equal(userId, addedLike.UserId);
         Assert.Equal(postId, addedLike.PostId);
+        await _context.PostRepository.Received(1).RecordViewAsync(postId, userId, cancellationToken);
     }
 
     [Fact]
@@ -93,27 +100,34 @@ public class LikeServiceTests
         await _likeRepository.DidNotReceive().TryAddAsync(
             Arg.Any<CommentLike>(),
             Arg.Any<CancellationToken>());
+        await _context.CommentRepository.DidNotReceive().RecordViewAsync(
+            Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
 
-    [Fact]
-    public async Task AddCommentLikeAsync_WhenCommentExists_ForwardsLikeToRepository()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task AddCommentLikeAsync_WhenCommentExists_RecordsViewEvenForDuplicate(bool added)
     {
         var userId = Guid.NewGuid();
         var commentId = Guid.NewGuid();
+        using var cancellationTokenSource = new CancellationTokenSource();
+        var cancellationToken = cancellationTokenSource.Token;
         CommentLike? addedLike = null;
         _context.CommentRepository.ExistsAsync(commentId, Arg.Any<CancellationToken>()).Returns(true);
         _likeRepository
             .TryAddAsync(
                 Arg.Do<CommentLike>(like => addedLike = like),
                 Arg.Any<CancellationToken>())
-            .Returns(true);
+            .Returns(added);
 
-        var result = await _service.AddCommentLikeAsync(userId, commentId);
+        var result = await _service.AddCommentLikeAsync(userId, commentId, cancellationToken);
 
-        Assert.True(result);
+        Assert.Equal(added, result);
         Assert.NotNull(addedLike);
         Assert.Equal(userId, addedLike.UserId);
         Assert.Equal(commentId, addedLike.CommentId);
+        await _context.CommentRepository.Received(1).RecordViewAsync(commentId, userId, cancellationToken);
     }
 
     [Fact]

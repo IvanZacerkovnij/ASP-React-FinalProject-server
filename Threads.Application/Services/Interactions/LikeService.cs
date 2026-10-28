@@ -108,7 +108,10 @@ public class LikeService : ILikeService
             CommentId = commentId
         };
         
-        return await _likeRepository.TryAddAsync(like, cancellationToken);
+        var added = await _likeRepository.TryAddAsync(like, cancellationToken);
+        await _commentRepository.RecordViewAsync(commentId, userId, cancellationToken);
+
+        return added;
     }
     
     public async Task<bool> AddPostLikeAsync(Guid userId, Guid postId, CancellationToken cancellationToken = default)
@@ -126,7 +129,10 @@ public class LikeService : ILikeService
             PostId = postId
         };
         
-        return await _likeRepository.TryAddAsync(like, cancellationToken);
+        var added = await _likeRepository.TryAddAsync(like, cancellationToken);
+        await _postRepository.RecordViewAsync(postId, userId, cancellationToken);
+
+        return added;
     }
 
     public Task<bool> RemovePostLikeAsync(Guid userId, Guid postId, CancellationToken cancellationToken = default)

@@ -65,27 +65,34 @@ public class RepostServiceTests
         await _repostRepository.DidNotReceive().TryAddAsync(
             Arg.Any<PostRepost>(),
             Arg.Any<CancellationToken>());
+        await _context.PostRepository.DidNotReceive().RecordViewAsync(
+            Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
 
-    [Fact]
-    public async Task AddPostRepostAsync_WhenPostExists_ForwardsRepostToRepository()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task AddPostRepostAsync_WhenPostExists_RecordsViewEvenForDuplicate(bool added)
     {
         var userId = Guid.NewGuid();
         var postId = Guid.NewGuid();
+        using var cancellationTokenSource = new CancellationTokenSource();
+        var cancellationToken = cancellationTokenSource.Token;
         PostRepost? addedRepost = null;
         _context.PostRepository.ExistsAsync(postId, Arg.Any<CancellationToken>()).Returns(true);
         _repostRepository
             .TryAddAsync(
                 Arg.Do<PostRepost>(repost => addedRepost = repost),
                 Arg.Any<CancellationToken>())
-            .Returns(true);
+            .Returns(added);
 
-        var result = await _service.AddPostRepostAsync(userId, postId);
+        var result = await _service.AddPostRepostAsync(userId, postId, cancellationToken);
 
-        Assert.True(result);
+        Assert.Equal(added, result);
         Assert.NotNull(addedRepost);
         Assert.Equal(userId, addedRepost.UserId);
         Assert.Equal(postId, addedRepost.PostId);
+        await _context.PostRepository.Received(1).RecordViewAsync(postId, userId, cancellationToken);
     }
 
     [Fact]
@@ -97,27 +104,34 @@ public class RepostServiceTests
         await _repostRepository.DidNotReceive().TryAddAsync(
             Arg.Any<CommentRepost>(),
             Arg.Any<CancellationToken>());
+        await _context.CommentRepository.DidNotReceive().RecordViewAsync(
+            Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
 
-    [Fact]
-    public async Task AddCommentRepostAsync_WhenCommentExists_ForwardsRepostToRepository()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task AddCommentRepostAsync_WhenCommentExists_RecordsViewEvenForDuplicate(bool added)
     {
         var userId = Guid.NewGuid();
         var commentId = Guid.NewGuid();
+        using var cancellationTokenSource = new CancellationTokenSource();
+        var cancellationToken = cancellationTokenSource.Token;
         CommentRepost? addedRepost = null;
         _context.CommentRepository.ExistsAsync(commentId, Arg.Any<CancellationToken>()).Returns(true);
         _repostRepository
             .TryAddAsync(
                 Arg.Do<CommentRepost>(repost => addedRepost = repost),
                 Arg.Any<CancellationToken>())
-            .Returns(true);
+            .Returns(added);
 
-        var result = await _service.AddCommentRepostAsync(userId, commentId);
+        var result = await _service.AddCommentRepostAsync(userId, commentId, cancellationToken);
 
-        Assert.True(result);
+        Assert.Equal(added, result);
         Assert.NotNull(addedRepost);
         Assert.Equal(userId, addedRepost.UserId);
         Assert.Equal(commentId, addedRepost.CommentId);
+        await _context.CommentRepository.Received(1).RecordViewAsync(commentId, userId, cancellationToken);
     }
 
     [Fact]

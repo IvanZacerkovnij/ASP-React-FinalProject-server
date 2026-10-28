@@ -108,7 +108,10 @@ public class BookmarkService : IBookmarkService
             PostId = postId
         };
 
-        return await _bookmarkRepository.TryAddAsync(bookmark, cancellationToken);
+        var added = await _bookmarkRepository.TryAddAsync(bookmark, cancellationToken);
+        await _postRepository.RecordViewAsync(postId, userId, cancellationToken);
+
+        return added;
     }
     public async Task<bool> AddCommentBookmarkAsync(Guid userId, Guid commentId, CancellationToken cancellationToken = default)
     {
@@ -125,7 +128,10 @@ public class BookmarkService : IBookmarkService
             CommentId = commentId
         };
 
-        return await _bookmarkRepository.TryAddAsync(bookmark, cancellationToken);
+        var added = await _bookmarkRepository.TryAddAsync(bookmark, cancellationToken);
+        await _commentRepository.RecordViewAsync(commentId, userId, cancellationToken);
+
+        return added;
     }
 
     public Task<bool> RemovePostBookmarkAsync(Guid userId, Guid postId, CancellationToken cancellationToken = default)

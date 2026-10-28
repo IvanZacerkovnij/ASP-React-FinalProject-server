@@ -65,27 +65,34 @@ public class BookmarkServiceTests
         await _bookmarkRepository.DidNotReceive().TryAddAsync(
             Arg.Any<PostBookmark>(),
             Arg.Any<CancellationToken>());
+        await _context.PostRepository.DidNotReceive().RecordViewAsync(
+            Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
 
-    [Fact]
-    public async Task AddPostBookmarkAsync_WhenPostExists_ForwardsBookmarkToRepository()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task AddPostBookmarkAsync_WhenPostExists_RecordsViewEvenForDuplicate(bool added)
     {
         var userId = Guid.NewGuid();
         var postId = Guid.NewGuid();
+        using var cancellationTokenSource = new CancellationTokenSource();
+        var cancellationToken = cancellationTokenSource.Token;
         PostBookmark? addedBookmark = null;
         _context.PostRepository.ExistsAsync(postId, Arg.Any<CancellationToken>()).Returns(true);
         _bookmarkRepository
             .TryAddAsync(
                 Arg.Do<PostBookmark>(bookmark => addedBookmark = bookmark),
                 Arg.Any<CancellationToken>())
-            .Returns(true);
+            .Returns(added);
 
-        var result = await _service.AddPostBookmarkAsync(userId, postId);
+        var result = await _service.AddPostBookmarkAsync(userId, postId, cancellationToken);
 
-        Assert.True(result);
+        Assert.Equal(added, result);
         Assert.NotNull(addedBookmark);
         Assert.Equal(userId, addedBookmark.UserId);
         Assert.Equal(postId, addedBookmark.PostId);
+        await _context.PostRepository.Received(1).RecordViewAsync(postId, userId, cancellationToken);
     }
 
     [Fact]
@@ -97,27 +104,34 @@ public class BookmarkServiceTests
         await _bookmarkRepository.DidNotReceive().TryAddAsync(
             Arg.Any<CommentBookmark>(),
             Arg.Any<CancellationToken>());
+        await _context.CommentRepository.DidNotReceive().RecordViewAsync(
+            Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
 
-    [Fact]
-    public async Task AddCommentBookmarkAsync_WhenCommentExists_ForwardsBookmarkToRepository()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task AddCommentBookmarkAsync_WhenCommentExists_RecordsViewEvenForDuplicate(bool added)
     {
         var userId = Guid.NewGuid();
         var commentId = Guid.NewGuid();
+        using var cancellationTokenSource = new CancellationTokenSource();
+        var cancellationToken = cancellationTokenSource.Token;
         CommentBookmark? addedBookmark = null;
         _context.CommentRepository.ExistsAsync(commentId, Arg.Any<CancellationToken>()).Returns(true);
         _bookmarkRepository
             .TryAddAsync(
                 Arg.Do<CommentBookmark>(bookmark => addedBookmark = bookmark),
                 Arg.Any<CancellationToken>())
-            .Returns(true);
+            .Returns(added);
 
-        var result = await _service.AddCommentBookmarkAsync(userId, commentId);
+        var result = await _service.AddCommentBookmarkAsync(userId, commentId, cancellationToken);
 
-        Assert.True(result);
+        Assert.Equal(added, result);
         Assert.NotNull(addedBookmark);
         Assert.Equal(userId, addedBookmark.UserId);
         Assert.Equal(commentId, addedBookmark.CommentId);
+        await _context.CommentRepository.Received(1).RecordViewAsync(commentId, userId, cancellationToken);
     }
 
     [Fact]
