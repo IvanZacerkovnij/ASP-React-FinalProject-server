@@ -63,12 +63,13 @@ BackEndForFinalProject
 │   │   ├── MediaController.cs      # upload і доступ до медіа
 │   │   ├── ReportsController.cs    # створення скарг на контент і користувачів
 │   │   └── Admin*Controller.cs     # moderation, users і dashboard для адміністратора
+│   ├── Configuration               # конфігуратори builder/app для DI, інфраструктури, безпеки й middleware
 │   ├── ExceptionHandling           # глобальне перетворення винятків у ProblemDetails
 │   ├── Extensions                  # controller helper для явних ProblemDetails-відповідей
 │   ├── Middleware                  # логування повільних HTTP-запитів
 │   ├── Requests                    # HTTP-моделі для multipart/form-data
 │   ├── Responses                   # стабільні title/detail для API-помилок
-│   └── Program.cs                  # entrypoint і DI-конфігурація API
+│   └── Program.cs                  # entrypoint і виклики конфігураторів
 ├── Threads.Application
 │   ├── DTOs
 │   │   ├── Posts / Comments        # DTO публікацій і коментарів
