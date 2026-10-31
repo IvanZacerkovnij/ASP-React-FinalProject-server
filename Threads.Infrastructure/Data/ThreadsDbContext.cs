@@ -5,6 +5,7 @@ namespace Threads.Infrastructure.Data;
 
 public class ThreadsDbContext : DbContext
 {
+    public DbSet<Notification> Notifications { get; set; }
     public DbSet<Comment> Comments { get; set; }
     public DbSet<Post> Posts { get; set; }
     public DbSet<ScheduledPost> ScheduledPosts { get; set; }

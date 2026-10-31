@@ -339,6 +339,67 @@ namespace Threads.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Threads.Domain.Entities.Notification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ActorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CommentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("PostId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ReadAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("RecipientId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActorId");
+
+                    b.HasIndex("CommentId");
+
+                    b.HasIndex("PostId");
+
+                    b.HasIndex("RecipientId")
+                        .HasFilter("\"ReadAt\" IS NULL");
+
+                    b.HasIndex("SourceId");
+
+                    b.HasIndex("RecipientId", "CreatedAt", "Id");
+
+                    b.HasIndex("Type", "ActorId", "SourceId")
+                        .IsUnique();
+
+                    b.ToTable("Notifications", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Notifications_DifferentUsers", "\"ActorId\" <> \"RecipientId\"");
+
+                            t.HasCheckConstraint("CK_Notifications_Type", "\"Type\" IN ('Follow', 'PostLike', 'CommentLike', 'PostRepost', 'CommentRepost', 'PostComment', 'CommentReply', 'Quote')");
+                        });
+                });
+
             modelBuilder.Entity("Threads.Domain.Entities.PendingRegistration", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1172,6 +1233,39 @@ namespace Threads.Infrastructure.Migrations
                     b.Navigation("ScheduledPost");
 
                     b.Navigation("UploadedByUser");
+                });
+
+            modelBuilder.Entity("Threads.Domain.Entities.Notification", b =>
+                {
+                    b.HasOne("Threads.Domain.Entities.User", "Actor")
+                        .WithMany()
+                        .HasForeignKey("ActorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Threads.Domain.Entities.Comment", "Comment")
+                        .WithMany()
+                        .HasForeignKey("CommentId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("Threads.Domain.Entities.Post", "Post")
+                        .WithMany()
+                        .HasForeignKey("PostId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("Threads.Domain.Entities.User", "Recipient")
+                        .WithMany()
+                        .HasForeignKey("RecipientId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Actor");
+
+                    b.Navigation("Comment");
+
+                    b.Navigation("Post");
+
+                    b.Navigation("Recipient");
                 });
 
             modelBuilder.Entity("Threads.Domain.Entities.Poll", b =>

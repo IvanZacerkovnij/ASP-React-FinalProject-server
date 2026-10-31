@@ -12,6 +12,8 @@ using Threads.Application.Interfaces.ScheduledPosts;
 using Threads.Application.Interfaces.Users;
 using Threads.Application.Interfaces.Likes;
 using Threads.Application.Interfaces.Versions;
+using Threads.Application.Interfaces.Notifications;
+using Threads.Infrastructure.Data.Repositories.Notifications;
 using Threads.Application.Services.Posts;
 using Threads.Application.Services.Versions;
 using Threads.Infrastructure.Data.Repositories.Bookmarks;
@@ -38,6 +40,7 @@ public static class RepositoryConfigurator
 {
     public static WebApplicationBuilder AddRepositories(this WebApplicationBuilder builder)
     {
+        builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
         builder.Services.AddScoped<IRecommendationRepository, RecommendationRepository>();
         builder.Services.AddScoped<IUserRepository, UserRepository>();
         builder.Services.AddScoped<IAdministrationRepository, AdministrationRepository>();

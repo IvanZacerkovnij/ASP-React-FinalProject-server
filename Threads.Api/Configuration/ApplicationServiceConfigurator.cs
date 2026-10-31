@@ -12,6 +12,8 @@ using Threads.Application.Interfaces.ScheduledPosts;
 using Threads.Application.Interfaces.Users;
 using Threads.Application.Interfaces.Likes;
 using Threads.Application.Mapping;
+using Threads.Application.Interfaces.Notifications;
+using Threads.Application.Services.Notifications;
 using Threads.Application.Recommendations;
 using Threads.Application.Services.Auth;
 using Threads.Application.Services.Admin;
@@ -34,6 +36,7 @@ public static class ApplicationServiceConfigurator
     {
         builder.Services.AddDataProtection();
         builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddScoped<INotificationService, NotificationService>();
         builder.Services.AddOptions<RecommendationOptions>()
             .Bind(builder.Configuration.GetSection("Recommendations"))
             .ValidateDataAnnotations()
